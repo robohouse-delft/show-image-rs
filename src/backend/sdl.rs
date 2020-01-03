@@ -31,9 +31,9 @@ pub struct Window {
 impl Context {
 	pub fn new() -> Result<Self, String> {
 		sdl2::hint::set("SDL_NO_SIGNAL_HANDLERS", "1");
-		let context = sdl2::init().map_err(|e| format!("Failed to initialize SDL2: {}", e))?;
-		let video = context.video().map_err(|e| format!("Failed to get SDL2 video subsystem: {}", e))?;
-		let events = context.event_pump().map_err(|e| format!("Failed to get SDL2 event pump: {}", e))?;
+		let context = sdl2::init().map_err(|e| format!("failed to initialize SDL2: {}", e))?;
+		let video = context.video().map_err(|e| format!("failed to get SDL2 video subsystem: {}", e))?;
+		let events = context.event_pump().map_err(|e| format!("failed to get SDL2 event pump: {}", e))?;
 
 		Ok(Self {
 			video,
@@ -51,7 +51,7 @@ impl Context {
 
 		let id = window.id();
 
-		let canvas = window.into_canvas().build().map_err(|e| format!("failed to create canvasr for window {:?}: {}", name, e))?;
+		let canvas = window.into_canvas().build().map_err(|e| format!("failed to create canvas for window {:?}: {}", name, e))?;
 
 		let texture_creator = canvas.texture_creator();
 
@@ -116,7 +116,7 @@ impl Window {
 	pub fn show(&mut self, image: &impl ImageData) -> Result<(), String> {
 		let size = image.data().len();
 		let data = unsafe { std::slice::from_raw_parts_mut(image.data().as_ptr() as *mut u8, size) };
-		let info = image.info().map_err(|e| format!("failed to display imge: {}", e))?;
+		let info = image.info().map_err(|e| format!("failed to display image: {}", e))?;
 
 		let pixel_format = match info.pixel_format {
 			PixelFormat::Bgr8  => PixelFormatEnum::RGB24,
