@@ -17,10 +17,10 @@ fn main() -> Result<(), String> {
 	let image = read_png(&args[1])?;
 
 	let mut show_image = show_image::Context::new()?;
-	let mut window = show_image.window("image")?;
+	let window = show_image.window("image")?;
 	window.show(&image)?;
 
-	let mut window2 = show_image.window("image2")?;
+	let window2 = show_image.window("image2")?;
 	window2.show(&image)?;
 
 	show_image.run()?;

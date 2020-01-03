@@ -12,5 +12,6 @@ keywords = ["image", "visualize", "show", "debug"]
 default = ["image"]
 
 [dependencies]
-sdl2 = { version="0.32.2" }
+sdl2 = "0.32.2"
+keyboard-types = "0.4.4"
 image = { version="0.22.3", optional=true }
