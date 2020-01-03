@@ -1,5 +1,8 @@
-mod sdl;
 mod features;
+mod backend;
+
+pub use backend::Context;
+pub use backend::Window;
 
 pub enum PixelFormat {
 	Rgb8,
@@ -20,6 +23,3 @@ pub trait ImageData {
 	fn data(&self) -> &[u8];
 	fn info(&self) -> Result<ImageInfo, String>;
 }
-
-pub use sdl::Context;
-pub use sdl::Window;
