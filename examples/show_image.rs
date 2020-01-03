@@ -1,8 +1,6 @@
 use image;
 
 use std::path::Path;
-use image::png::PNGDecoder;
-use image::ImageDecoder;
 
 
 fn read_png(path: impl AsRef<Path>) -> Result<image::DynamicImage, String> {

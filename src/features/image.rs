@@ -25,7 +25,7 @@ impl ImageData for DynamicImage {
 	fn info(&self) -> Result<ImageInfo, String> {
 		let (pixel_format, layout) = match self {
 			Self::ImageLuma8(x)  => Ok((PixelFormat::Mono8, x.sample_layout())),
-			Self::ImageLumaA8(x) => Err("8-bit mono with alpha channel is not supported"),
+			Self::ImageLumaA8(_) => Err("8-bit mono with alpha channel is not supported"),
 			Self::ImageRgb8(x)   => Ok((PixelFormat::Rgb8,  x.sample_layout())),
 			Self::ImageRgba8(x)  => Ok((PixelFormat::Rgba8, x.sample_layout())),
 			Self::ImageBgr8(x)   => Ok((PixelFormat::Bgr8,  x.sample_layout())),
