@@ -6,6 +6,7 @@ authors = [
 	"RoboHouse <robohouse@robovalley.com>",
 ]
 edition = "2018"
+keywords = ["image", "visualize", "show", "debug"]
 
 [features]
 default = ["image"]
