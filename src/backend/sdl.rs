@@ -68,6 +68,8 @@ impl Context {
 	}
 
 	pub fn run(&mut self) -> Result<(), String> {
+		let delay = std::time::Duration::from_nanos(1_000_000_000 / 60);
+		let mut next_frame = std::time::Instant::now() + delay;
 		loop {
 			while let Some(event) = self.events.poll_event() {
 				match event {
@@ -89,7 +91,13 @@ impl Context {
 				window.canvas.present();
 			}
 
-			std::thread::sleep(std::time::Duration::from_millis(1000 / 60));
+			let now = std::time::Instant::now();
+			if now < next_frame {
+				std::thread::sleep(next_frame - now);
+				next_frame += delay;
+			} else {
+				next_frame = now.max(next_frame + delay);
+			}
 		}
 	}
 
