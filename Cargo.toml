@@ -11,5 +11,5 @@ edition = "2018"
 default = ["image"]
 
 [dependencies]
-sdl2 = { version="0.32.2", features=["gfx"] }
+sdl2 = { version="0.32.2" }
 image = { version="0.22.3", optional=true }
