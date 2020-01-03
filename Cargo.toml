@@ -1,7 +1,10 @@
 [package]
 name = "show-image"
 version = "0.1.0"
-authors = ["Maarten de Vries <maarten@de-vri.es>"]
+authors = [
+	"Maarten de Vries <maarten@de-vri.es>",
+	"RoboHouse <robohouse@robovalley.com>",
+]
 edition = "2018"
 
 [features]
