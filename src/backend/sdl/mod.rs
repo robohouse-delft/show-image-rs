@@ -9,6 +9,7 @@ use sdl2::surface::Surface;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::mpsc;
+use crate::oneshot;
 
 use crate::ImageData;
 use crate::KeyboardEvent;
