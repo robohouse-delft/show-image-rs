@@ -9,7 +9,7 @@ const NOT_READY     : u8 = 0;
 const FINISHED      : u8 = 1;
 const DISCONNECTED  : u8 = 2;
 
-fn channel<T: Send>() -> (Sender<T>, Receiver<T>) {
+pub fn channel<T: Send>() -> (Sender<T>, Receiver<T>) {
 	let inner =  Arc::new(Inner::new());
 	(Sender::new(inner.clone()), Receiver::new(inner))
 }
@@ -88,14 +88,17 @@ impl<T> Receiver<T> {
 		}
 	}
 
+	#[allow(unused)]
 	pub fn try_recv(&mut self) -> Result<T, TryReceiveError> {
 		self.internal_try_recv(&mut self.inner.mutex.lock().unwrap())
 	}
 
+	#[allow(unused)]
 	pub fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<T, TryReceiveError> {
 		self.recv_deadline(std::time::Instant::now() + timeout)
 	}
 
+	#[allow(unused)]
 	pub fn recv_deadline(&mut self, deadline: std::time::Instant) -> Result<T, TryReceiveError> {
 		let mut lock = self.inner.mutex.lock().unwrap();
 		loop {

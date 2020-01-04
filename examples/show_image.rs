@@ -17,13 +17,18 @@ fn main() -> Result<(), String> {
 	let image = read_png(&args[1])?;
 
 	let mut show_image = show_image::Context::new()?;
-	let window = show_image.window("image")?;
-	window.show(&image)?;
+	let window = show_image.make_window(show_image::WindowOptions {
+		name: "image".into(),
+		size: [800, 600],
+		resizable: true,
+	})?;
+	window.set_image(&image)?;
 
-	let window2 = show_image.window("image2")?;
-	window2.show(&image)?;
+	// let window2 = show_image.window("image2")?;
+	// window2.show(&image)?;
 
-	show_image.run()?;
+	// show_image.run()?;
+	std::thread::sleep(std::time::Duration::from_secs(5));
 
 	Ok(())
 }

@@ -11,6 +11,7 @@ pub use keyboard_types::Modifiers as KeyModifiers;
 
 pub use backend::Context;
 pub use backend::Window;
+pub use backend::WindowOptions;
 
 pub enum PixelFormat {
 	Rgb8,
