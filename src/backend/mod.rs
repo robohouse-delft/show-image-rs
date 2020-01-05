@@ -7,6 +7,9 @@ mod sdl;
 pub use sdl::Context;
 pub use sdl::Window;
 
+/// Get the global context.
+///
+/// If the global context was not yet initialized, this function will initialize it.
 pub fn context() -> Result<&'static Context, &'static str> {
 	unsafe {
 		INIT.call_once(|| {
@@ -24,6 +27,8 @@ pub fn context() -> Result<&'static Context, &'static str> {
 /// Make a window with default options using the global context.
 ///
 /// See [`Context::make_window`] for more details.
+///
+/// If the global context was not yet initialized, this function will initialize it.
 pub fn make_window(name: impl Into<String>) -> Result<Window, String> {
 	context()?.make_window(name)
 }
@@ -31,6 +36,8 @@ pub fn make_window(name: impl Into<String>) -> Result<Window, String> {
 /// Make a window with the given options using the global context.
 ///
 /// See [`Context::make_window_full`] for more details.
+///
+/// If the global context was not yet initialized, this function will initialize it.
 pub fn make_window_full(options: crate::WindowOptions) -> Result<Window, String> {
 	context()?.make_window_full(options)
 }

@@ -32,6 +32,10 @@ const RESULT_TIMEOUT: Duration = Duration::from_millis(500);
 ///
 /// The context runs an event loop in a background thread.
 /// This context can be used to create windows and manage the background thread.
+///
+/// Only one context can be created in total.
+/// Subsequent calls will fail with an error.
+/// This also means you can not use the global context and a manually created context in the same program.
 pub struct Context {
 	/// Channel to send command to the background thread.
 	command_tx: mpsc::SyncSender<ContextCommand>,
