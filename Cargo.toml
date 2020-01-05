@@ -7,6 +7,12 @@ authors = [
 ]
 edition = "2018"
 keywords = ["image", "visualize", "show", "debug"]
+categories = [
+	"development-tools::debugging",
+	"multimedia::images",
+	"visualization",
+	"gui",
+]
 
 [features]
 default = ["image"]
