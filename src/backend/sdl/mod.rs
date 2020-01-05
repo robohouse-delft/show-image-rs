@@ -209,7 +209,7 @@ impl Window {
 	pub fn wait_key_deadline(&self, deadline: Instant) -> Option<KeyboardEvent> {
 		loop {
 			let now = Instant::now();
-			if now <= deadline {
+			if now >= deadline {
 				return None;
 			}
 			let event = match self.events().recv_timeout(deadline - now) {
@@ -341,7 +341,7 @@ impl ContextInner {
 	/// Handle an SDL2 keyboard event.
 	fn handle_sdl_keyboard_event(&mut self, window_id: u32, event: KeyboardEvent) -> Result<(), String> {
 		if let Some(window) = self.windows.iter().find(|x| x.id == window_id) {
-			// Ignore errors, it likely means the receiver isn't handling events.
+			// Ignore errors, it means the receiver isn't handling events.
 			let _ = window.event_tx.try_send(event);
 		}
 		Ok(())
