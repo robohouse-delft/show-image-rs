@@ -42,8 +42,11 @@ pub struct Context {
 ///
 /// If the handle is dropped, the window is closed.
 pub struct Window {
+	/// The window ID.
+	id: u32,
+
 	/// Channel to send commands to the background thread.
-	command_tx: mpsc::SyncSender<WindowCommand>,
+	command_tx: mpsc::SyncSender<ContextCommand>,
 
 	/// Channel to receive events from the background thread.
 	event_rx: mpsc::Receiver<KeyboardEvent>,
@@ -52,16 +55,13 @@ pub struct Window {
 /// Commands that can be sent to the context in the background thread.
 enum ContextCommand {
 	/// Create a window with the given options.
-	CreateWindow(WindowOptions, oneshot::Sender<Result<Window, String>>),
-}
+	CreateWindow(WindowOptions, mpsc::SyncSender<ContextCommand>, oneshot::Sender<Result<Window, String>>),
 
-/// Command that can be sent to a specific window in the background thread.
-enum WindowCommand {
+	/// Destroy a window.
+	DestroyWindow(u32, oneshot::Sender<Result<(), String>>),
+
 	/// Set the image of the window.
-	SetImage(Box<[u8]>, ImageInfo, oneshot::Sender<Result<(), String>>),
-
-	/// Close the window.
-	Close(oneshot::Sender<()>),
+	SetImage(u32, Box<[u8]>, ImageInfo, oneshot::Sender<Result<(), String>>),
 }
 
 /// Inner context doing the real work in the background thread.
@@ -93,9 +93,6 @@ struct WindowInner {
 	/// A texture representing the current image to be drawn.
 	texture: Option<(Texture<'static>, sdl2::rect::Rect)>,
 
-	/// Channel to receive commands.
-	command_rx: mpsc::Receiver<WindowCommand>,
-
 	/// Channel to send keyboard events.
 	event_tx: mpsc::SyncSender<KeyboardEvent>,
 }
@@ -120,7 +117,7 @@ impl Context {
 	/// Create a new window with the given options.
 	pub fn make_window(&mut self, options: WindowOptions) -> Result<Window, String> {
 		let (result_tx, result_rx) = oneshot::channel();
-		self.command_tx.send(ContextCommand::CreateWindow(options, result_tx))
+		self.command_tx.send(ContextCommand::CreateWindow(options, self.command_tx.clone(), result_tx))
 			.map_err(|e| format!("failed to send command to context thread: {}", e))?;
 		result_rx.recv().map_err(|e| format!("context thread did not create a window: {}", e))?
 	}
@@ -145,7 +142,7 @@ impl Window {
 		let info = image.info().map_err(|e| format!("failed to display image: {}", e))?;
 
 		let (result_tx, mut result_rx) = oneshot::channel();
-		self.command_tx.send(WindowCommand::SetImage(data, info, result_tx)).unwrap();
+		self.command_tx.send(ContextCommand::SetImage(self.id, data, info, result_tx)).unwrap();
 		result_rx.recv_timeout(Duration::from_millis(100))
 			.map_err(|e| format!("failed to set image: {}", e))?
 			.map_err(|e| format!("failed to set image: {}", e))
@@ -194,10 +191,9 @@ impl Window {
 	/// Close the window without dropping the handle.
 	pub fn close_impl(&mut self) -> Result<(), String> {
 		let (result_tx, result_rx) = oneshot::channel();
-		self.command_tx.send(WindowCommand::Close(result_tx))
+		self.command_tx.send(ContextCommand::DestroyWindow(self.id, result_tx))
 			.map_err(|e| format!("failed to send command to window: {}", e))?;
-		result_rx.recv().map_err(|e| format!("error receiving response from window: {}", e))?;
-		Ok(())
+		result_rx.recv().map_err(|e| format!("error receiving response from window: {}", e))?
 	}
 }
 
@@ -253,11 +249,6 @@ impl ContextInner {
 		// Handle all queued commands for the context.
 		self.poll_commands();
 
-		// Handle all queued window commandsn.
-		for window in &mut self.windows {
-			window.poll_commands()?;
-		}
-
 		// Loop over all windows.
 		for window in &mut self.windows {
 			// Always clear the whole window, to avoid artefacts.
@@ -301,7 +292,7 @@ impl ContextInner {
 	fn handle_sdl_window_event(&mut self, window_id: u32, event: WindowEvent) -> Result<(), String> {
 		match event {
 			WindowEvent::Close => {
-				self.find_window_mut(window_id).map(|x| x.close());
+				self.destroy_window(window_id)?;
 			},
 			_ => (),
 		}
@@ -318,8 +309,9 @@ impl ContextInner {
 	}
 
 	/// Find a created window by ID.
-	fn find_window_mut(&mut self, id: u32) -> Option<&mut WindowInner> {
+	fn find_window_mut(&mut self, id: u32) -> Result<&mut WindowInner, String> {
 		self.windows.iter_mut().find(|x| x.id == id)
+			.ok_or_else(|| format!("failed to find window with ID {}", id))
 	}
 
 	/// Handle all queued commands.
@@ -332,14 +324,21 @@ impl ContextInner {
 	/// Handle a single command.
 	fn handle_command(&mut self, command: ContextCommand) {
 		match command {
-			ContextCommand::CreateWindow(options, channel) => {
-				channel.send(self.make_window(options));
+			ContextCommand::CreateWindow(options, command_tx, result_tx) => {
+				result_tx.send(self.make_window(options, command_tx));
 			},
+			ContextCommand::DestroyWindow(id, result_tx) => {
+				result_tx.send(self.destroy_window(id));
+			}
+			ContextCommand::SetImage(id, data, info, result_tx) => {
+				let result = self.find_window_mut(id).and_then(|window| window.set_image(data, info));
+				result_tx.send(result);
+			}
 		}
 	}
 
 	/// Create a new window.
-	fn make_window(&mut self, options: WindowOptions) -> Result<Window, String> {
+	fn make_window(&mut self, options: WindowOptions, command_tx: mpsc::SyncSender<ContextCommand>) -> Result<Window, String> {
 		let window = self.video.window(&options.name, options.size[0], options.size[1])
 			.borderless()
 			.resizable()
@@ -349,7 +348,6 @@ impl ContextInner {
 		let id = window.id();
 		let canvas = window.into_canvas().build().map_err(|e| format!("failed to create canvas for window {:?}: {}", options.name, e))?;
 		let texture_creator = canvas.texture_creator();
-		let (command_tx, command_rx) = mpsc::sync_channel(10);
 		let (event_tx, event_rx) = mpsc::sync_channel(10);
 
 		let inner = WindowInner {
@@ -357,44 +355,25 @@ impl ContextInner {
 			canvas,
 			texture_creator,
 			texture: None,
-			command_rx,
 			event_tx,
 		};
 
 		self.windows.push(inner);
 
-		Ok(Window { command_tx, event_rx })
+		Ok(Window { id, command_tx, event_rx })
+	}
+
+	/// Destroy a window by ID.
+	fn destroy_window(&mut self, id: u32) -> Result<(), String> {
+		let index = self.windows.iter().position(|x| x.id == id)
+			.ok_or_else(|| format!("failed to find window with ID {}", id))?;
+		let mut window = self.windows.remove(index);
+		window.close();
+		Ok(())
 	}
 }
 
 impl WindowInner {
-	/// Handle all queued commands.
-	fn poll_commands(&mut self) -> Result<(), String> {
-		loop {
-			match self.command_rx.try_recv() {
-				Ok(x) => self.handle_command(x),
-				Err(mpsc::TryRecvError::Empty) => return Ok(()),
-				Err(mpsc::TryRecvError::Disconnected) => {
-					self.close();
-					return Ok(());
-				}
-			}
-		}
-	}
-
-	/// Handle a single command.
-	fn handle_command(&mut self, command: WindowCommand) {
-		match command {
-			WindowCommand::SetImage(data, info, result_tx) => {
-				result_tx.send(self.set_image(data, info));
-			},
-			WindowCommand::Close(result_tx) => {
-				self.close();
-				result_tx.send(());
-			},
-		}
-	}
-
 	/// Set the displayed image.
 	fn set_image(&mut self, mut data: Box<[u8]>, info: ImageInfo) -> Result<(), String> {
 		let pixel_format = match info.pixel_format {
