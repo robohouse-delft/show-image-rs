@@ -7,61 +7,103 @@ use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 
 use std::sync::mpsc;
-use crate::oneshot;
+use std::time::Duration;
+use std::time::Instant;
 
 use crate::ImageData;
 use crate::ImageInfo;
+use crate::KeyState;
 use crate::KeyboardEvent;
 use crate::PixelFormat;
-use crate::KeyState;
+use crate::WindowOptions;
+use crate::oneshot;
 
 mod key_code;
 mod key_location;
 mod modifiers;
 mod scan_code;
 
+/// A context for creating windows.
+///
+/// The context runs an event loop in a background thread.
+/// This context can be used to create windows and manage the background thread.
 pub struct Context {
+	/// Channel to send command to the background thread.
 	command_tx: mpsc::SyncSender<ContextCommand>,
-	thread: std::thread::JoinHandle<Result<(), String>>,
+
+	/// Join handle for the background thread.
+	_thread: std::thread::JoinHandle<Result<(), String>>,
 }
 
+/// A window capable of displaying images.
+///
+/// The handle can be used to set the displayed image,
+/// handle key events and to close the window.
+///
+/// If the handle is dropped, the window is closed.
 pub struct Window {
+	/// Channel to send commands to the background thread.
 	command_tx: mpsc::SyncSender<WindowCommand>,
+
+	/// Channel to receive events from the background thread.
 	event_rx: mpsc::Receiver<KeyboardEvent>,
 }
 
-pub struct WindowOptions {
-	pub name: String,
-	pub size: [u32; 2],
-	pub resizable: bool,
-}
-
+/// Commands that can be sent to the context in the background thread.
 enum ContextCommand {
+	/// Create a window with the given options.
 	CreateWindow(WindowOptions, oneshot::Sender<Result<Window, String>>),
 }
 
+/// Command that can be sent to a specific window in the background thread.
 enum WindowCommand {
-	SetImage(Box<[u8]>, ImageInfo),
+	/// Set the image of the window.
+	SetImage(Box<[u8]>, ImageInfo, oneshot::Sender<Result<(), String>>),
+
+	/// Close the window.
 	Close(oneshot::Sender<()>),
 }
 
+/// Inner context doing the real work in the background thread.
 struct ContextInner {
+	/// SDL2 video subsystem to create windows with.
 	video: sdl2::VideoSubsystem,
+
+	/// SDL2 event pump to handle events with.
 	events: sdl2::EventPump,
+
+	/// List of created windows.
 	windows: Vec<WindowInner>,
+
+	/// Channel to receive commands.
 	command_rx: mpsc::Receiver<ContextCommand>,
 }
 
+/// Inner window doing the real work in the background thread.
 struct WindowInner {
+	/// The window ID, used to look up the window in the vector.
 	id: u32,
+
+	/// The canvas to draw the image on.
 	canvas: Canvas<sdl2::video::Window>,
+
+	/// A texture creator for the window.
 	texture_creator: TextureCreator<sdl2::video::WindowContext>,
+
+	/// A texture representing the current image to be drawn.
 	texture: Option<(Texture<'static>, sdl2::rect::Rect)>,
+
+	/// Channel to receive commands.
 	command_rx: mpsc::Receiver<WindowCommand>,
+
+	/// Channel to send keyboard events.
 	event_tx: mpsc::SyncSender<KeyboardEvent>,
 }
 
 impl Context {
+	/// Create a new context.
+	///
+	/// The context will spawn a background thread immediately.
 	pub fn new() -> Result<Self, String> {
 		let (command_tx, command_rx) = mpsc::sync_channel(10);
 		let thread = std::thread::spawn(move || {
@@ -71,10 +113,11 @@ impl Context {
 
 		Ok(Context {
 			command_tx,
-			thread,
+			_thread: thread,
 		})
 	}
 
+	/// Create a new window with the given options.
 	pub fn make_window(&mut self, options: WindowOptions) -> Result<Window, String> {
 		let (result_tx, result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::CreateWindow(options, result_tx))
@@ -82,8 +125,86 @@ impl Context {
 		result_rx.recv().map_err(|e| format!("context thread did not create a window: {}", e))?
 	}
 
-	pub fn join(self) -> Result<(), String> {
-		self.thread.join().map_err(|e| format!("failed to join context thread: {:?}", e))?
+	// /// Create a new window with the default options.
+	// pub fn make_window_defaults(&mut self, name: String) -> Result<Window, String> {
+	// 	let options = WindowOptions { name, ..Default::default() };
+	// 	self.make_window(options)
+	// }
+
+	// /// Close all windows, stop and join the background thread.
+	// pub fn close(self) -> Result<(), String> {
+	// 	// TODO: close all windows.
+	// 	self.thread.join().map_err(|e| format!("failed to join context thread: {:?}", e))?
+	// }
+}
+
+impl Window {
+	/// Set the image to de displayed by the window.
+	pub fn set_image(&self, image: &impl ImageData) -> Result<(), String> {
+		let data = Box::from(image.data());
+		let info = image.info().map_err(|e| format!("failed to display image: {}", e))?;
+
+		let (result_tx, mut result_rx) = oneshot::channel();
+		self.command_tx.send(WindowCommand::SetImage(data, info, result_tx)).unwrap();
+		result_rx.recv_timeout(Duration::from_millis(100))
+			.map_err(|e| format!("failed to set image: {}", e))?
+			.map_err(|e| format!("failed to set image: {}", e))
+	}
+
+	/// Close the window.
+	///
+	/// The window is automatically closed if the handle is dropped,
+	/// but this function allows you to handle errors that may occur.
+	pub fn close(mut self) -> Result<(), String> {
+		self.close_impl()
+	}
+
+	/// Get the receiver for keyboard events.
+	pub fn events(&self) -> &mpsc::Receiver<KeyboardEvent> {
+		&self.event_rx
+	}
+
+	/// Wait for a key-down event with a timeout.
+	///
+	/// This function discards all key-up events, blocking until a key is pressed or the timeout occured.
+	pub fn wait_key(&self, timeout: Duration) -> Option<KeyboardEvent> {
+		self.wait_key_deadline(Instant::now() + timeout)
+	}
+
+	/// Wait for a key-down event with a dealine.
+	///
+	/// This function discards all key-up events, blocking until a key is pressed or the deadline passes.
+	pub fn wait_key_deadline(&self, deadline: Instant) -> Option<KeyboardEvent> {
+		loop {
+			let now = Instant::now();
+			if now <= deadline {
+				return None;
+			}
+			let event = match self.events().recv_timeout(deadline - now) {
+				Ok(x) => x,
+				Err(_) => return None,
+			};
+
+			if event.state == KeyState::Down {
+				return Some(event)
+			}
+		}
+	}
+
+	/// Close the window without dropping the handle.
+	pub fn close_impl(&mut self) -> Result<(), String> {
+		let (result_tx, result_rx) = oneshot::channel();
+		self.command_tx.send(WindowCommand::Close(result_tx))
+			.map_err(|e| format!("failed to send command to window: {}", e))?;
+		result_rx.recv().map_err(|e| format!("error receiving response from window: {}", e))?;
+		Ok(())
+	}
+}
+
+/// Close the window when the handle is dropped.
+impl Drop for Window {
+	fn drop(&mut self) {
+		let _ = self.close_impl();
 	}
 }
 
@@ -103,15 +224,16 @@ impl ContextInner {
 		})
 	}
 
-	pub fn run(&mut self) -> Result<(), String> {
-		let delay = std::time::Duration::from_nanos(1_000_000_000 / 60);
-		let mut next_frame = std::time::Instant::now() + delay;
+	/// Run the event loop.
+	fn run(&mut self) -> Result<(), String> {
+		let delay = Duration::from_nanos(1_000_000_000 / 60);
+		let mut next_frame = Instant::now() + delay;
 
 		loop {
 			self.run_one()?;
 
 			// Sleep till the next scheduled frame.
-			let now = std::time::Instant::now();
+			let now = Instant::now();
 			if now < next_frame {
 				std::thread::sleep(next_frame - now);
 				next_frame += delay;
@@ -121,6 +243,7 @@ impl ContextInner {
 		}
 	}
 
+	/// Run one iteration of the event loop.
 	fn run_one(&mut self) -> Result<(), String> {
 		// Handle all queued SDL events.
 		while let Some(event) = self.events.poll_event() {
@@ -156,22 +279,25 @@ impl ContextInner {
 		Ok(())
 	}
 
+	/// Handle an SDL2 event.
 	fn handle_sdl_event(&mut self, event: Event) -> Result<(), String> {
 		match event {
 			Event::Window { window_id, win_event, .. } => {
 				self.handle_sdl_window_event(window_id, win_event)
 			},
 			Event::KeyDown { window_id, keycode, scancode, keymod, repeat, .. } => {
-				self.handle_sdl_key_event(window_id, convert_key_event(KeyState::Down, keycode, scancode, keymod, repeat))
+				let event = convert_keyboard_event(KeyState::Down, keycode, scancode, keymod, repeat);
+				self.handle_sdl_keyboard_event(window_id, event)
 			},
 			Event::KeyUp { window_id, keycode, scancode, keymod, repeat, .. } => {
-				self.handle_sdl_key_event(window_id, convert_key_event(KeyState::Up, keycode, scancode, keymod, repeat))
+				let event = convert_keyboard_event(KeyState::Up, keycode, scancode, keymod, repeat);
+				self.handle_sdl_keyboard_event(window_id, event)
 			},
 			_ => Ok(()),
 		}
-
 	}
 
+	/// Handle an SDL2 window event.
 	fn handle_sdl_window_event(&mut self, window_id: u32, event: WindowEvent) -> Result<(), String> {
 		match event {
 			WindowEvent::Close => {
@@ -182,7 +308,8 @@ impl ContextInner {
 		Ok(())
 	}
 
-	fn handle_sdl_key_event(&mut self, window_id: u32, event: KeyboardEvent) -> Result<(), String> {
+	/// Handle an SDL2 keyboard event.
+	fn handle_sdl_keyboard_event(&mut self, window_id: u32, event: KeyboardEvent) -> Result<(), String> {
 		if let Some(window) = self.windows.iter().find(|x| x.id == window_id) {
 			// Ignore errors, it likely means the receiver isn't handling events.
 			let _ = window.event_tx.try_send(event);
@@ -190,16 +317,19 @@ impl ContextInner {
 		Ok(())
 	}
 
+	/// Find a created window by ID.
 	fn find_window_mut(&mut self, id: u32) -> Option<&mut WindowInner> {
 		self.windows.iter_mut().find(|x| x.id == id)
 	}
 
+	/// Handle all queued commands.
 	fn poll_commands(&mut self) {
 		while let Ok(command) = self.command_rx.try_recv() {
 			self.handle_command(command);
 		}
 	}
 
+	/// Handle a single command.
 	fn handle_command(&mut self, command: ContextCommand) {
 		match command {
 			ContextCommand::CreateWindow(options, channel) => {
@@ -238,10 +368,11 @@ impl ContextInner {
 }
 
 impl WindowInner {
+	/// Handle all queued commands.
 	fn poll_commands(&mut self) -> Result<(), String> {
 		loop {
 			match self.command_rx.try_recv() {
-				Ok(x) => self.handle_command(x)?,
+				Ok(x) => self.handle_command(x),
 				Err(mpsc::TryRecvError::Empty) => return Ok(()),
 				Err(mpsc::TryRecvError::Disconnected) => {
 					self.close();
@@ -251,24 +382,27 @@ impl WindowInner {
 		}
 	}
 
-	fn handle_command(&mut self, command: WindowCommand) -> Result<(), String> {
+	/// Handle a single command.
+	fn handle_command(&mut self, command: WindowCommand) {
 		match command {
-			WindowCommand::SetImage(data, info) => self.set_image(data, info),
+			WindowCommand::SetImage(data, info, result_tx) => {
+				result_tx.send(self.set_image(data, info));
+			},
 			WindowCommand::Close(result_tx) => {
 				self.close();
 				result_tx.send(());
-				Ok(())
 			},
 		}
 	}
 
+	/// Set the displayed image.
 	fn set_image(&mut self, mut data: Box<[u8]>, info: ImageInfo) -> Result<(), String> {
 		let pixel_format = match info.pixel_format {
 			PixelFormat::Bgr8  => PixelFormatEnum::RGB24,
 			PixelFormat::Rgba8 => PixelFormatEnum::RGBA32,
 			PixelFormat::Rgb8  => PixelFormatEnum::BGR24,
 			PixelFormat::Bgra8 => PixelFormatEnum::BGRA32,
-			PixelFormat::Mono8 => unimplemented!(),
+			PixelFormat::Mono8 => return Err(String::from("8-bit mono images are not yet supported")),
 		};
 
 		let surface = Surface::from_data(&mut data, info.width as u32, info.height as u32, info.row_stride as u32, pixel_format)
@@ -283,78 +417,14 @@ impl WindowInner {
 		Ok(())
 	}
 
+	/// Close the window.
 	fn close(&mut self) {
 		self.canvas.window_mut().hide();
 	}
 }
 
-impl Window {
-	pub fn set_image(&self, image: &impl ImageData) -> Result<(), String> {
-		let data = Box::from(image.data());
-		let info = image.info().map_err(|e| format!("failed to display image: {}", e))?;
-		self.command_tx.send(WindowCommand::SetImage(data, info)).unwrap();
-		Ok(())
-	}
-
-	pub fn close(&self) -> Result<(), String> {
-		let (result_tx, result_rx) = oneshot::channel();
-		self.command_tx.send(WindowCommand::Close(result_tx))
-			.map_err(|e| format!("failed to send command to window: {}", e))?;
-		result_rx.recv().map_err(|e| format!("error receiving response from window: {}", e))?;
-		Ok(())
-	}
-
-	/// Get the receiver for keyboard events.
-	pub fn events(&self) -> &mpsc::Receiver<KeyboardEvent> {
-		&self.event_rx
-	}
-
-	/// Wait for a key down event with a timeout.
-	///
-	/// This function discards all key-up events, blocking until a key had been pressed,
-	/// or the timeout occured.
-	pub fn wait_key(&self, timeout: std::time::Duration) -> Option<KeyboardEvent> {
-		let deadline = std::time::Instant::now() + timeout;
-		loop {
-			let now = std::time::Instant::now();
-			if now <= deadline {
-				return None;
-			}
-			let event = match self.events().recv_timeout(deadline - now) {
-				Ok(x) => x,
-				Err(_) => return None,
-			};
-
-			if event.state == KeyState::Down {
-				return Some(event)
-			}
-		}
-	}
-
-	/// Wait for a key down event with a dealine.
-	///
-	/// This function discards all key-up events, blocking until a key had been pressed,
-	/// or the deadline passes.
-	pub fn wait_key_deadline(&self, deadline: std::time::Instant) -> Option<KeyboardEvent> {
-		loop {
-			let now = std::time::Instant::now();
-			if now <= deadline {
-				return None;
-			}
-			let event = match self.events().recv_timeout(deadline - now) {
-				Ok(x) => x,
-				Err(_) => return None,
-			};
-
-			if event.state == KeyState::Down {
-				return Some(event)
-			}
-		}
-	}
-}
-
-/// Convert an SDL key event to the more generic KeyboardEvent.
-fn convert_key_event(
+/// Convert an SDL2 keyboard event to the more generic KeyboardEvent.
+fn convert_keyboard_event(
 	state: KeyState,
 	key_code: Option<sdl2::keyboard::Keycode>,
 	scan_code: Option<sdl2::keyboard::Scancode>,

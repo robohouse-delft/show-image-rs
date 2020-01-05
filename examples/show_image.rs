@@ -21,6 +21,7 @@ fn main() -> Result<(), String> {
 		name: "image".into(),
 		size: [800, 600],
 		resizable: true,
+		preserve_aspect_ratio: true,
 	})?;
 	window.set_image(&image)?;
 
