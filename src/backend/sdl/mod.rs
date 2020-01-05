@@ -150,8 +150,8 @@ impl Context {
 	}
 
 	/// Create a new window with the default options.
-	pub fn make_window_defaults(&self, name: String) -> Result<Window, String> {
-		let options = WindowOptions { name, ..Default::default() };
+	pub fn make_window_defaults(&self, name: impl Into<String>) -> Result<Window, String> {
+		let options = WindowOptions { name: name.into(), ..Default::default() };
 		self.make_window(options)
 	}
 

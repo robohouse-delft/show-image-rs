@@ -9,8 +9,7 @@ pub use keyboard_types::KeyboardEvent;
 pub use keyboard_types::Location as KeyLocation;
 pub use keyboard_types::Modifiers as KeyModifiers;
 
-pub use backend::Context;
-pub use backend::Window;
+pub use backend::*;
 
 /// Error that can occur while waiting for a key press.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
