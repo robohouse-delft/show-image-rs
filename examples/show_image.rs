@@ -25,11 +25,14 @@ fn main() -> Result<(), String> {
 	})?;
 	window.set_image(&image)?;
 
-	// let window2 = show_image.window("image2")?;
-	// window2.show(&image)?;
-
-	// show_image.run()?;
-	std::thread::sleep(std::time::Duration::from_secs(5));
+	loop {
+		if let Some(event) = window.wait_key(std::time::Duration::from_millis(100)) {
+			println!("{:#?}", event);
+			if event.key == show_image::KeyCode::Escape {
+				break;
+			}
+		}
+	}
 
 	Ok(())
 }
