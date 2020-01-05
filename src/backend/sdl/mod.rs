@@ -141,18 +141,18 @@ impl Context {
 		}
 	}
 
+	/// Create a new window with default options.
+	pub fn make_window(&self, name: impl Into<String>) -> Result<Window, String> {
+		let options = WindowOptions { name: name.into(), ..Default::default() };
+		self.make_window_full(options)
+	}
+
 	/// Create a new window with the given options.
-	pub fn make_window(&self, options: WindowOptions) -> Result<Window, String> {
+	pub fn make_window_full(&self, options: WindowOptions) -> Result<Window, String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::CreateWindow(options, self.command_tx.clone(), result_tx))
 			.map_err(|e| format!("failed to send command to context thread: {}", e))?;
 		result_rx.recv_timeout(RESULT_TIMEOUT).map_err(|e| format!("failed to receive result from context thread: {}", e))?
-	}
-
-	/// Create a new window with the default options.
-	pub fn make_window_defaults(&self, name: impl Into<String>) -> Result<Window, String> {
-		let options = WindowOptions { name: name.into(), ..Default::default() };
-		self.make_window(options)
 	}
 
 	/// Close all windows and stop the background thread.

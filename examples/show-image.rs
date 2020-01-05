@@ -1,5 +1,5 @@
 use image;
-use show_image::make_window_defaults;
+use show_image::make_window;
 
 use std::path::Path;
 
@@ -17,7 +17,7 @@ fn main() -> Result<(), String> {
 
 	let image = read_png(&args[1])?;
 
-	let window = make_window_defaults("image")?;
+	let window = make_window("image")?;
 	window.set_image(&image)?;
 
 	while let Ok(event) = window.wait_key(std::time::Duration::from_millis(100)) {
