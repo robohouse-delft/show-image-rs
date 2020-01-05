@@ -1,6 +1,7 @@
 use sdl2::event::Event;
 use sdl2::event::WindowEvent;
 use sdl2::pixels::PixelFormatEnum;
+use sdl2::rect::Rect;
 use sdl2::render::Canvas;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
@@ -104,10 +105,13 @@ struct WindowInner {
 	texture_creator: TextureCreator<sdl2::video::WindowContext>,
 
 	/// A texture representing the current image to be drawn.
-	texture: Option<(Texture<'static>, sdl2::rect::Rect)>,
+	texture: Option<(Texture<'static>, Rect)>,
 
 	/// Channel to send keyboard events.
 	event_tx: mpsc::SyncSender<KeyboardEvent>,
+
+	/// If true, preserve aspect ratio when scaling image.
+	preserve_aspect_ratio: bool,
 }
 
 impl Context {
@@ -307,20 +311,7 @@ impl ContextInner {
 
 		// Loop over all windows.
 		for window in &mut self.windows {
-			// Always clear the whole window, to avoid artefacts.
-			window.canvas.clear();
-
-			// Redraw the image, if any.
-			let texture = window.texture.take();
-			if let Some((texture, image_size)) = texture {
-				let viewport = window.canvas.viewport();
-				window.canvas.copy(&texture, image_size.clone(), viewport)
-					.map_err(|e| format!("failed to copy data to window: {}", e))?;
-				window.texture = Some((texture, image_size));
-				window.canvas.window_mut().show();
-			}
-
-			window.canvas.present();
+			window.draw()?;
 		}
 
 		Ok(())
@@ -362,12 +353,6 @@ impl ContextInner {
 			let _ = window.event_tx.try_send(event);
 		}
 		Ok(())
-	}
-
-	/// Find a created window by ID.
-	fn find_window_mut(&mut self, id: u32) -> Result<&mut WindowInner, String> {
-		self.windows.iter_mut().find(|x| x.id == id)
-			.ok_or_else(|| format!("failed to find window with ID {}", id))
 	}
 
 	/// Handle all queued commands.
@@ -419,6 +404,7 @@ impl ContextInner {
 			texture_creator,
 			texture: None,
 			event_tx,
+			preserve_aspect_ratio: options.preserve_aspect_ratio,
 		};
 
 		self.windows.push(inner);
@@ -463,6 +449,28 @@ impl WindowInner {
 		Ok(())
 	}
 
+	/// Draw the contents of the window.
+	fn draw(&mut self) -> Result<(), String> {
+		// Always clear the whole window, to avoid artefacts.
+		self.canvas.clear();
+
+		// Redraw the image, if any.
+		if let Some((texture, image_size)) = &self.texture {
+			let rect = if self.preserve_aspect_ratio {
+				compute_target_rect_with_aspect_ratio(image_size, &self.canvas.viewport())
+			} else {
+				self.canvas.viewport()
+			};
+
+			self.canvas.copy(&texture, image_size.clone(), rect)
+				.map_err(|e| format!("failed to copy data to self: {}", e))?;
+			self.canvas.window_mut().show();
+		}
+
+		self.canvas.present();
+		Ok(())
+	}
+
 	/// Close the window.
 	fn close(&mut self) {
 		self.canvas.window_mut().hide();
@@ -485,5 +493,25 @@ fn convert_keyboard_event(
 		modifiers: modifiers::convert_modifiers(modifiers),
 		repeat,
 		is_composing: false,
+	}
+}
+
+fn compute_target_rect_with_aspect_ratio(source: &Rect, canvas: &Rect) -> Rect {
+	let source_w = f64::from(source.width());
+	let source_h = f64::from(source.height());
+	let canvas_w = f64::from(canvas.width());
+	let canvas_h = f64::from(canvas.height());
+
+	let scale_w = canvas_w / source_w;
+	let scale_h = canvas_h / source_h;
+
+	if scale_w < scale_h {
+		let new_height = (source_h * scale_w).round() as u32;
+		let top = (canvas.height() - new_height) / 2;
+		Rect::new(canvas.x(), canvas.y() + top as i32, canvas.width(), new_height)
+	} else {
+		let new_width = (source_w * scale_h).round() as u32;
+		let left = (canvas.width() - new_width) / 2;
+		Rect::new(canvas.x() + left as i32, canvas.y(), new_width, canvas.height())
 	}
 }
