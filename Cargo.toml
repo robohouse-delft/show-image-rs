@@ -3,11 +3,14 @@ name = "show-image"
 version = "0.1.0"
 license = "BSD-2-Clause"
 description = "quickly show images in a window for debugging"
+edition = "2018"
+repository = "https://github.com/robohouse-delft/show-image/"
+
 authors = [
 	"Maarten de Vries <maarten@de-vri.es>",
 	"RoboHouse <robohouse@robovalley.com>",
 ]
-edition = "2018"
+
 keywords = ["image", "visualize", "show", "debug"]
 categories = [
 	"development-tools::debugging",
