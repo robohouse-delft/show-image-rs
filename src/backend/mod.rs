@@ -23,14 +23,14 @@ pub fn context() -> Result<&'static Context, &'static str> {
 
 /// Make a window with default options using the global context.
 ///
-/// See [`Window::make_window`] for more details.
+/// See [`Context::make_window`] for more details.
 pub fn make_window(name: impl Into<String>) -> Result<Window, String> {
 	context()?.make_window(name)
 }
 
 /// Make a window with the given options using the global context.
 ///
-/// See [`Window::make_window_full`] for more details.
+/// See [`Context::make_window_full`] for more details.
 pub fn make_window_full(options: crate::WindowOptions) -> Result<Window, String> {
 	context()?.make_window_full(options)
 }

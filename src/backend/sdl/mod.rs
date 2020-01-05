@@ -160,7 +160,7 @@ impl Context {
 	/// The background thread will stop as soon as possible,
 	/// but it may still be running when this function returns.
 	///
-	/// Use [`Self::join`] to join the background thread if desired.
+	/// Use [`Context::join`] to join the background thread if desired.
 	pub fn stop(&self) -> Result<(), String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::Stop(result_tx))
@@ -173,7 +173,7 @@ impl Context {
 	/// This function also returns any possible error that occured in the background thread.
 	///
 	/// Note that the background thread will only terminate if an error occurs
-	/// or if [`Self::stop`] is called.
+	/// or if [`Context::stop`] is called.
 	pub fn join(self) -> Result<(), String> {
 		self.thread.join().map_err(|e| format!("failed to join context thread: {:?}", e))?
 	}
