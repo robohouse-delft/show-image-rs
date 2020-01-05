@@ -348,7 +348,6 @@ impl ContextInner {
 	fn handle_sdl_window_event(&mut self, window_id: u32, event: WindowEvent) -> Result<(), String> {
 		match event {
 			WindowEvent::Close => {
-				// TODO: Or just hide the window?
 				self.destroy_window(window_id)?;
 			},
 			_ => (),
