@@ -110,16 +110,26 @@ impl Context {
 	///
 	/// The context will spawn a background thread immediately.
 	pub fn new() -> Result<Self, String> {
+		let (result_tx, mut result_rx) = oneshot::channel();
 		let (command_tx, command_rx) = mpsc::sync_channel(10);
 		let thread = std::thread::spawn(move || {
-			let mut context = ContextInner::new(command_rx)?;
-			context.run()
+			match ContextInner::new(command_rx) {
+				Err(e) => {
+					result_tx.send(Err(e));
+					Ok(())
+				},
+				Ok(mut context) => {
+					result_tx.send(Ok(()));
+					context.run()
+				}
+			}
 		});
 
-		Ok(Context {
-			command_tx,
-			thread,
-		})
+		match result_rx.recv_timeout(Duration::from_millis(1500)) {
+			Err(e) => Err(format!("failed to receive result from context thread: {}", e)),
+			Ok(Err(e)) => Err(e),
+			Ok(Ok(())) => Ok(Context { command_tx, thread })
+		}
 	}
 
 	/// Create a new window with the given options.
