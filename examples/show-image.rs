@@ -16,7 +16,7 @@ fn main() -> Result<(), String> {
 
 	let image = read_png(&args[1])?;
 
-	let mut show_image = show_image::Context::new()?;
+	let show_image = show_image::Context::new()?;
 	let window = show_image.make_window(show_image::WindowOptions {
 		name: "image".into(),
 		size: [800, 600],
@@ -25,8 +25,8 @@ fn main() -> Result<(), String> {
 	})?;
 	window.set_image(&image)?;
 
-	loop {
-		if let Some(event) = window.wait_key(std::time::Duration::from_millis(100)) {
+	while let Ok(event) = window.wait_key(std::time::Duration::from_millis(100)) {
+		if let Some(event) = event {
 			println!("{:#?}", event);
 			if event.key == show_image::KeyCode::Escape {
 				break;

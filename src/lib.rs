@@ -12,6 +12,16 @@ pub use keyboard_types::Modifiers as KeyModifiers;
 pub use backend::Context;
 pub use backend::Window;
 
+/// Error that can occur while waiting for a key press.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum WaitKeyError {
+	/// The window is closed.
+	///
+	/// No further key events will happen,
+	/// and any loop waiting for keys should terminate.
+	WindowClosed,
+}
+
 /// Supported pixel formats.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum PixelFormat {
@@ -74,6 +84,16 @@ pub struct WindowOptions {
 
 	/// Preserve the aspact ratio
 	pub preserve_aspect_ratio: bool,
+}
+
+impl std::error::Error for WaitKeyError {}
+
+impl std::fmt::Display for WaitKeyError {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			WaitKeyError::WindowClosed => write!(f, "window closed"),
+		}
+	}
 }
 
 impl Default for WindowOptions {

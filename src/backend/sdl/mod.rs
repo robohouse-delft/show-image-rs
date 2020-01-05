@@ -15,6 +15,7 @@ use crate::ImageInfo;
 use crate::KeyState;
 use crate::KeyboardEvent;
 use crate::PixelFormat;
+use crate::WaitKeyError;
 use crate::WindowOptions;
 use crate::oneshot;
 
@@ -133,7 +134,7 @@ impl Context {
 	}
 
 	/// Create a new window with the given options.
-	pub fn make_window(&mut self, options: WindowOptions) -> Result<Window, String> {
+	pub fn make_window(&self, options: WindowOptions) -> Result<Window, String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::CreateWindow(options, self.command_tx.clone(), result_tx))
 			.map_err(|e| format!("failed to send command to context thread: {}", e))?;
@@ -141,7 +142,7 @@ impl Context {
 	}
 
 	/// Create a new window with the default options.
-	pub fn make_window_defaults(&mut self, name: String) -> Result<Window, String> {
+	pub fn make_window_defaults(&self, name: String) -> Result<Window, String> {
 		let options = WindowOptions { name, ..Default::default() };
 		self.make_window(options)
 	}
@@ -152,7 +153,7 @@ impl Context {
 	/// but it may still be running when this function returns.
 	///
 	/// Use [`Self::join`] to join the background thread if desired.
-	pub fn stop(&mut self) -> Result<(), String> {
+	pub fn stop(&self) -> Result<(), String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::Stop(result_tx))
 			.map_err(|e| format!("failed to send command to context thread: {}", e))?;
@@ -187,7 +188,7 @@ impl Window {
 	///
 	/// The window is automatically closed if the handle is dropped,
 	/// but this function allows you to handle errors that may occur.
-	pub fn close(mut self) -> Result<(), String> {
+	pub fn close(self) -> Result<(), String> {
 		self.close_impl()
 	}
 
@@ -198,33 +199,44 @@ impl Window {
 
 	/// Wait for a key-down event with a timeout.
 	///
-	/// This function discards all key-up events, blocking until a key is pressed or the timeout occured.
-	pub fn wait_key(&self, timeout: Duration) -> Option<KeyboardEvent> {
+	/// If an error is returned, no further key events will be received.
+	/// Any loop processing keyboard input should terminate.
+	///
+	/// If no key press was available within the timeout, `Ok(None)` is returned.
+	///
+	/// This function discards all key-up events and blocks until a key is pressed or the timeout occurs.
+	pub fn wait_key(&self, timeout: Duration) -> Result<Option<KeyboardEvent>, WaitKeyError> {
 		self.wait_key_deadline(Instant::now() + timeout)
 	}
 
-	/// Wait for a key-down event with a dealine.
+	/// Wait for a key-down event with a deadline.
 	///
-	/// This function discards all key-up events, blocking until a key is pressed or the deadline passes.
-	pub fn wait_key_deadline(&self, deadline: Instant) -> Option<KeyboardEvent> {
+	/// If an error is returned, no further key events will be received.
+	/// Any loop processing keyboard input should terminate.
+	///
+	/// If no key press was available within the timeout, `Ok(None)` is returned.
+	///
+	/// This function discards all key-up events and blocks until a key is pressed or the deadline passes.
+	pub fn wait_key_deadline(&self, deadline: Instant) -> Result<Option<KeyboardEvent>, WaitKeyError> {
 		loop {
 			let now = Instant::now();
 			if now >= deadline {
-				return None;
+				return Ok(None);
 			}
 			let event = match self.events().recv_timeout(deadline - now) {
 				Ok(x) => x,
-				Err(_) => return None,
+				Err(mpsc::RecvTimeoutError::Timeout) => return Ok(None),
+				Err(mpsc::RecvTimeoutError::Disconnected) => return Err(WaitKeyError::WindowClosed),
 			};
 
 			if event.state == KeyState::Down {
-				return Some(event)
+				return Ok(Some(event))
 			}
 		}
 	}
 
 	/// Close the window without dropping the handle.
-	pub fn close_impl(&mut self) -> Result<(), String> {
+	pub fn close_impl(&self) -> Result<(), String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::DestroyWindow(self.id, result_tx))
 			.map_err(|e| format!("failed to send command to window: {}", e))?;
