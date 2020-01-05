@@ -76,6 +76,7 @@ impl<T> Receiver<T> {
 		Self { inner }
 	}
 
+	#[allow(unused)]
 	pub fn recv(self) -> Result<T, ReceiveError> {
 		let mut lock = self.inner.mutex.lock().unwrap();
 		loop {

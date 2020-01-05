@@ -23,6 +23,8 @@ mod key_location;
 mod modifiers;
 mod scan_code;
 
+const RESULT_TIMEOUT: Duration = Duration::from_millis(500);
+
 /// A context for creating windows.
 ///
 /// The context runs an event loop in a background thread.
@@ -32,7 +34,7 @@ pub struct Context {
 	command_tx: mpsc::SyncSender<ContextCommand>,
 
 	/// Join handle for the background thread.
-	_thread: std::thread::JoinHandle<Result<(), String>>,
+	thread: std::thread::JoinHandle<Result<(), String>>,
 }
 
 /// A window capable of displaying images.
@@ -54,6 +56,9 @@ pub struct Window {
 
 /// Commands that can be sent to the context in the background thread.
 enum ContextCommand {
+	/// Stop the background thread as soon as possible.
+	Stop(oneshot::Sender<()>),
+
 	/// Create a window with the given options.
 	CreateWindow(WindowOptions, mpsc::SyncSender<ContextCommand>, oneshot::Sender<Result<Window, String>>),
 
@@ -77,6 +82,9 @@ struct ContextInner {
 
 	/// Channel to receive commands.
 	command_rx: mpsc::Receiver<ContextCommand>,
+
+	/// Flag to indicate the context should stop as soon as possible.
+	stop: bool,
 }
 
 /// Inner window doing the real work in the background thread.
@@ -110,29 +118,46 @@ impl Context {
 
 		Ok(Context {
 			command_tx,
-			_thread: thread,
+			thread,
 		})
 	}
 
 	/// Create a new window with the given options.
 	pub fn make_window(&mut self, options: WindowOptions) -> Result<Window, String> {
-		let (result_tx, result_rx) = oneshot::channel();
+		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::CreateWindow(options, self.command_tx.clone(), result_tx))
 			.map_err(|e| format!("failed to send command to context thread: {}", e))?;
-		result_rx.recv().map_err(|e| format!("context thread did not create a window: {}", e))?
+		result_rx.recv_timeout(RESULT_TIMEOUT).map_err(|e| format!("failed to receive result from context thread: {}", e))?
 	}
 
-	// /// Create a new window with the default options.
-	// pub fn make_window_defaults(&mut self, name: String) -> Result<Window, String> {
-	// 	let options = WindowOptions { name, ..Default::default() };
-	// 	self.make_window(options)
-	// }
+	/// Create a new window with the default options.
+	pub fn make_window_defaults(&mut self, name: String) -> Result<Window, String> {
+		let options = WindowOptions { name, ..Default::default() };
+		self.make_window(options)
+	}
 
-	// /// Close all windows, stop and join the background thread.
-	// pub fn close(self) -> Result<(), String> {
-	// 	// TODO: close all windows.
-	// 	self.thread.join().map_err(|e| format!("failed to join context thread: {:?}", e))?
-	// }
+	/// Close all windows and stop the background thread.
+	///
+	/// The background thread will stop as soon as possible,
+	/// but it may still be running when this function returns.
+	///
+	/// Use [`Self::join`] to join the background thread if desired.
+	pub fn stop(&mut self) -> Result<(), String> {
+		let (result_tx, mut result_rx) = oneshot::channel();
+		self.command_tx.send(ContextCommand::Stop(result_tx))
+			.map_err(|e| format!("failed to send command to context thread: {}", e))?;
+		result_rx.recv_timeout(RESULT_TIMEOUT).map_err(|e| format!("failed to receive result from context thread: {}", e))
+	}
+
+	/// Join the background thread, blocking until the thread has terminated.
+	///
+	/// This function also returns any possible error that occured in the background thread.
+	///
+	/// Note that the background thread will only terminate if an error occurs
+	/// or if [`Self::stop`] is called.
+	pub fn join(self) -> Result<(), String> {
+		self.thread.join().map_err(|e| format!("failed to join context thread: {:?}", e))?
+	}
 }
 
 impl Window {
@@ -143,9 +168,9 @@ impl Window {
 
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::SetImage(self.id, data, info, result_tx)).unwrap();
-		result_rx.recv_timeout(Duration::from_millis(100))
-			.map_err(|e| format!("failed to set image: {}", e))?
-			.map_err(|e| format!("failed to set image: {}", e))
+		result_rx.recv_timeout(RESULT_TIMEOUT)
+			.map_err(|e| format!("failed to receive result from context thread: {}", e))?
+			.map_err(|e| format!("failed to display image: {}", e))
 	}
 
 	/// Close the window.
@@ -190,10 +215,10 @@ impl Window {
 
 	/// Close the window without dropping the handle.
 	pub fn close_impl(&mut self) -> Result<(), String> {
-		let (result_tx, result_rx) = oneshot::channel();
+		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::DestroyWindow(self.id, result_tx))
 			.map_err(|e| format!("failed to send command to window: {}", e))?;
-		result_rx.recv().map_err(|e| format!("error receiving response from window: {}", e))?
+		result_rx.recv_timeout(RESULT_TIMEOUT).map_err(|e| format!("failed to receive result from context thread: {}", e))?
 	}
 }
 
@@ -217,6 +242,7 @@ impl ContextInner {
 			events,
 			windows: Vec::new(),
 			command_rx,
+			stop: false,
 		})
 	}
 
@@ -225,7 +251,7 @@ impl ContextInner {
 		let delay = Duration::from_nanos(1_000_000_000 / 60);
 		let mut next_frame = Instant::now() + delay;
 
-		loop {
+		while !self.stop {
 			self.run_one()?;
 
 			// Sleep till the next scheduled frame.
@@ -237,6 +263,8 @@ impl ContextInner {
 				next_frame = now.max(next_frame + delay);
 			}
 		}
+
+		Ok(())
 	}
 
 	/// Run one iteration of the event loop.
@@ -292,6 +320,7 @@ impl ContextInner {
 	fn handle_sdl_window_event(&mut self, window_id: u32, event: WindowEvent) -> Result<(), String> {
 		match event {
 			WindowEvent::Close => {
+				// TODO: Or just hide the window?
 				self.destroy_window(window_id)?;
 			},
 			_ => (),
@@ -324,6 +353,10 @@ impl ContextInner {
 	/// Handle a single command.
 	fn handle_command(&mut self, command: ContextCommand) {
 		match command {
+			ContextCommand::Stop(result_tx) => {
+				self.stop = true;
+				result_tx.send(());
+			},
 			ContextCommand::CreateWindow(options, command_tx, result_tx) => {
 				result_tx.send(self.make_window(options, command_tx));
 			},

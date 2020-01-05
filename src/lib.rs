@@ -13,6 +13,7 @@ pub use backend::Context;
 pub use backend::Window;
 
 /// Supported pixel formats.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum PixelFormat {
 	/// Interlaced 8-bit RGB data.
 	Rgb8,
@@ -31,6 +32,7 @@ pub enum PixelFormat {
 }
 
 /// Information describing the binary data of an image.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImageInfo {
 	/// The width of the image in pixels.
 	pub width: usize,
@@ -55,6 +57,7 @@ pub trait ImageData {
 }
 
 /// Options for creating a window.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WindowOptions {
 	/// The name of the window.
 	pub name: String,
@@ -71,4 +74,73 @@ pub struct WindowOptions {
 
 	/// Preserve the aspact ratio
 	pub preserve_aspect_ratio: bool,
+}
+
+impl Default for WindowOptions {
+	fn default() -> Self {
+		Self {
+			name: String::from("image"),
+			size: [800, 600],
+			resizable: true,
+			preserve_aspect_ratio: true,
+		}
+	}
+}
+
+impl WindowOptions {
+	/// Set the name of the window.
+	///
+	/// This function consumed and returns `self` to allow daisy chaining.
+	pub fn set_name(mut self, name: String) -> Self {
+		self.name = name;
+		self
+	}
+
+	/// Set the initial size of the window.
+	///
+	/// This property may be ignored by a window manager.
+	///
+	/// This function consumed and returns `self` to allow daisy chaining.
+	pub fn set_size(mut self, size: [u32; 2]) -> Self {
+		self.size = size;
+		self
+	}
+
+	/// Set the initial width of the window.
+	///
+	/// This property may be ignored by a window manager.
+	///
+	/// This function consumed and returns `self` to allow daisy chaining.
+	pub fn set_width(mut self, width: u32) -> Self {
+		self.size[0] = width;
+		self
+	}
+
+	/// Set the initial height of the window.
+	///
+	/// This property may be ignored by a window manager.
+	///
+	/// This function consumed and returns `self` to allow daisy chaining.
+	pub fn set_height(mut self, height: u32) -> Self {
+		self.size[1] = height;
+		self
+	}
+
+	/// Make the window resiable or not.
+	///
+	/// This property may be ignored by a window manager.
+	///
+	/// This function consumed and returns `self` to allow daisy chaining.
+	pub fn set_resizable(mut self, resizable: bool) -> Self {
+		self.resizable = resizable;
+		self
+	}
+
+	/// Preserve the aspect ratio of displayed images, or not.
+	///
+	/// This function consumed and returns `self` to allow daisy chaining.
+	pub fn set_preserve_aspect_ratio(mut self, preserve_aspect_ratio: bool) -> Self {
+		self.preserve_aspect_ratio = preserve_aspect_ratio;
+		self
+	}
 }
