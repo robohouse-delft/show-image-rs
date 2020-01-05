@@ -19,6 +19,7 @@ use crate::WaitKeyError;
 use crate::WindowOptions;
 use crate::oneshot;
 
+mod grayscale;
 mod key_code;
 mod key_location;
 mod modifiers;
@@ -77,6 +78,9 @@ struct ContextInner {
 
 	/// SDL2 event pump to handle events with.
 	events: sdl2::EventPump,
+
+	/// The palette to use for drawing grayscale pictures.
+	gray_palette: sdl2::pixels::Palette,
 
 	/// List of created windows.
 	windows: Vec<WindowInner>,
@@ -258,10 +262,12 @@ impl ContextInner {
 		let context = sdl2::init().map_err(|e| format!("failed to initialize SDL2: {}", e))?;
 		let video = context.video().map_err(|e| format!("failed to get SDL2 video subsystem: {}", e))?;
 		let events = context.event_pump().map_err(|e| format!("failed to get SDL2 event pump: {}", e))?;
+		let gray_palette = grayscale::grayscale_palette().map_err(|e| format!("failed to create grayscale palette: {}", e))?;
 
 		Ok(Self {
 			video,
 			events,
+			gray_palette,
 			windows: Vec::new(),
 			command_rx,
 			stop: false,
@@ -384,11 +390,13 @@ impl ContextInner {
 			},
 			ContextCommand::DestroyWindow(id, result_tx) => {
 				result_tx.send(self.destroy_window(id));
-			}
+			},
 			ContextCommand::SetImage(id, data, info, result_tx) => {
-				let result = self.find_window_mut(id).and_then(|window| window.set_image(data, info));
-				result_tx.send(result);
-			}
+				match self.windows.iter_mut().find(|x| x.id == id) {
+					None => result_tx.send(Err(format!("failed to find window with ID {}", id))),
+					Some(window) => result_tx.send(window.set_image(&self.gray_palette, data, info)),
+				}
+			},
 		}
 	}
 
@@ -404,6 +412,7 @@ impl ContextInner {
 		let canvas = window.into_canvas().build().map_err(|e| format!("failed to create canvas for window {:?}: {}", options.name, e))?;
 		let texture_creator = canvas.texture_creator();
 		let (event_tx, event_rx) = mpsc::sync_channel(10);
+
 
 		let inner = WindowInner {
 			id,
@@ -430,18 +439,22 @@ impl ContextInner {
 
 impl WindowInner {
 	/// Set the displayed image.
-	fn set_image(&mut self, mut data: Box<[u8]>, info: ImageInfo) -> Result<(), String> {
+	fn set_image(&mut self, gray_palette: &sdl2::pixels::Palette, mut data: Box<[u8]>, info: ImageInfo) -> Result<(), String> {
 		let pixel_format = match info.pixel_format {
 			PixelFormat::Bgr8  => PixelFormatEnum::RGB24,
 			PixelFormat::Rgba8 => PixelFormatEnum::RGBA32,
 			PixelFormat::Rgb8  => PixelFormatEnum::BGR24,
 			PixelFormat::Bgra8 => PixelFormatEnum::BGRA32,
-			PixelFormat::Mono8 => return Err(String::from("8-bit mono images are not yet supported")),
+			PixelFormat::Mono8 => PixelFormatEnum::Index8,
 		};
 
-		let surface = Surface::from_data(&mut data, info.width as u32, info.height as u32, info.row_stride as u32, pixel_format)
+		let mut surface = Surface::from_data(&mut data, info.width as u32, info.height as u32, info.row_stride as u32, pixel_format)
 			.map_err(|e| format!("failed to create surface for pixel data: {}", e))?;
 		let image_size = surface.rect();
+
+		if info.pixel_format == PixelFormat::Mono8 {
+			surface.set_palette(gray_palette).map_err(|e| format!("failed to set grayscale palette on canvas: {}", e))?;
+		}
 
 		let texture = self.texture_creator.create_texture_from_surface(surface)
 			.map_err(|e| format!("failed to create texture from surface: {}", e))?;
