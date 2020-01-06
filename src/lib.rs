@@ -1,10 +1,17 @@
 //! `show-image` is a library for quickly displaying images.
 //! It is intended as a debugging aid for writing image processing code.
-//! The library is not inteded to be used for writing full-featured GUIs,
+//! The library is not intended to be used for writing full-featured GUIs,
 //! although you can process keyboard events from the created windows.
 //!
+//! # Supported image types.
 //! It is the goal of the library to support as many different data types used to represent images.
 //! To prevent dependency bloat and unreasonable compile times, feature flags can be used to enable support for third party libraries.
+//!
+//! Currently, the following types are supported:
+//!   * Tuples of binary data and an [`ImageInfo`].
+//!   * [`image::DynamicImage`] and [`image::ImageBuffer`] with the `image` feature.
+//!   * [`tch::Tensor`](::tch::Tensor) with the `tch` feature.
+//!
 //! If you think support for a specific data type is missing, feel free to send a PR or create an issue on GitHub.
 //!
 //! # Global context or manually created context.
