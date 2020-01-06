@@ -120,7 +120,7 @@ pub enum WaitKeyError {
 ///
 /// This trait is implemented for tuples of `(Data, ImageInfo)` if `Data` can be converted into a `Box<[u8]>`,
 /// and for `&(Data, ImageInfo)` if `Data` is `AsRef<[u8]>`.
-/// Amonst others, that includes `&[u8]`, `Box<[u8]>`, `Vec<u8>`.
+/// Amongst others, that includes `&[u8]`, `Box<[u8]>`, `Vec<u8>`.
 ///
 /// Implementations for types from third-party libraries can be enabled using feature flags.
 pub trait ImageData {
@@ -152,7 +152,7 @@ pub struct WindowOptions {
 	/// This may be ignored by a window manager.
 	pub resizable: bool,
 
-	/// Preserve the aspact ratio
+	/// Preserve the aspect ratio
 	pub preserve_aspect_ratio: bool,
 }
 
@@ -216,7 +216,7 @@ impl WindowOptions {
 		self
 	}
 
-	/// Make the window resiable or not.
+	/// Make the window resizable or not.
 	///
 	/// This property may be ignored by a window manager.
 	///

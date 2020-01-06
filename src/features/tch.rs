@@ -255,7 +255,7 @@ mod test {
 	fn guess_tensor_info() {
 		let data = tch::Tensor::of_slice(&(0..120).collect::<Vec<u8>>());
 
-		// Guess monochromo from compatible data.
+		// Guess monochrome from compatible data.
 		assert_eq!(data.reshape(&[12, 10, 1]).as_image_guess_bgr().info(), Ok(ImageInfo::mono8(10, 12)));
 		assert_eq!(data.reshape(&[1, 12, 10]).as_image_guess_bgr().info(), Ok(ImageInfo::mono8(10, 12)));
 		assert_eq!(data.reshape(&[12, 10]).as_image_guess_bgr().info(), Ok(ImageInfo::mono8(10, 12)));

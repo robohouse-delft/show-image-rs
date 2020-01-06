@@ -32,7 +32,7 @@ pub enum PixelFormat {
 	/// Interlaced 8-bit BGRA data.
 	Bgra8,
 
-	/// 8-bit grayscale data.
+	/// 8-bit monochrome data.
 	Mono8,
 }
 
@@ -66,7 +66,7 @@ impl ImageInfo {
 		Self::new(PixelFormat::Bgra8, width, height)
 	}
 
-	/// Create a new 8-bit grayscale info struct with the given width and height.
+	/// Create a new 8-bit monochrome info struct with the given width and height.
 	pub fn mono8(width: usize, height: usize) -> Self {
 		Self::new(PixelFormat::Mono8, width, height)
 	}

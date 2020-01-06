@@ -20,7 +20,7 @@ use crate::WaitKeyError;
 use crate::WindowOptions;
 use crate::oneshot;
 
-mod grayscale;
+mod monochrome;
 mod key_code;
 mod key_location;
 mod modifiers;
@@ -84,8 +84,8 @@ struct ContextInner {
 	/// SDL2 event pump to handle events with.
 	events: sdl2::EventPump,
 
-	/// The palette to use for drawing grayscale pictures.
-	gray_palette: sdl2::pixels::Palette,
+	/// The palette to use for drawing monochrome pictures.
+	mono_palette: sdl2::pixels::Palette,
 
 	/// List of created windows.
 	windows: Vec<WindowInner>,
@@ -270,12 +270,12 @@ impl ContextInner {
 		let context = sdl2::init().map_err(|e| format!("failed to initialize SDL2: {}", e))?;
 		let video = context.video().map_err(|e| format!("failed to get SDL2 video subsystem: {}", e))?;
 		let events = context.event_pump().map_err(|e| format!("failed to get SDL2 event pump: {}", e))?;
-		let gray_palette = grayscale::grayscale_palette().map_err(|e| format!("failed to create grayscale palette: {}", e))?;
+		let mono_palette = monochrome::mono_palette().map_err(|e| format!("failed to create monochrome palette: {}", e))?;
 
 		Ok(Self {
 			video,
 			events,
-			gray_palette,
+			mono_palette,
 			windows: Vec::new(),
 			command_rx,
 			stop: false,
@@ -382,7 +382,7 @@ impl ContextInner {
 			ContextCommand::SetImage(id, data, info, result_tx) => {
 				match self.windows.iter_mut().find(|x| x.id == id) {
 					None => result_tx.send(Err(format!("failed to find window with ID {}", id))),
-					Some(window) => result_tx.send(window.set_image(&self.gray_palette, data, info)),
+					Some(window) => result_tx.send(window.set_image(&self.mono_palette, data, info)),
 				}
 			},
 		}
@@ -428,7 +428,7 @@ impl ContextInner {
 
 impl WindowInner {
 	/// Set the displayed image.
-	fn set_image(&mut self, gray_palette: &sdl2::pixels::Palette, mut data: Box<[u8]>, info: ImageInfo) -> Result<(), String> {
+	fn set_image(&mut self, mono_palette: &sdl2::pixels::Palette, mut data: Box<[u8]>, info: ImageInfo) -> Result<(), String> {
 		let pixel_format = match info.pixel_format {
 			PixelFormat::Bgr8  => PixelFormatEnum::RGB24,
 			PixelFormat::Rgba8 => PixelFormatEnum::RGBA32,
@@ -442,7 +442,7 @@ impl WindowInner {
 		let image_size = surface.rect();
 
 		if info.pixel_format == PixelFormat::Mono8 {
-			surface.set_palette(gray_palette).map_err(|e| format!("failed to set grayscale palette on canvas: {}", e))?;
+			surface.set_palette(mono_palette).map_err(|e| format!("failed to set monochrome palette on canvas: {}", e))?;
 		}
 
 		let texture = self.texture_creator.create_texture_from_surface(surface)

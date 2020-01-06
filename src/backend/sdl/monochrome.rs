@@ -5,7 +5,7 @@ const fn c(value: u8) -> Color {
 	Color { r: value, g: value, b: value, a: 255 }
 }
 
-/// Color values for a palette to draw 8-bit grayscale data.
+/// Color values for a palette to draw 8-bit monochrome data.
 pub const GRAYSCALE_PALETTE: [Color; 256] = [
 	c(0x00), c(0x01), c(0x02), c(0x03), c(0x04), c(0x05), c(0x06), c(0x07), c(0x08), c(0x09), c(0x0a), c(0x0b), c(0x0c), c(0x0d), c(0x0e), c(0x0f),
 	c(0x10), c(0x11), c(0x12), c(0x13), c(0x14), c(0x15), c(0x16), c(0x17), c(0x18), c(0x19), c(0x1a), c(0x1b), c(0x1c), c(0x1d), c(0x1e), c(0x1f),
@@ -25,7 +25,7 @@ pub const GRAYSCALE_PALETTE: [Color; 256] = [
 	c(0xf0), c(0xf1), c(0xf2), c(0xf3), c(0xf4), c(0xf5), c(0xf6), c(0xf7), c(0xf8), c(0xf9), c(0xfa), c(0xfb), c(0xfc), c(0xfd), c(0xfe), c(0xff),
 ];
 
-/// Create a palette useable to draw 8-bit grayscale data.
-pub fn grayscale_palette() -> Result<Palette, String> {
+/// Create a palette useable to draw 8-bit monochrome data.
+pub fn mono_palette() -> Result<Palette, String> {
 	Palette::with_colors(&GRAYSCALE_PALETTE[..])
 }
