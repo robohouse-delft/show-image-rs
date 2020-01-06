@@ -1,3 +1,34 @@
+//! Support for [`tch::Tensor`].
+//!
+//! This module adds support for displaying [`tch::Tensor`] as images.
+//! The main interface is provided by an extension trait [`TensorAsImage`],
+//! which allows you to wrap a tensor in a [`TensorImage`].
+//! The wrapper struct adds some required metadata for interpreting the tensor data as an image.
+//!
+//! The metadata has to be supplied by the user, or it can be guessed automatically based on the tensor shape.
+//! When guessing, you do need to specify if you want to interpret multi-channel tensors as RGB or BGR.
+//! An extension trait [`TensorAsImage`] is provided to construct the wrapper with the proper metadata.
+//!
+//! It may not be possible to interpret a tensor as the requested image format,
+//! so all function in the extension trait return a [`Result`].
+//! The [`ImageData`] trait is implemented for [`TensorImage`] and for [`Result`]`<`[`TensorImage`]`, `[`String`]`>`,
+//! so you can directly pass the result to [`set_image`](crate::Window::set_image),
+//!
+//! Both planar and interlaced tensors are supported.
+//! If you specify the format manually, you must also specify if the tensor contains interlaced or planar data.
+//! If you let the library guess, it will try to deduce it automatically based on the tensor shape.
+//!
+//! # Example
+//! ```no_run
+//! use show_image::make_window;
+//! use show_image::tch::TensorAsImage;
+//!
+//! let tensor = tch::vision::imagenet::load_image("/path/to/image").unwrap();
+//! let window = make_window("image")?;
+//! window.set_image(tensor.as_image_guess_rgb())?;
+//! # Result::<(), String>::Ok(())
+//! ```
+
 use crate::ImageInfo;
 use crate::PixelFormat;
 use crate::ImageData;
