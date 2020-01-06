@@ -66,6 +66,7 @@ pub enum ColorFormat {
 ///
 /// The original tensor is unaffected, but the conversion can be expensive.
 /// If you also need to convert the tensor, consider doing so before displaying it.
+#[allow(clippy::needless_lifetimes)]
 pub trait TensorAsImage {
 	/// Wrap the tensor in a [`TensorImage`] that implements [`ImageData`].
 	///

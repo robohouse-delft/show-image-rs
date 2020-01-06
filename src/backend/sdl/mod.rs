@@ -340,6 +340,7 @@ impl ContextInner {
 	}
 
 	/// Handle an SDL2 window event.
+	#[allow(clippy::single_match)]
 	fn handle_sdl_window_event(&mut self, window_id: u32, event: WindowEvent) -> Result<(), String> {
 		match event {
 			WindowEvent::Close => {
