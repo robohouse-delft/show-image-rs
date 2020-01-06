@@ -185,9 +185,9 @@ impl Context {
 
 impl Window {
 	/// Set the image to de displayed by the window.
-	pub fn set_image(&self, image: &impl ImageData) -> Result<(), String> {
-		let data = Box::from(image.data());
+	pub fn set_image(&self, image: impl ImageData) -> Result<(), String> {
 		let info = image.info().map_err(|e| format!("failed to display image: {}", e))?;
+		let data = image.data();
 
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::SetImage(self.id, data, info, result_tx)).unwrap();

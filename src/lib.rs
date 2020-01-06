@@ -136,7 +136,15 @@ pub struct ImageInfo {
 
 /// Allows a type to be displayed as an image.
 pub trait ImageData {
-	fn data(&self) -> &[u8];
+	/// Get the image data as boxed slice.
+	///
+	/// This function takes self by value to prevent copying if possible.
+	/// If the data can not be moved into a box, consider implementing the trait for references.
+	fn data(self) -> Box<[u8]>;
+
+	/// Get the [`ImageInfo`] describing the binary data.
+	///
+	/// This function may fail at runtime if the data can not be described properly.
 	fn info(&self) -> Result<ImageInfo, String>;
 }
 
