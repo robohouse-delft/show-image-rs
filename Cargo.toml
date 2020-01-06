@@ -20,10 +20,12 @@ categories = [
 ]
 
 [dependencies]
-sdl2 = "0.32.2"
 keyboard-types = "0.4.4"
+sdl2 = "0.32.2"
 image = { version="0.22.3", optional=true }
+tch = { version="0.1.3", optional=true }
 
 [dev-dependencies]
+show-image = { version = "0.2.0", path = ".", features=["image", "tch"] }
 image = "0.22.3"
-show-image = { version = "0.2.0", path = ".", features=["image"] }
+tch = "0.1.3"

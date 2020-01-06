@@ -96,6 +96,7 @@ mod image_info;
 mod oneshot;
 
 pub use backend::*;
+pub use features::*;
 pub use image_info::*;
 
 /// Error that can occur while waiting for a key press.
