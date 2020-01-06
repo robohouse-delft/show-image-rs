@@ -1,2 +1,2 @@
-#[cfg(feature = "image")]
+#[cfg(any(test, feature = "image"))]
 mod image;

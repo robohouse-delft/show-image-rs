@@ -19,10 +19,11 @@ categories = [
 	"gui",
 ]
 
-[features]
-default = ["image"]
-
 [dependencies]
 sdl2 = "0.32.2"
 keyboard-types = "0.4.4"
 image = { version="0.22.3", optional=true }
+
+[dev-dependencies]
+image = "0.22.3"
+show-image = { version = "0.2.0", path = ".", features=["image"] }
