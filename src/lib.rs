@@ -72,11 +72,6 @@
 //! # }
 //! ```
 
-
-mod backend;
-mod features;
-mod oneshot;
-
 pub use keyboard_types::Code as ScanCode;
 pub use keyboard_types::Key as KeyCode;
 pub use keyboard_types::KeyState;
@@ -84,7 +79,13 @@ pub use keyboard_types::KeyboardEvent;
 pub use keyboard_types::Location as KeyLocation;
 pub use keyboard_types::Modifiers as KeyModifiers;
 
+mod backend;
+mod features;
+mod image_info;
+mod oneshot;
+
 pub use backend::*;
+pub use image_info::*;
 
 /// Error that can occur while waiting for a key press.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -94,44 +95,6 @@ pub enum WaitKeyError {
 	/// No further key events will happen,
 	/// and any loop waiting for keys should terminate.
 	WindowClosed,
-}
-
-/// Supported pixel formats.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum PixelFormat {
-	/// Interlaced 8-bit RGB data.
-	Rgb8,
-
-	/// Interlaced 8-bit RGBA data.
-	Rgba8,
-
-	/// Interlaced 8-bit BGR data.
-	Bgr8,
-
-	/// Interlaced 8-bit BGRA data.
-	Bgra8,
-
-	/// 8-bit grayscale data.
-	Mono8,
-}
-
-/// Information describing the binary data of an image.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ImageInfo {
-	/// The width of the image in pixels.
-	pub width: usize,
-
-	/// The height of the image in pixels.
-	pub height: usize,
-
-	/// The row stride of the image data in bytes.
-	///
-	/// The data is assumed to be stored row-major.
-	/// The stride is the byte offset between two rows in the data.
-	pub row_stride: usize,
-
-	/// The pixel format of the image data.
-	pub pixel_format: PixelFormat,
 }
 
 /// Allows a type to be displayed as an image.
