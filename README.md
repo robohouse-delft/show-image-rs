@@ -2,8 +2,8 @@
 
 `show-image` is a library for quickly displaying images.
 It is intended as a debugging aid for writing image processing code.
-The library is not intended to be used for writing full-featured GUIs,
-although you can process keyboard events from the created windows.
+The library is not intended for making full-featured GUIs,
+but you can process keyboard events from the created windows.
 
 ## Supported image types.
 It is the goal of the library to support as many different data types used to represent images.
