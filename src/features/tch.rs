@@ -3,7 +3,7 @@ use crate::PixelFormat;
 use crate::ImageData;
 
 /// Wrapper for [`tch::Tensor`] that implements [`ImageData`].
-pub struct TchImage<'a> {
+pub struct TensorImage<'a> {
 	tensor: &'a tch::Tensor,
 	info: ImageInfo,
 	planar: bool,
@@ -27,107 +27,115 @@ pub enum ColorFormat {
 	Bgr,
 }
 
+/// Extension trait to allow displaying tensors as image.
+///
+/// The tensor data will always be copied.
+/// Additionaly, the data will be converted to 8 bit integers,
+/// and planar data will be converted to interlaced data.
+///
+/// The original tensor is unaffected, but the conversion can be expensive.
+/// If you also need to convert the tensor, consider doing so before displaying it.
 pub trait TensorAsImage {
-	/// Wrap the tensor in a [`TchImage`] that implements [`ImageData`].
+	/// Wrap the tensor in a [`TensorImage`] that implements [`ImageData`].
 	///
 	/// This function requires you to specify the pixel format of the tensor,
 	/// or a preferred color format to have the library guess based on the tensor shape.
 	///
 	/// See the other functions in the trait for easier shorthands.
-	fn as_image<'a>(&'a self, pixel_format: TensorPixelFormat) -> Result<TchImage<'a>, String>;
+	fn as_image<'a>(&'a self, pixel_format: TensorPixelFormat) -> Result<TensorImage<'a>, String>;
 
-	/// Wrap the tensor with a known pixel format in a [`TchImage`], assuming it holds interlaced pixel data.
-	fn as_interlaced<'a>(&'a self, pixel_format: PixelFormat) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor with a known pixel format in a [`TensorImage`], assuming it holds interlaced pixel data.
+	fn as_interlaced<'a>(&'a self, pixel_format: PixelFormat) -> Result<TensorImage<'a>, String> {
 		self.as_image(TensorPixelFormat::Interlaced(pixel_format))
 	}
 
-	/// Wrap the tensor with a known pixel format in a [`TchImage`], assuming it holds planaer pixel data.
-	fn as_planar<'a>(&'a self, pixel_format: PixelFormat) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor with a known pixel format in a [`TensorImage`], assuming it holds planaer pixel data.
+	fn as_planar<'a>(&'a self, pixel_format: PixelFormat) -> Result<TensorImage<'a>, String> {
 		self.as_image(TensorPixelFormat::Planar(pixel_format))
 	}
 
-	/// Wrap the tensor in a [`TchImage`].
+	/// Wrap the tensor in a [`TensorImage`].
 	///
 	/// The pixel format of the tensor will be guessed based on the shape.
 	/// The `color_format` argument determines if tensors with 3 or 4 channels are interpreted as RGB or BGR.
-	fn as_image_guess<'a>(&'a self, color_format: ColorFormat) -> Result<TchImage<'a>, String> {
+	fn as_image_guess<'a>(&'a self, color_format: ColorFormat) -> Result<TensorImage<'a>, String> {
 		self.as_image(TensorPixelFormat::Guess(color_format))
 	}
 
-	/// Wrap the tensor in a [`TchImage`].
+	/// Wrap the tensor in a [`TensorImage`].
 	///
 	/// The pixel format of the tensor will be guessed based on the shape.
 	/// Tensors with 3 or 4 channels will be interpreted as RGB.
-	fn as_image_guess_rgb<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	fn as_image_guess_rgb<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_image_guess(ColorFormat::Rgb)
 	}
 
-	/// Wrap the tensor in a [`TchImage`].
+	/// Wrap the tensor in a [`TensorImage`].
 	///
 	/// The pixel format of the tensor will be guessed based on the shape.
 	/// Tensors with 3 or 4 channels will be interpreted as BGR.
-	fn as_image_guess_bgr<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	fn as_image_guess_bgr<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_image_guess(ColorFormat::Bgr)
 	}
 
-	/// Wrap the tensor in a [`TchImage`], assuming it holds monochrome data.
-	fn as_mono8<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor in a [`TensorImage`], assuming it holds monochrome data.
+	fn as_mono8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_interlaced(PixelFormat::Mono8)
 	}
 
-	/// Wrap the tensor in a [`TchImage`], assuming it holds interlaced RGB data.
-	fn as_interlaced_rgb8<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced RGB data.
+	fn as_interlaced_rgb8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_interlaced(PixelFormat::Rgb8)
 	}
 
-	/// Wrap the tensor in a [`TchImage`], assuming it holds interlaced RGBA data.
-	fn as_interlaced_rgba8<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced RGBA data.
+	fn as_interlaced_rgba8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_interlaced(PixelFormat::Rgba8)
 	}
 
-	/// Wrap the tensor in a [`TchImage`], assuming it holds interlaced BGR data.
-	fn as_interlaced_bgr8<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced BGR data.
+	fn as_interlaced_bgr8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_interlaced(PixelFormat::Bgr8)
 	}
 
-	/// Wrap the tensor in a [`TchImage`], assuming it holds interlaced BGRA data.
-	fn as_interlaced_bgra8<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced BGRA data.
+	fn as_interlaced_bgra8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_interlaced(PixelFormat::Bgra8)
 	}
 
-	/// Wrap the tensor in a [`TchImage`], assuming it holds planar RGB data.
-	fn as_planar_rgb8<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar RGB data.
+	fn as_planar_rgb8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_planar(PixelFormat::Rgb8)
 	}
 
-	/// Wrap the tensor in a [`TchImage`], assuming it holds planar RGBA data.
-	fn as_planar_rgba8<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar RGBA data.
+	fn as_planar_rgba8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_planar(PixelFormat::Rgba8)
 	}
 
-	/// Wrap the tensor in a [`TchImage`], assuming it holds planar BGR data.
-	fn as_planar_bgr8<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar BGR data.
+	fn as_planar_bgr8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_planar(PixelFormat::Bgr8)
 	}
 
-	/// Wrap the tensor in a [`TchImage`], assuming it holds planar BGRA data.
-	fn as_planar_bgra8<'a>(&'a self) -> Result<TchImage<'a>, String> {
+	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar BGRA data.
+	fn as_planar_bgra8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
 		self.as_planar(PixelFormat::Bgra8)
 	}
 }
 
 impl TensorAsImage for tch::Tensor {
-	fn as_image(&self, pixel_format: TensorPixelFormat) -> Result<TchImage, String> {
+	fn as_image(&self, pixel_format: TensorPixelFormat) -> Result<TensorImage, String> {
 		let (planar, info) = match pixel_format {
 			TensorPixelFormat::Planar(pixel_format)     => tensor_info(self, pixel_format, true)?,
 			TensorPixelFormat::Interlaced(pixel_format) => tensor_info(self, pixel_format, false)?,
 			TensorPixelFormat::Guess(color_format)      => guess_tensor_info(self, color_format)?,
 		};
-		Ok(TchImage { tensor: self, info, planar })
+		Ok(TensorImage { tensor: self, info, planar })
 	}
 }
 
-impl ImageData for TchImage<'_> {
+impl ImageData for TensorImage<'_> {
 	fn data(self) -> Box<[u8]> {
 		if self.planar {
 			Vec::<u8>::from(self.tensor.permute(&[1, 2, 0])).into_boxed_slice()
@@ -141,7 +149,7 @@ impl ImageData for TchImage<'_> {
 	}
 }
 
-impl ImageData for Result<TchImage<'_>, String> {
+impl ImageData for Result<TensorImage<'_>, String> {
 	fn data(self) -> Box<[u8]> {
 		self.expect("ImageData::data called on an Err variant").data()
 	}
