@@ -9,36 +9,68 @@
 //!
 //! # Global context or manually created context.
 //! The library uses a [`Context`] object to manage an event loop running in a background thread.
-//! You can manually create such a context, or you can use the module functions [`make_window`] and [`make_window_full`].
-//! The free functions will use a global context that is initialized when needed.
+//! You can manually create such a context, or you can use the global functions [`make_window`] and [`make_window_full`].
+//! These free functions will use a global context that is initialized when needed.
 //!
 //! Only one [`Context`] object can ever be created, so you can not mix the free functions with a manually created context.
 //!
-//! # Keyboard events
+//! # Keyboard events.
 //! You can handle keyboard events for windows.
 //! You can use [`Window::wait_key`] or [`Window::wait_key_deadline`] to wait for key press events.
 //! Alternatively you can use [`Window::events`] to get direct access to the channel where all keyboard events are sent (including key release events).
 //!
+//! Keyboard events are reported using types re-exported from the `keyboard-types` crate for easy interoperability with other crates.
+//!
 //!
 //! # Example 1: Using the global context.
+//! This example uses a tuple of `(&[u8], `[`ImageInfo`]`)` as image,
+//! but any type that implements [`ImageData`] will do.
 //! ```no_run
 //! # use image;
 //! # use std::time::Duration;
-//! use show_image::make_window;
-//! use show_image::KeyCode;
-//! # fn read_image(path: impl AsRef<std::path::Path>) -> Result<image::DynamicImage, String> {
-//! #   let path = path.as_ref();
-//! #   image::open(path).map_err(|e| format!("Failed to read image from {:?}: {}", path, e))
-//! # }
+//! # let pixel_data = &[0u8][..];
+//! use show_image::{ImageInfo, make_window};
 //!
-//! # fn main() -> Result<(), String> {
-//! let image = read_image("/path/to/image.png")?;
+//! let image = (pixel_data, ImageInfo::rgb8(1920, 1080));
 //!
+//! // Create a window and display the image.
+//! let window = make_window("image")?;
+//! window.set_image(image)?;
+//!
+//! # Result::<(), String>::Ok(())
+//! ```
+//!
+//! # Example 2: Using a manually created context.
+//!
+//! Alternatively, you can manually create a [`Context`] and use that to create a window.
+//! This avoids using global state, but since you can only create one context,
+//! you will have to pass the context everywhere in your code.
+//!
+//! ```no_run
+//! use show_image::Context;
+//! # use show_image::ImageInfo;
+//!
+//! # let image = (&[0u8][..], ImageInfo::rgb8(1920, 1080));
+//! let context = Context::new()?;
+//! let window = context.make_window("image")?;
+//! window.set_image(&image)?;
+//! # Result::<(), String>::Ok(())
+//! ```
+//!
+//! # Example 3: Handling keyboard events.
+//! ```no_run
+//! # use std::time::Duration;
+//! # use show_image::ImageInfo;
+//! use show_image::{KeyCode, make_window};
+//!
+//! # let image = (&[0u8][..], ImageInfo::rgb8(1920, 1080));
+//! #
 //! // Create a window and display the image.
 //! let window = make_window("image")?;
 //! window.set_image(&image)?;
 //!
 //! // Print keyboard events until Escape is pressed, then exit.
+//! // If the user closes the window, wait_key() will return an error and the loop also exits.
 //! while let Ok(event) = window.wait_key(Duration::from_millis(100)) {
 //!     if let Some(event) = event {
 //!         println!("{:#?}", event);
@@ -48,28 +80,7 @@
 //!     }
 //! }
 //!
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! # Example 2: Using a manually created context.
-//!
-//! Alternatively, you can manually create a [`Context`] and use that to create a window.
-//! This avoids using global state, but it requires you to pass a context everywhere in your code.
-//!
-//! ```no_run
-//! # use image;
-//! use show_image::Context;
-//! # fn read_image(path: impl AsRef<std::path::Path>) -> Result<image::DynamicImage, String> {
-//! #   unimplemented!();
-//! # }
-//! # fn main() -> Result<(), String> {
-//! # let image = read_image("/path/to/image.png")?;
-//! let context = Context::new()?;
-//! let window = context.make_window("image")?;
-//! window.set_image(&image)?;
-//! # Ok(())
-//! # }
+//! # Result::<(), String>::Ok(())
 //! ```
 
 pub use keyboard_types::Code as ScanCode;
@@ -98,6 +109,12 @@ pub enum WaitKeyError {
 }
 
 /// Allows a type to be displayed as an image.
+///
+/// This trait is implemented for tuples of `(Data, ImageInfo)` if `Data` can be converted into a `Box<[u8]>`,
+/// and for `&(Data, ImageInfo)` if `Data` is `AsRef<[u8]>`.
+/// Amonst others, that includes `&[u8]`, `Box<[u8]>`, `Vec<u8>`.
+///
+/// Implementations for types from third-party libraries can be enabled using feature flags.
 pub trait ImageData {
 	/// Get the image data as boxed slice.
 	///
@@ -207,5 +224,57 @@ impl WindowOptions {
 	pub fn set_preserve_aspect_ratio(mut self, preserve_aspect_ratio: bool) -> Self {
 		self.preserve_aspect_ratio = preserve_aspect_ratio;
 		self
+	}
+}
+
+impl<Container> ImageData for (Container, ImageInfo)
+where
+	Box<[u8]>: From<Container>,
+{
+	fn data(self) -> Box<[u8]> {
+		Box::from(self.0)
+	}
+
+	fn info(&self) -> Result<ImageInfo, String> {
+		Ok(self.1.clone())
+	}
+}
+
+impl<Container> ImageData for (Container, &ImageInfo)
+where
+	Box<[u8]>: From<Container>,
+{
+	fn data(self) -> Box<[u8]> {
+		Box::from(self.0)
+	}
+
+	fn info(&self) -> Result<ImageInfo, String> {
+		Ok(self.1.clone())
+	}
+}
+
+impl<Container> ImageData for &(Container, ImageInfo)
+where
+	Container: AsRef<[u8]>,
+{
+	fn data(self) -> Box<[u8]> {
+		Box::from(self.0.as_ref())
+	}
+
+	fn info(&self) -> Result<ImageInfo, String> {
+		Ok(self.1.clone())
+	}
+}
+
+impl<Container> ImageData for &(Container, &ImageInfo)
+where
+	Container: AsRef<[u8]>,
+{
+	fn data(self) -> Box<[u8]> {
+		Box::from(self.0.as_ref())
+	}
+
+	fn info(&self) -> Result<ImageInfo, String> {
+		Ok(self.1.clone())
 	}
 }
