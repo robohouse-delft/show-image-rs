@@ -30,12 +30,8 @@ const RESULT_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// A context for creating windows.
 ///
-/// The context runs an event loop in a background thread.
-/// This context can be used to create windows and manage the background thread.
-///
-/// Only one context can be created in total.
-/// Subsequent calls will fail with an error.
-/// This also means you can not use the global context and a manually created context in the same program.
+/// Once initialized, the context runs an event loop in a background thread.
+/// You can interact with the background thead through the context object.
 pub struct Context {
 	/// Channel to send command to the background thread.
 	command_tx: mpsc::SyncSender<ContextCommand>,
@@ -165,6 +161,7 @@ impl Context {
 	/// but it may still be running when this function returns.
 	///
 	/// Use [`Context::join`] to join the background thread if desired.
+	#[allow(unused)]
 	pub fn stop(&self) -> Result<(), String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::Stop(result_tx))
@@ -178,6 +175,7 @@ impl Context {
 	///
 	/// Note that the background thread will only terminate if an error occurs
 	/// or if [`Context::stop`] is called.
+	#[allow(unused)]
 	pub fn join(self) -> Result<(), String> {
 		self.thread.join().map_err(|e| format!("failed to join context thread: {:?}", e))?
 	}

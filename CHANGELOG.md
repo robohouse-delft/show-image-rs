@@ -1,3 +1,6 @@
+v0.4.0
+  * Remove access to `Context` to simplify API.
+
 v0.3.0
   * Change `ImageData` trait to allow consuming images.
   * Implement `ImageData` for tuples of data and `ImageInfo`.

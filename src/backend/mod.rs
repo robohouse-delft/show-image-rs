@@ -4,13 +4,13 @@ static INIT: Once = Once::new();
 static mut CONTEXT: Option<Result<Context, String>> = None;
 
 mod sdl;
-pub use sdl::Context;
+use sdl::Context;
 pub use sdl::Window;
 
 /// Get the global context.
 ///
 /// If the global context was not yet initialized, this function will initialize it.
-pub fn context() -> Result<&'static Context, &'static str> {
+fn context() -> Result<&'static Context, &'static str> {
 	unsafe {
 		INIT.call_once(|| {
 			let context = Context::new()
