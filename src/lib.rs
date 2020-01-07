@@ -9,7 +9,7 @@
 //! support for third party libraries must be enabled explicitly with feature flags.
 //!
 //! Currently, the following types are supported:
-//!   * Tuples of binary data and an [`ImageInfo`].
+//!   * Tuples of binary data and [`ImageInfo`].
 //!   * [`image::DynamicImage`] and [`image::ImageBuffer`] with the `image` feature.
 //!   * [`tch::Tensor`](::tch::Tensor) with the `tch` feature.
 //!
@@ -17,9 +17,9 @@
 //! feel free to send a PR or create an issue on GitHub.
 //!
 //! # Keyboard events.
-//! You can handle keyboard events for windows.
-//! You can use [`Window::wait_key`] or [`Window::wait_key_deadline`] to wait for key press events.
-//! Alternatively you can use [`Window::events`] to get direct access to the channel where all keyboard events are sent (including key release events).
+//! You can handle keyboard events for windows using [`Window::wait_key`] or [`Window::wait_key_deadline`].
+//! These functions will wait for key press events while discarding key up events.
+//! Alternatively you can use [`Window::events`] to get direct access to a channel with all keyboard events.
 //!
 //! Keyboard events are reported using types re-exported from the `keyboard-types` crate for easy interoperability with other crates.
 //!
