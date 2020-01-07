@@ -1,4 +1,7 @@
-# show-image [![Docs.rs](https://docs.rs/com/badge.svg)](https://docs.rs/crate/show-image/)
+[![Docs.rs](https://docs.rs/com/badge.svg)](https://docs.rs/crate/show-image/)
+[![CI](https://github.com/robohouse-delft/show-image-rs/workflows/CI/badge.svg)](https://github.com/robohouse-delft/show-image-rs/actions?query=workflow%3ACI+branch%3Amaster)
+
+# show-image
 
 `show-image` is a library for quickly displaying images.
 It is intended as a debugging aid for writing image processing code.
