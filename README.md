@@ -32,7 +32,7 @@ Keyboard events are reported using types re-exported from the `keyboard-types` c
 
 
 ## Example 1: Using the global context.
-This example uses a tuple of `(&[u8], ``ImageInfo``)` as image,
+This example uses a tuple of `(&[u8], ImageInfo)` as image,
 but any type that implements `ImageData` will do.
 ```rust
 use show_image::{ImageInfo, make_window};
