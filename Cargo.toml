@@ -4,7 +4,9 @@ version = "0.3.0"
 license = "BSD-2-Clause"
 description = "quickly show images in a window for debugging"
 edition = "2018"
+
 repository = "https://github.com/robohouse-delft/show-image/"
+documentation = "https://docs.rs/show-image"
 
 authors = [
 	"Maarten de Vries <maarten@de-vri.es>",
