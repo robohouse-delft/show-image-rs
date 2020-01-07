@@ -5,7 +5,7 @@ license = "BSD-2-Clause"
 description = "quickly show images in a window for debugging"
 edition = "2018"
 
-repository = "https://github.com/robohouse-delft/show-image/"
+repository = "https://github.com/robohouse-delft/show-image-rs"
 documentation = "https://docs.rs/show-image"
 
 authors = [
