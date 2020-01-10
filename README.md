@@ -28,6 +28,10 @@ Alternatively you can use `Window::events` to get direct access to a channel wit
 
 Keyboard events are reported using types re-exported from the `keyboard-types` crate for easy interoperability with other crates.
 
+## Saving displayed images.
+If the `save` feature is enabled, windows allow the displayed image to be saved using `Ctrl+S`.
+This will open a file dialog to save the currently displayed image.
+
 ## Example 1: Showing an image.
 This example uses a tuple of `(&[u8], ImageInfo)` as image,
 but any type that implements `ImageData` will do.

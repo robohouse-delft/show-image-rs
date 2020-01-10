@@ -7,14 +7,20 @@ use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 
+#[cfg(feature = "save")]
+use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 use std::time::Instant;
 
 use crate::ImageData;
 use crate::ImageInfo;
+#[cfg(feature = "save")]
+use crate::KeyCode;
 use crate::KeyState;
 use crate::KeyboardEvent;
+#[cfg(feature = "save")]
+use crate::KeyModifiers;
 use crate::PixelFormat;
 use crate::WaitKeyError;
 use crate::WindowOptions;
@@ -106,6 +112,14 @@ struct WindowInner {
 
 	/// A texture representing the current image to be drawn.
 	texture: Option<(Texture<'static>, Rect)>,
+
+	/// The data of the currently displayed image.
+	#[cfg(feature = "save")]
+	data: Option<(Arc<Box<[u8]>>, ImageInfo)>,
+
+	/// Join handles for background threads saving images.
+	#[cfg(feature = "save")]
+	save_threads: Vec<std::thread::JoinHandle<Result<(), String>>>,
 
 	/// Channel to send keyboard events.
 	event_tx: mpsc::SyncSender<KeyboardEvent>,
@@ -351,9 +365,8 @@ impl ContextInner {
 
 	/// Handle an SDL2 keyboard event.
 	fn handle_sdl_keyboard_event(&mut self, window_id: u32, event: KeyboardEvent) -> Result<(), String> {
-		if let Some(window) = self.windows.iter().find(|x| x.id == window_id) {
-			// Ignore errors, it means the receiver isn't handling events.
-			let _ = window.event_tx.try_send(event);
+		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
+			window.handle_keyboard_event(event)?;
 		}
 		Ok(())
 	}
@@ -406,6 +419,10 @@ impl ContextInner {
 			canvas,
 			texture_creator,
 			texture: None,
+			#[cfg(feature = "save")]
+			data: None,
+			#[cfg(feature = "save")]
+			save_threads: Vec::new(),
 			event_tx,
 			preserve_aspect_ratio: options.preserve_aspect_ratio,
 		};
@@ -440,6 +457,7 @@ impl WindowInner {
 			.map_err(|e| format!("failed to create surface for pixel data: {}", e))?;
 		let image_size = surface.rect();
 
+
 		if info.pixel_format == PixelFormat::Mono8 {
 			surface.set_palette(mono_palette).map_err(|e| format!("failed to set monochrome palette on canvas: {}", e))?;
 		}
@@ -448,6 +466,10 @@ impl WindowInner {
 			.map_err(|e| format!("failed to create texture from surface: {}", e))?;
 		let texture = unsafe { std::mem::transmute::<_, Texture<'static>>(texture) };
 		self.texture = Some((texture, image_size));
+
+		#[cfg(feature = "save")] {
+			self.data = Some((Arc::new(data), info));
+		}
 
 		Ok(())
 	}
@@ -477,6 +499,66 @@ impl WindowInner {
 	/// Close the window.
 	fn close(&mut self) {
 		self.canvas.window_mut().hide();
+	}
+
+	fn handle_keyboard_event(&mut self, event: KeyboardEvent) -> Result<(), String> {
+		#[cfg(feature = "save")] {
+			if event.state == KeyState::Down && event.key == KeyCode::Character("S".into()) && event.modifiers == KeyModifiers::CONTROL {
+				return self.save_image();
+			}
+		}
+		// Ignore errors, it means the receiver isn't handling events.
+		let _ = self.event_tx.try_send(event);
+
+		Ok(())
+	}
+
+	#[cfg(feature = "save")]
+	fn save_image(&mut self) -> Result<(), String> {
+		let (data, info) = match &self.data {
+			Some(x) => x.clone(),
+			None => return Ok(()),
+		};
+
+		let thread = std::thread::spawn(move || {
+			let path = match tinyfiledialogs::save_file_dialog("Save image", "image.png") {
+				Some(x) => x,
+				None => return Ok(()),
+			};
+
+			save_image(path.as_ref(), &data, info)
+		});
+
+		// TODO: Reap finished join handles at some point.
+		// TODO: Join them somehow when cleanly stopping context.
+		self.save_threads.push(thread);
+
+		Ok(())
+	}
+}
+
+#[cfg(feature = "save")]
+fn save_image(path: &std::path::Path, data: &[u8], info: ImageInfo) -> Result<(), String> {
+	let color_type = match info.pixel_format {
+		PixelFormat::Mono8 => image::ColorType::Gray(8),
+		PixelFormat::Rgb8  => image::ColorType::RGB(8),
+		PixelFormat::Rgba8 => image::ColorType::RGBA(8),
+		PixelFormat::Bgr8  => image::ColorType::BGR(8),
+		PixelFormat::Bgra8 => image::ColorType::BGRA(8),
+	};
+
+	let bytes_per_pixel = usize::from(info.pixel_format.bytes_per_pixel());
+
+	if info.row_stride == info.width * bytes_per_pixel {
+		image::save_buffer(path, data, info.width as u32, info.height as u32, color_type)
+			.map_err(|e| format!("failed to save image: {}", e))
+	} else {
+		let mut packed = Vec::with_capacity(info.width * info.height * bytes_per_pixel);
+		for row in 0..info.height {
+			packed.extend_from_slice(&data[info.row_stride * row..][..info.width * bytes_per_pixel]);
+		}
+		image::save_buffer(path, &packed, info.width as u32, info.height as u32, color_type)
+			.map_err(|e| format!("failed to save image: {}", e))
 	}
 }
 

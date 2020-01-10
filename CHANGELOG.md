@@ -1,3 +1,6 @@
+v0.4.1
+  * Allow end-users to save displayed images.
+
 v0.4.0
   * Remove access to `Context` to simplify API.
 
