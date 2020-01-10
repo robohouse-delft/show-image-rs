@@ -1,5 +1,6 @@
 v0.4.1
   * Allow end-users to save displayed images.
+  * Fix display of color images without alpha channel.
 
 v0.4.0
   * Remove access to `Context` to simplify API.

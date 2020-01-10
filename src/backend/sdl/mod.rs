@@ -446,11 +446,11 @@ impl WindowInner {
 	/// Set the displayed image.
 	fn set_image(&mut self, mono_palette: &sdl2::pixels::Palette, mut data: Box<[u8]>, info: ImageInfo) -> Result<(), String> {
 		let pixel_format = match info.pixel_format {
-			PixelFormat::Bgr8  => PixelFormatEnum::RGB24,
-			PixelFormat::Rgba8 => PixelFormatEnum::RGBA32,
-			PixelFormat::Rgb8  => PixelFormatEnum::BGR24,
-			PixelFormat::Bgra8 => PixelFormatEnum::BGRA32,
 			PixelFormat::Mono8 => PixelFormatEnum::Index8,
+			PixelFormat::Rgb8  => PixelFormatEnum::RGB24,
+			PixelFormat::Rgba8 => PixelFormatEnum::RGBA32,
+			PixelFormat::Bgr8  => PixelFormatEnum::BGR24,
+			PixelFormat::Bgra8 => PixelFormatEnum::BGRA32,
 		};
 
 		let mut surface = Surface::from_data(&mut data, info.width as u32, info.height as u32, info.row_stride as u32, pixel_format)
