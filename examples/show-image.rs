@@ -1,21 +1,16 @@
-use image;
+use show_image::ImageData;
 use show_image::make_window;
-
-use std::path::Path;
-
-
-fn read_png(path: impl AsRef<Path>) -> Result<image::DynamicImage, String> {
-	let path = path.as_ref();
-	image::open(path).map_err(|e| format!("Failed to read image from {:?}: {}", path, e))
-}
 
 fn main() -> Result<(), String> {
 	let args : Vec<_> = std::env::args().collect();
 	if args.len() != 2 {
 		return Err(format!("usage: {} IMAGE", args[0]));
 	}
+	let path = &args[1];
 
-	let image = read_png(&args[1])?;
+	let image = image::open(path)
+		.map_err(|e| format!("Failed to read image from {:?}: {}", path, e))?;
+	println!("{:#?}", image.info());
 
 	let window = make_window("image")?;
 	window.set_image(&image)?;
