@@ -10,10 +10,13 @@ fn main() -> Result<(), String> {
 
 	let tensor = tch::vision::imagenet::load_image(&args[1])
 		.map_err(|e| format!("failed to load image from {:?}: {}", &args[1], e))?;
-	println!("{:#?}", image.info());
+	let image = tensor.as_image_guess_rgb();
+	if let Ok(image) = &image {
+		println!("{:#?}", image.info());
+	}
 
 	let window = make_window("image")?;
-	window.set_image(tensor.as_image_guess_rgb())?;
+	window.set_image(image)?;
 
 	while let Ok(event) = window.wait_key(std::time::Duration::from_millis(100)) {
 		if let Some(event) = event {
