@@ -159,46 +159,47 @@ impl std::fmt::Display for TryReceiveError {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use assert2::assert;
 
 	#[test]
 	fn try_recv_value() {
 		let (tx, mut rx) = channel();
 		tx.send(10);
-		assert_eq!(rx.try_recv(), Ok(10));
+		assert!(rx.try_recv() == Ok(10));
 	}
 
 	#[test]
 	fn try_recv_no_value() {
 		let (_tx, mut rx) = channel::<i32>();
-		assert_eq!(rx.try_recv(), Err(TryReceiveError::NotReady));
+		assert!(rx.try_recv() == Err(TryReceiveError::NotReady));
 	}
 
 	#[test]
 	fn try_recv_twice() {
 		let (tx, mut rx) = channel::<i32>();
 		tx.send(10);
-		assert_eq!(rx.try_recv(), Ok(10));
-		assert_eq!(rx.try_recv(), Err(TryReceiveError::AlreadyRetrieved));
+		assert!(rx.try_recv() == Ok(10));
+		assert!(rx.try_recv() == Err(TryReceiveError::AlreadyRetrieved));
 	}
 
 	#[test]
 	fn try_recv_disconnected() {
 		let (tx, mut rx) = channel::<i32>();
 		drop(tx);
-		assert_eq!(rx.try_recv(), Err(TryReceiveError::Disconnected));
+		assert!(rx.try_recv() == Err(TryReceiveError::Disconnected));
 	}
 
 	#[test]
 	fn recv() {
 		let (tx, rx) = channel();
 		tx.send(10);
-		assert_eq!(rx.recv().ok(), Some(10));
+		assert!(rx.recv().ok() == Some(10));
 	}
 
 	#[test]
 	fn recv_timeout() {
 		let (_tx, mut rx) = channel::<i32>();
-		assert_eq!(rx.recv_timeout(std::time::Duration::from_millis(1)), Err(TryReceiveError::NotReady));
+		assert!(rx.recv_timeout(std::time::Duration::from_millis(1)) == Err(TryReceiveError::NotReady));
 	}
 
 	#[test]
@@ -207,7 +208,7 @@ mod test {
 		let thread = std::thread::spawn(|| {
 			tx.send(12);
 		});
-		assert_eq!(rx.recv_timeout(std::time::Duration::from_millis(500)), Ok(12));
+		assert!(rx.recv_timeout(std::time::Duration::from_millis(500)) == Ok(12));
 		let _ = thread.join();
 	}
 }

@@ -34,6 +34,7 @@ tinyfiledialogs = { version="3.3.9",  optional=true }
 
 [dev-dependencies]
 show-image = { path = ".", features=["full"] }
+assert2 = "0.1.1"
 
 [package.metadata.docs.rs]
 all-features = true
