@@ -1,3 +1,7 @@
+v0.4.2
+  * Fix example.
+  * Use `assert2` for tests.
+
 v0.4.1
   * Allow end-users to save displayed images.
   * Fix display of color images without alpha channel.
