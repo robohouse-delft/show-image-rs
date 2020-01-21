@@ -1,3 +1,6 @@
+v0.4.3
+  * Add readme to Cargo manifest.
+
 v0.4.2
   * Fix example.
   * Use `assert2` for tests.
