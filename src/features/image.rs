@@ -5,23 +5,31 @@ use crate::PixelFormat;
 impl ImageData for image::DynamicImage {
 	fn data(self) -> Box<[u8]> {
 		match self {
-			image::DynamicImage::ImageLuma8(x)  => into_bytes(x),
-			image::DynamicImage::ImageLumaA8(x) => into_bytes(x),
-			image::DynamicImage::ImageRgb8(x)   => into_bytes(x),
-			image::DynamicImage::ImageRgba8(x)  => into_bytes(x),
-			image::DynamicImage::ImageBgr8(x)   => into_bytes(x),
-			image::DynamicImage::ImageBgra8(x)  => into_bytes(x),
+			image::DynamicImage::ImageLuma8(x)   => into_bytes(x),
+			image::DynamicImage::ImageLumaA8(x)  => into_bytes(x),
+			image::DynamicImage::ImageLuma16(_)  => panic!("unsupported pixel format: Luma16"),
+			image::DynamicImage::ImageLumaA16(_) => panic!("unsupported pixel format: LumaA16"),
+			image::DynamicImage::ImageRgb8(x)    => into_bytes(x),
+			image::DynamicImage::ImageRgba8(x)   => into_bytes(x),
+			image::DynamicImage::ImageRgb16(_)   => panic!("unsupported pixel format: Rgb16"),
+			image::DynamicImage::ImageRgba16(_)  => panic!("unsupported pixel format: Rgba16"),
+			image::DynamicImage::ImageBgr8(x)    => into_bytes(x),
+			image::DynamicImage::ImageBgra8(x)   => into_bytes(x),
 		}
 	}
 
 	fn info(&self) -> Result<ImageInfo, String> {
 		match self {
-			image::DynamicImage::ImageLuma8(x)  => info(x),
-			image::DynamicImage::ImageLumaA8(x) => info(x),
-			image::DynamicImage::ImageRgb8(x)   => info(x),
-			image::DynamicImage::ImageRgba8(x)  => info(x),
-			image::DynamicImage::ImageBgr8(x)   => info(x),
-			image::DynamicImage::ImageBgra8(x)  => info(x),
+			image::DynamicImage::ImageLuma8(x)   => info(x),
+			image::DynamicImage::ImageLumaA8(x)  => info(x),
+			image::DynamicImage::ImageLuma16(_)  => Err(String::from("unsupported pixel format: Luma16")),
+			image::DynamicImage::ImageLumaA16(_) => Err(String::from("unsupported pixel format: LumaA16")),
+			image::DynamicImage::ImageRgb8(x)    => info(x),
+			image::DynamicImage::ImageRgba8(x)   => info(x),
+			image::DynamicImage::ImageRgb16(_)   => Err(String::from("unsupported pixel format: Rgb16")),
+			image::DynamicImage::ImageRgba16(_)  => Err(String::from("unsupported pixel format: Rgba16")),
+			image::DynamicImage::ImageBgr8(x)    => info(x),
+			image::DynamicImage::ImageBgra8(x)   => info(x),
 		}
 	}
 }
@@ -29,12 +37,16 @@ impl ImageData for image::DynamicImage {
 impl ImageData for &'_ image::DynamicImage {
 	fn data(self) -> Box<[u8]> {
 		match self {
-			image::DynamicImage::ImageLuma8(x)  => Box::from(as_bytes(x)),
-			image::DynamicImage::ImageLumaA8(x) => Box::from(as_bytes(x)),
-			image::DynamicImage::ImageRgb8(x)   => Box::from(as_bytes(x)),
-			image::DynamicImage::ImageRgba8(x)  => Box::from(as_bytes(x)),
-			image::DynamicImage::ImageBgr8(x)   => Box::from(as_bytes(x)),
-			image::DynamicImage::ImageBgra8(x)  => Box::from(as_bytes(x)),
+			image::DynamicImage::ImageLuma8(x)   => Box::from(as_bytes(x)),
+			image::DynamicImage::ImageLumaA8(x)  => Box::from(as_bytes(x)),
+			image::DynamicImage::ImageLuma16(_)  => panic!("unsupported pixel format: Luma16"),
+			image::DynamicImage::ImageLumaA16(_) => panic!("unsupported pixel format: LumaA16"),
+			image::DynamicImage::ImageRgb8(x)    => Box::from(as_bytes(x)),
+			image::DynamicImage::ImageRgba8(x)   => Box::from(as_bytes(x)),
+			image::DynamicImage::ImageRgb16(_)   => panic!("unsupported pixel format: Rgb16"),
+			image::DynamicImage::ImageRgba16(_)  => panic!("unsupported pixel format: Rgba16"),
+			image::DynamicImage::ImageBgr8(x)    => Box::from(as_bytes(x)),
+			image::DynamicImage::ImageBgra8(x)   => Box::from(as_bytes(x)),
 		}
 	}
 
@@ -96,11 +108,11 @@ where
 /// Extract the PixelFormat from an [`image::Pixel`].
 fn pixel_format<P: image::Pixel>() -> Result<PixelFormat, String> {
 	match P::COLOR_TYPE {
-		image::ColorType::BGR(8)  => Ok(PixelFormat::Bgr8),
-		image::ColorType::BGRA(8) => Ok(PixelFormat::Bgra8),
-		image::ColorType::RGB(8)  => Ok(PixelFormat::Rgb8),
-		image::ColorType::RGBA(8) => Ok(PixelFormat::Rgba8),
-		image::ColorType::Gray(8) => Ok(PixelFormat::Mono8),
+		image::ColorType::Bgr8  => Ok(PixelFormat::Bgr8),
+		image::ColorType::Bgra8 => Ok(PixelFormat::Bgra8),
+		image::ColorType::Rgb8  => Ok(PixelFormat::Rgb8),
+		image::ColorType::Rgba8 => Ok(PixelFormat::Rgba8),
+		image::ColorType::L8    => Ok(PixelFormat::Mono8),
 		x  => Err(format!("unsupported color type: {:?}", x)),
 	}
 }

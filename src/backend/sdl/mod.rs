@@ -540,11 +540,11 @@ impl WindowInner {
 #[cfg(feature = "save")]
 fn save_image(path: &std::path::Path, data: &[u8], info: ImageInfo) -> Result<(), String> {
 	let color_type = match info.pixel_format {
-		PixelFormat::Mono8 => image::ColorType::Gray(8),
-		PixelFormat::Rgb8  => image::ColorType::RGB(8),
-		PixelFormat::Rgba8 => image::ColorType::RGBA(8),
-		PixelFormat::Bgr8  => image::ColorType::BGR(8),
-		PixelFormat::Bgra8 => image::ColorType::BGRA(8),
+		PixelFormat::Mono8 => image::ColorType::L8,
+		PixelFormat::Rgb8  => image::ColorType::Rgb8,
+		PixelFormat::Rgba8 => image::ColorType::Rgba8,
+		PixelFormat::Bgr8  => image::ColorType::Bgr8,
+		PixelFormat::Bgra8 => image::ColorType::Bgra8,
 	};
 
 	let bytes_per_pixel = usize::from(info.pixel_format.bytes_per_pixel());
