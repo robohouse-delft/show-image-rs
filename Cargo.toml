@@ -23,8 +23,9 @@ categories = [
 ]
 
 [features]
-full = ["save", "image", "tch"]
-save = ["tinyfiledialogs", "image"]
+full     = ["save", "image", "tch"]
+save     = ["tinyfiledialogs", "image"]
+doc-only = ["tch/doc-only"]
 
 [dependencies]
 keyboard-types  = "0.4.4"
@@ -38,4 +39,4 @@ show-image = { path = ".", features=["full"] }
 assert2    = "0.1.1"
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["doc-only", "full"]
