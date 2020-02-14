@@ -503,7 +503,10 @@ impl WindowInner {
 
 	fn handle_keyboard_event(&mut self, event: KeyboardEvent) -> Result<(), String> {
 		#[cfg(feature = "save")] {
-			if event.state == KeyState::Down && event.key == KeyCode::Character("S".into()) && event.modifiers == KeyModifiers::CONTROL {
+			let ctrl  = event.modifiers.contains(KeyModifiers::CONTROL);
+			let shift = event.modifiers.contains(KeyModifiers::SHIFT);
+			let alt   = event.modifiers.contains(KeyModifiers::ALT);
+			if event.state == KeyState::Down && event.key == KeyCode::Character("S".into()) && ctrl && !shift && !alt {
 				return self.save_image();
 			}
 		}
