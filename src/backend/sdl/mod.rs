@@ -76,6 +76,9 @@ enum ContextCommand {
 
 	/// Set the image of the window.
 	SetImage(u32, Box<[u8]>, ImageInfo, String, oneshot::Sender<Result<(), String>>),
+
+	/// Get the currently displayed image of the window.
+	GetImage(u32, oneshot::Sender<Result<Option<(Arc<[u8]>, ImageInfo, String)>, String>>),
 }
 
 /// Inner context doing the real work in the background thread.
@@ -204,6 +207,14 @@ impl Window {
 		result_rx.recv_timeout(RESULT_TIMEOUT)
 			.map_err(|e| format!("failed to receive result from context thread: {}", e))?
 			.map_err(|e| format!("failed to display image: {}", e))
+	}
+
+	/// Get the currently displayed image of the window.
+	pub fn get_image(&self) -> Result<Option<(Arc<[u8]>, ImageInfo, String)>, String> {
+		let (result_tx, mut result_rx) = oneshot::channel();
+		self.command_tx.send(ContextCommand::GetImage(self.id, result_tx)).unwrap();
+		result_rx.recv_timeout(RESULT_TIMEOUT)
+			.map_err(|e| format!("failed to receive result from context thread: {}", e))?
 	}
 
 	/// Close the window.
@@ -393,6 +404,12 @@ impl ContextInner {
 				match self.windows.iter_mut().find(|x| x.id == id) {
 					None => result_tx.send(Err(format!("failed to find window with ID {}", id))),
 					Some(window) => result_tx.send(window.set_image(&self.mono_palette, data, info, name)),
+				}
+			},
+			ContextCommand::GetImage(id, result_tx) => {
+				match self.windows.iter_mut().find(|x| x.id == id) {
+					None => result_tx.send(Err(format!("failed to find window with ID {}", id))),
+					Some(window) => result_tx.send(Ok(window.image.clone())),
 				}
 			},
 		}
