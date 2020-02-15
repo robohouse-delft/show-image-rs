@@ -25,7 +25,7 @@
 //!
 //! let tensor = tch::vision::imagenet::load_image("/path/to/image").unwrap();
 //! let window = make_window("image")?;
-//! window.set_image(tensor.as_image_guess_rgb())?;
+//! window.set_image(tensor.as_image_guess_rgb(), "image-001")?;
 //! # Result::<(), String>::Ok(())
 //! ```
 
