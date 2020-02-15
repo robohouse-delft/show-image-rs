@@ -8,15 +8,18 @@ fn main() -> Result<(), String> {
 		return Err(format!("usage: {} IMAGE", args[0]));
 	}
 
-	let tensor = tch::vision::imagenet::load_image(&args[1])
-		.map_err(|e| format!("failed to load image from {:?}: {}", &args[1], e))?;
+	let path = std::path::Path::new(&args[1]);
+	let name = path.file_stem().and_then(|x| x.to_str()).unwrap_or("image");
+
+	let tensor = tch::vision::imagenet::load_image(path)
+		.map_err(|e| format!("failed to load image from {:?}: {}", path, e))?;
 	let image = tensor.as_image_guess_rgb();
 	if let Ok(image) = &image {
 		println!("{:#?}", image.info());
 	}
 
 	let window = make_window("image")?;
-	window.set_image(image)?;
+	window.set_image(image, name)?;
 
 	while let Ok(event) = window.wait_key(std::time::Duration::from_millis(100)) {
 		if let Some(event) = event {

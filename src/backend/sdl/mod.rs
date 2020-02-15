@@ -75,7 +75,7 @@ enum ContextCommand {
 	DestroyWindow(u32, oneshot::Sender<Result<(), String>>),
 
 	/// Set the image of the window.
-	SetImage(u32, Box<[u8]>, ImageInfo, oneshot::Sender<Result<(), String>>),
+	SetImage(u32, Box<[u8]>, ImageInfo, String, oneshot::Sender<Result<(), String>>),
 }
 
 /// Inner context doing the real work in the background thread.
@@ -114,11 +114,9 @@ struct WindowInner {
 	texture: Option<(Texture<'static>, Rect)>,
 
 	/// The data of the currently displayed image.
-	#[cfg(feature = "save")]
-	data: Option<(Arc<Box<[u8]>>, ImageInfo)>,
+	image: Option<(Arc<[u8]>, ImageInfo, String)>,
 
 	/// Join handles for background threads saving images.
-	#[cfg(feature = "save")]
 	save_threads: Vec<std::thread::JoinHandle<Result<(), String>>>,
 
 	/// Channel to send keyboard events.
@@ -197,12 +195,12 @@ impl Context {
 
 impl Window {
 	/// Set the image to de displayed by the window.
-	pub fn set_image(&self, image: impl ImageData) -> Result<(), String> {
+	pub fn set_image(&self, image: impl ImageData, name: impl Into<String>) -> Result<(), String> {
 		let info = image.info().map_err(|e| format!("failed to display image: {}", e))?;
 		let data = image.data();
 
 		let (result_tx, mut result_rx) = oneshot::channel();
-		self.command_tx.send(ContextCommand::SetImage(self.id, data, info, result_tx)).unwrap();
+		self.command_tx.send(ContextCommand::SetImage(self.id, data, info, name.into(), result_tx)).unwrap();
 		result_rx.recv_timeout(RESULT_TIMEOUT)
 			.map_err(|e| format!("failed to receive result from context thread: {}", e))?
 			.map_err(|e| format!("failed to display image: {}", e))
@@ -391,10 +389,10 @@ impl ContextInner {
 			ContextCommand::DestroyWindow(id, result_tx) => {
 				result_tx.send(self.destroy_window(id));
 			},
-			ContextCommand::SetImage(id, data, info, result_tx) => {
+			ContextCommand::SetImage(id, data, info, name, result_tx) => {
 				match self.windows.iter_mut().find(|x| x.id == id) {
 					None => result_tx.send(Err(format!("failed to find window with ID {}", id))),
-					Some(window) => result_tx.send(window.set_image(&self.mono_palette, data, info)),
+					Some(window) => result_tx.send(window.set_image(&self.mono_palette, data, info, name)),
 				}
 			},
 		}
@@ -419,9 +417,7 @@ impl ContextInner {
 			canvas,
 			texture_creator,
 			texture: None,
-			#[cfg(feature = "save")]
-			data: None,
-			#[cfg(feature = "save")]
+			image: None,
 			save_threads: Vec::new(),
 			event_tx,
 			preserve_aspect_ratio: options.preserve_aspect_ratio,
@@ -444,7 +440,7 @@ impl ContextInner {
 
 impl WindowInner {
 	/// Set the displayed image.
-	fn set_image(&mut self, mono_palette: &sdl2::pixels::Palette, mut data: Box<[u8]>, info: ImageInfo) -> Result<(), String> {
+	fn set_image(&mut self, mono_palette: &sdl2::pixels::Palette, mut data: Box<[u8]>, info: ImageInfo, name: String) -> Result<(), String> {
 		let pixel_format = match info.pixel_format {
 			PixelFormat::Mono8 => PixelFormatEnum::Index8,
 			PixelFormat::Rgb8  => PixelFormatEnum::RGB24,
@@ -466,10 +462,7 @@ impl WindowInner {
 			.map_err(|e| format!("failed to create texture from surface: {}", e))?;
 		let texture = unsafe { std::mem::transmute::<_, Texture<'static>>(texture) };
 		self.texture = Some((texture, image_size));
-
-		#[cfg(feature = "save")] {
-			self.data = Some((Arc::new(data), info));
-		}
+		self.image = Some((Arc::from(data), info, name));
 
 		Ok(())
 	}
@@ -518,7 +511,7 @@ impl WindowInner {
 
 	#[cfg(feature = "save")]
 	fn save_image(&mut self) -> Result<(), String> {
-		let (data, info) = match &self.data {
+		let (data, info, name) = match &self.image {
 			Some(x) => x.clone(),
 			None => return Ok(()),
 		};
@@ -533,7 +526,7 @@ impl WindowInner {
 		});
 
 		// TODO: Reap finished join handles at some point.
-		// TODO: Join them somehow when cleanly stopping context.
+		// TODO: Allow the threads to be joined through the Window handle.
 		self.save_threads.push(thread);
 
 		Ok(())
