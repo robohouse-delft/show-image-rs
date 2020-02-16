@@ -1,3 +1,7 @@
+v0.5.1
+  * Add `window.add_key_handler`to register asynchronous key handlers.
+  * Ignore key events that happened while a window was out of focus.
+
 v0.5.0
   * Add `stop()` function to cleanly stop the background thread.
   * Add `window.get_image()` to retrieve the displayed image.
