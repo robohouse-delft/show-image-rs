@@ -567,7 +567,6 @@ impl WindowInner {
 
 			self.canvas.copy(&texture, image_size.clone(), rect)
 				.map_err(|e| format!("failed to copy data to self: {}", e))?;
-			self.canvas.window_mut().show();
 		}
 
 		self.canvas.present();
