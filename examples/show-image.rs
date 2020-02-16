@@ -27,5 +27,6 @@ fn main() -> Result<(), String> {
 		}
 	}
 
+	show_image::stop()?;
 	Ok(())
 }

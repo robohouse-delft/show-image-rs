@@ -41,3 +41,16 @@ pub fn make_window(name: impl Into<String>) -> Result<Window, String> {
 pub fn make_window_full(options: crate::WindowOptions) -> Result<Window, String> {
 	context()?.make_window_full(options)
 }
+
+/// Stop the global context and join background thread.
+///
+/// Calling this before your process exits ensures that all background tasks
+/// have finished.
+///
+/// If you don't call this function, images being saved in the background thread may be corrupted on disk.
+/// Note that this will block until any potential file dialogs have been closed.
+pub fn stop() -> Result<(), String> {
+	let context = context()?;
+	context.stop()?;
+	context.join()
+}

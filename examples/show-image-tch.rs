@@ -24,12 +24,13 @@ fn main() -> Result<(), String> {
 
 	while let Ok(event) = window.wait_key(std::time::Duration::from_millis(100)) {
 		if let Some(event) = event {
-			println!("{:#?}", event);
+			//println!("{:#?}", event);
 			if event.key == show_image::KeyCode::Escape {
 				break;
 			}
 		}
 	}
 
+	show_image::stop()?;
 	Ok(())
 }

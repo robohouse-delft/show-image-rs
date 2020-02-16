@@ -7,8 +7,8 @@ use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 
-#[cfg(feature = "save")]
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::mpsc;
 use std::time::Duration;
 use std::time::Instant;
@@ -43,7 +43,7 @@ pub struct Context {
 	command_tx: mpsc::SyncSender<ContextCommand>,
 
 	/// Join handle for the background thread.
-	thread: std::thread::JoinHandle<Result<(), String>>,
+	thread: Mutex<Option<BackgroundThread<Result<(), String>>>>,
 }
 
 /// A window capable of displaying images.
@@ -98,6 +98,9 @@ struct ContextInner {
 	/// Channel to receive commands.
 	command_rx: mpsc::Receiver<ContextCommand>,
 
+	/// Background tasks that might be joined later.
+	background_tasks: Vec<BackgroundThread<()>>,
+
 	/// Flag to indicate the context should stop as soon as possible.
 	stop: bool,
 }
@@ -119,14 +122,45 @@ struct WindowInner {
 	/// The data of the currently displayed image.
 	image: Option<(Arc<[u8]>, ImageInfo, String)>,
 
-	/// Join handles for background threads saving images.
-	save_threads: Vec<std::thread::JoinHandle<Result<(), String>>>,
-
 	/// Channel to send keyboard events.
 	event_tx: mpsc::SyncSender<KeyboardEvent>,
 
 	/// If true, preserve aspect ratio when scaling image.
 	preserve_aspect_ratio: bool,
+}
+
+struct BackgroundThread<T> {
+	done: Arc<std::sync::atomic::AtomicBool>,
+	handle: std::thread::JoinHandle<T>,
+}
+
+impl<T> BackgroundThread<T> {
+	fn new<F>(f: F) -> Self
+	where
+		F: FnOnce() -> T,
+		F: Send + 'static,
+		T: Send + 'static,
+	{
+		let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+		let handle = std::thread::spawn({
+			let done = done.clone();
+			move || {
+				let result = f();
+				done.store(true, std::sync::atomic::Ordering::Release);
+				result
+			}
+		});
+
+		Self { done, handle }
+	}
+
+	fn is_done(&self) -> bool {
+		self.done.load(std::sync::atomic::Ordering::Acquire)
+	}
+
+	fn join(self) -> std::thread::Result<T> {
+		self.handle.join()
+	}
 }
 
 impl Context {
@@ -136,7 +170,7 @@ impl Context {
 	pub fn new() -> Result<Self, String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		let (command_tx, command_rx) = mpsc::sync_channel(10);
-		let thread = std::thread::spawn(move || {
+		let thread = BackgroundThread::new(move || {
 			match ContextInner::new(command_rx) {
 				Err(e) => {
 					result_tx.send(Err(e));
@@ -144,15 +178,20 @@ impl Context {
 				},
 				Ok(mut context) => {
 					result_tx.send(Ok(()));
-					context.run()
+					context.run()?;
+					context.join_background_tasks();
+					Ok(())
 				}
 			}
 		});
 
 		match result_rx.recv_timeout(Duration::from_millis(1500)) {
-			Err(e) => Err(format!("failed to receive result from context thread: {}", e)),
+			Err(e) => Err(format!("failed to receive ready notification from context thread: {}", e)),
 			Ok(Err(e)) => Err(e),
-			Ok(Ok(())) => Ok(Context { command_tx, thread })
+			Ok(Ok(())) => Ok(Context {
+				command_tx,
+				thread: Mutex::new(Some(thread)),
+			})
 		}
 	}
 
@@ -166,8 +205,8 @@ impl Context {
 	pub fn make_window_full(&self, options: WindowOptions) -> Result<Window, String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::CreateWindow(options, self.command_tx.clone(), result_tx))
-			.map_err(|e| format!("failed to send command to context thread: {}", e))?;
-		result_rx.recv_timeout(RESULT_TIMEOUT).map_err(|e| format!("failed to receive result from context thread: {}", e))?
+			.map_err(|e| format!("failed to send CreateWindow command to context thread: {}", e))?;
+		result_rx.recv_timeout(RESULT_TIMEOUT).map_err(|e| format!("failed to receive CreateWindow result from context thread: {}", e))?
 	}
 
 	/// Close all windows and stop the background thread.
@@ -180,8 +219,8 @@ impl Context {
 	pub fn stop(&self) -> Result<(), String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::Stop(result_tx))
-			.map_err(|e| format!("failed to send command to context thread: {}", e))?;
-		result_rx.recv_timeout(RESULT_TIMEOUT).map_err(|e| format!("failed to receive result from context thread: {}", e))
+			.map_err(|e| format!("failed to send Stop command to context thread: {}", e))?;
+		result_rx.recv_timeout(RESULT_TIMEOUT).map_err(|e| format!("failed to receive Stop result from context thread: {}", e))
 	}
 
 	/// Join the background thread, blocking until the thread has terminated.
@@ -191,8 +230,14 @@ impl Context {
 	/// Note that the background thread will only terminate if an error occurs
 	/// or if [`Context::stop`] is called.
 	#[allow(unused)]
-	pub fn join(self) -> Result<(), String> {
-		self.thread.join().map_err(|e| format!("failed to join context thread: {:?}", e))?
+	pub fn join(&self) -> Result<(), String> {
+		// Join main context thread.
+		let mut thread = self.thread.lock().unwrap();
+		if let Some(thread) = thread.take() {
+			thread.join().map_err(|e| format!("failed to join context thread: {:?}", e))?
+		} else {
+			Ok(())
+		}
 	}
 }
 
@@ -208,7 +253,7 @@ impl Window {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::SetImage(self.id, data, info, name.into(), result_tx)).unwrap();
 		result_rx.recv_timeout(RESULT_TIMEOUT)
-			.map_err(|e| format!("failed to receive result from context thread: {}", e))?
+			.map_err(|e| format!("failed to receive SetImage result from context thread: {}", e))?
 			.map_err(|e| format!("failed to display image: {}", e))
 	}
 
@@ -217,7 +262,7 @@ impl Window {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::GetImage(self.id, result_tx)).unwrap();
 		result_rx.recv_timeout(RESULT_TIMEOUT)
-			.map_err(|e| format!("failed to receive result from context thread: {}", e))?
+			.map_err(|e| format!("failed to receive GetImage result from context thread: {}", e))?
 	}
 
 	/// Close the window.
@@ -272,11 +317,11 @@ impl Window {
 	}
 
 	/// Close the window without dropping the handle.
-	pub fn close_impl(&self) -> Result<(), String> {
+	fn close_impl(&self) -> Result<(), String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::DestroyWindow(self.id, result_tx))
-			.map_err(|e| format!("failed to send command to window: {}", e))?;
-		result_rx.recv_timeout(RESULT_TIMEOUT).map_err(|e| format!("failed to receive result from context thread: {}", e))?
+			.map_err(|e| format!("failed to send DestroyWindow command to window: {}", e))?;
+		result_rx.recv_timeout(RESULT_TIMEOUT).map_err(|e| format!("failed to receive DestroyWindow result from context thread: {}", e))?
 	}
 }
 
@@ -302,6 +347,7 @@ impl ContextInner {
 			mono_palette,
 			windows: Vec::new(),
 			command_rx,
+			background_tasks: Vec::new(),
 			stop: false,
 		})
 	}
@@ -342,6 +388,7 @@ impl ContextInner {
 			window.draw()?;
 		}
 
+		self.clean_background_tasks();
 		Ok(())
 	}
 
@@ -378,7 +425,9 @@ impl ContextInner {
 	/// Handle an SDL2 keyboard event.
 	fn handle_sdl_keyboard_event(&mut self, window_id: u32, event: KeyboardEvent) -> Result<(), String> {
 		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
-			window.handle_keyboard_event(event)?;
+			if let Some(work) = window.handle_keyboard_event(event)? {
+				self.background_tasks.push(work);
+			}
 		}
 		Ok(())
 	}
@@ -438,7 +487,6 @@ impl ContextInner {
 			texture_creator,
 			texture: None,
 			image: None,
-			save_threads: Vec::new(),
 			event_tx,
 			preserve_aspect_ratio: options.preserve_aspect_ratio,
 		};
@@ -455,6 +503,23 @@ impl ContextInner {
 		let mut window = self.windows.remove(index);
 		window.close();
 		Ok(())
+	}
+
+	/// Clean finished background threads.
+	///
+	/// Finished threads are joined to check their result.
+	/// If a joined thread returns an error, the error is returned and no other threads are cleaned.
+	fn clean_background_tasks(&mut self) {
+		self.background_tasks.retain(|x| !x.is_done());
+	}
+
+	/// Join all background threads.
+	///
+	/// If a joined thread returns an error, the error is returned and no other threads are joined.
+	fn join_background_tasks(&mut self) {
+		while !self.background_tasks.is_empty() {
+			let _ = self.background_tasks.remove(self.background_tasks.len() - 1).join();
+		}
 	}
 }
 
@@ -514,37 +579,27 @@ impl WindowInner {
 		self.canvas.window_mut().hide();
 	}
 
-	fn handle_keyboard_event(&mut self, event: KeyboardEvent) -> Result<(), String> {
+	fn handle_keyboard_event(&mut self, event: KeyboardEvent) -> Result<Option<BackgroundThread<()>>, String> {
 		#[cfg(feature = "save")] {
 			let ctrl  = event.modifiers.contains(KeyModifiers::CONTROL);
 			let shift = event.modifiers.contains(KeyModifiers::SHIFT);
 			let alt   = event.modifiers.contains(KeyModifiers::ALT);
 			if event.state == KeyState::Down && event.key == KeyCode::Character("S".into()) && ctrl && !shift && !alt {
-				return self.save_image();
+				return Ok(self.save_image());
 			}
 		}
 		// Ignore errors, it means the receiver isn't handling events.
 		let _ = self.event_tx.try_send(event);
-
-		Ok(())
+		Ok(None)
 	}
 
 	#[cfg(feature = "save")]
-	fn save_image(&mut self) -> Result<(), String> {
-		let (data, info, name) = match &self.image {
-			Some(x) => x.clone(),
-			None => return Ok(()),
-		};
+	fn save_image(&mut self) -> Option<BackgroundThread<()>> {
+		let (data, info, name) = self.image.as_ref()?.clone();
 
-		let thread = std::thread::spawn(move || {
-			crate::prompt_save_image(&format!("{}.png", name), &data, info)
-		});
-
-		// TODO: Reap finished join handles at some point.
-		// TODO: Allow the threads to be joined through the Window handle.
-		self.save_threads.push(thread);
-
-		Ok(())
+		Some(BackgroundThread::new(move || {
+			let _ = crate::prompt_save_image(&format!("{}.png", name), &data, info);
+		}))
 	}
 }
 
