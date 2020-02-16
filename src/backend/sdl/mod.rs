@@ -503,6 +503,7 @@ impl ContextInner {
 
 	/// Destroy a window by ID.
 	fn destroy_window(&mut self, id: u32) -> Result<(), String> {
+		self.key_handlers.retain(|(handler_window_id, _)| *handler_window_id != id);
 		let index = self.windows.iter().position(|x| x.id == id)
 			.ok_or_else(|| format!("failed to find window with ID {}", id))?;
 		let mut window = self.windows.remove(index);
