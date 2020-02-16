@@ -376,8 +376,29 @@ impl ContextInner {
 	/// Run one iteration of the event loop.
 	fn run_one(&mut self) -> Result<(), String> {
 		// Handle all queued SDL events.
+		// Skip all key events for windows that just got focussed,
+		// because these are probably virtual events that happened while the window was not focussed.
+		// Work-around for https://bugzilla.libsdl.org/show_bug.cgi?id=4989
+		let mut focussed_windows = Vec::new();
 		while let Some(event) = self.events.poll_event() {
-			self.handle_sdl_event(event)?;
+			match event {
+				Event::Window { window_id, win_event, .. } => {
+					match win_event {
+						WindowEvent::Close => self.destroy_window(window_id)?,
+						WindowEvent::FocusGained => focussed_windows.push(window_id),
+						_ => (),
+					}
+				},
+				Event::KeyDown { window_id, keycode, scancode, keymod, repeat, .. } if !focussed_windows.contains(&window_id) => {
+					let event = convert_keyboard_event(KeyState::Down, keycode, scancode, keymod, repeat);
+					self.handle_sdl_keyboard_event(window_id, event)?;
+				},
+				Event::KeyUp { window_id, keycode, scancode, keymod, repeat, .. } if !focussed_windows.contains(&window_id) => {
+					let event = convert_keyboard_event(KeyState::Up, keycode, scancode, keymod, repeat);
+					self.handle_sdl_keyboard_event(window_id, event)?;
+				},
+				_ => (),
+			}
 		}
 
 		// Handle all queued commands for the context.
@@ -389,36 +410,6 @@ impl ContextInner {
 		}
 
 		self.clean_background_tasks();
-		Ok(())
-	}
-
-	/// Handle an SDL2 event.
-	fn handle_sdl_event(&mut self, event: Event) -> Result<(), String> {
-		match event {
-			Event::Window { window_id, win_event, .. } => {
-				self.handle_sdl_window_event(window_id, win_event)
-			},
-			Event::KeyDown { window_id, keycode, scancode, keymod, repeat, .. } => {
-				let event = convert_keyboard_event(KeyState::Down, keycode, scancode, keymod, repeat);
-				self.handle_sdl_keyboard_event(window_id, event)
-			},
-			Event::KeyUp { window_id, keycode, scancode, keymod, repeat, .. } => {
-				let event = convert_keyboard_event(KeyState::Up, keycode, scancode, keymod, repeat);
-				self.handle_sdl_keyboard_event(window_id, event)
-			},
-			_ => Ok(()),
-		}
-	}
-
-	/// Handle an SDL2 window event.
-	#[allow(clippy::single_match)]
-	fn handle_sdl_window_event(&mut self, window_id: u32, event: WindowEvent) -> Result<(), String> {
-		match event {
-			WindowEvent::Close => {
-				self.destroy_window(window_id)?;
-			},
-			_ => (),
-		}
 		Ok(())
 	}
 
