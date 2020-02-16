@@ -245,7 +245,7 @@ impl Window {
 	/// Set the image to de displayed by the window.
 	///
 	/// The name is used to suggest a defaullt file name when saving images.
-	/// It is also returned again by [`Self::get_image`].
+	/// It is also returned again by [`Window::get_image`].
 	pub fn set_image(&self, image: impl ImageData, name: impl Into<String>) -> Result<(), String> {
 		let info = image.info().map_err(|e| format!("failed to display image: {}", e))?;
 		let data = image.data();
