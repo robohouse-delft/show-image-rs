@@ -32,6 +32,10 @@ mod key_code;
 mod key_location;
 mod modifiers;
 mod scan_code;
+mod key_handler;
+
+pub use key_handler::KeyHandler;
+pub use key_handler::KeyHandlerContext;
 
 const RESULT_TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -80,6 +84,9 @@ enum ContextCommand {
 
 	/// Get the currently displayed image of the window.
 	GetImage(u32, oneshot::Sender<Result<Option<(Arc<[u8]>, ImageInfo, String)>, String>>),
+
+	/// Register a key handler to be run in the background contex.
+	AddKeyHandler(u32, KeyHandler, oneshot::Sender<Result<(), String>>),
 }
 
 /// Inner context doing the real work in the background thread.
@@ -98,6 +105,9 @@ struct ContextInner {
 
 	/// Channel to receive commands.
 	command_rx: mpsc::Receiver<ContextCommand>,
+
+	/// Key handlers to be run in the context thread.
+	key_handlers: Vec<(u32, KeyHandler)>,
 
 	/// Background tasks that might be joined later.
 	background_tasks: Vec<BackgroundThread<()>>,
@@ -232,6 +242,26 @@ impl Window {
 			.map_err(|e| format!("failed to receive GetImage result from context thread: {}", e))?
 	}
 
+	/// Add a handler for keyboard events.
+	///
+	/// The added handler will be run directly in the context thread.
+	/// This allows you to handle keyboard event asynchronously,
+	/// but it also means your hander shouldn't block for long.
+	///
+	/// The handler can use the [`KeyHandlerContext::spawn_task`] to perform long running operations.
+	///
+	/// If you want to handle key events in your own thread,
+	/// use [`Window::wait_key`], [`Window::wait_key_deadline`] or [`Window::events`].
+	pub fn add_key_handler<Handler>(&self, handler: Handler) -> Result<(), String>
+	where
+		Handler: FnMut(&mut KeyHandlerContext) + Send + 'static,
+	{
+		let (result_tx, mut result_rx) = oneshot::channel();
+		self.command_tx.send(ContextCommand::AddKeyHandler(self.id, Box::new(handler), result_tx)).unwrap();
+		result_rx.recv_timeout(RESULT_TIMEOUT)
+			.map_err(|e| format!("failed to receive AddKeyHandler result from context thread: {}", e))?
+	}
+
 	/// Close the window.
 	///
 	/// The window is automatically closed if the handle is dropped,
@@ -314,6 +344,7 @@ impl ContextInner {
 			mono_palette,
 			windows: Vec::new(),
 			command_rx,
+			key_handlers: Vec::new(),
 			background_tasks: Vec::new(),
 			stop: false,
 		})
@@ -383,6 +414,13 @@ impl ContextInner {
 	/// Handle an SDL2 keyboard event.
 	fn handle_sdl_keyboard_event(&mut self, window_id: u32, event: KeyboardEvent) -> Result<(), String> {
 		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
+			for (_, handler) in self.key_handlers.iter_mut().filter(|(id, _)| *id == window_id) {
+				let mut context = KeyHandlerContext::new(&mut self.background_tasks, &event, window.image.as_ref());
+				handler(&mut context);
+				if context.should_stop_propagation() {
+					break;
+				}
+			}
 			if let Some(work) = window.handle_keyboard_event(event)? {
 				self.background_tasks.push(work);
 			}
@@ -420,6 +458,15 @@ impl ContextInner {
 				match self.windows.iter_mut().find(|x| x.id == id) {
 					None => result_tx.send(Err(format!("failed to find window with ID {}", id))),
 					Some(window) => result_tx.send(Ok(window.image.clone())),
+				}
+			},
+			ContextCommand::AddKeyHandler(id, handler, result_tx) => {
+				match self.windows.iter_mut().find(|x| x.id == id) {
+					None => result_tx.send(Err(format!("failed to find window with ID {}", id))),
+					Some(_) => {
+						self.key_handlers.push((id, handler));
+						result_tx.send(Ok(()))
+					}
 				}
 			},
 		}

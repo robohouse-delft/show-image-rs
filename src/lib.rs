@@ -19,7 +19,8 @@
 //! # Keyboard events.
 //! You can handle keyboard events for windows using [`Window::wait_key`] or [`Window::wait_key_deadline`].
 //! These functions will wait for key press events while discarding key up events.
-//! Alternatively you can use [`Window::events`] to get direct access to a channel with all keyboard events.
+//! Alternatively you can use [`Window::events`] to get direct access to a channel with all keyboard events,
+//! or use [`Window::add_key_handler`] to register an asynchronous key handler.
 //!
 //! Keyboard events are reported using types re-exported from the `keyboard-types` crate for easy interoperability with other crates.
 //!
