@@ -24,7 +24,8 @@ feel free to send a PR or create an issue on GitHub.
 ## Keyboard events.
 You can handle keyboard events for windows using `Window::wait_key` or `Window::wait_key_deadline`.
 These functions will wait for key press events while discarding key up events.
-Alternatively you can use `Window::events` to get direct access to a channel with all keyboard events.
+Alternatively you can use `Window::events` to get direct access to a channel with all keyboard events,
+or use `Window::add_key_handler` to register an asynchronous key handler.
 
 Keyboard events are reported using types re-exported from the `keyboard-types` crate for easy interoperability with other crates.
 
@@ -53,7 +54,6 @@ window.set_image(image, "image-001")?;
 ```rust
 use show_image::{KeyCode, make_window};
 
-#
 // Create a window and display the image.
 let window = make_window("image")?;
 window.set_image(&image, "image-001")?;
@@ -71,5 +71,4 @@ while let Ok(event) = window.wait_key(Duration::from_millis(100)) {
 
 // Make sure all background tasks are stopped cleanly.
 show_image::stop()?;
-
 ```

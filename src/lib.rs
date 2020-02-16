@@ -55,9 +55,8 @@
 //! # use show_image::ImageInfo;
 //! use show_image::{KeyCode, make_window};
 //!
-//! # let image = (&[0u8][..], ImageInfo::rgb8(1920, 1080));
-//! #
 //! // Create a window and display the image.
+//! # let image = (&[0u8][..], ImageInfo::rgb8(1920, 1080));
 //! let window = make_window("image")?;
 //! window.set_image(&image, "image-001")?;
 //!
@@ -74,7 +73,6 @@
 //!
 //! // Make sure all background tasks are stopped cleanly.
 //! show_image::stop()?;
-//!
 //! # Result::<(), String>::Ok(())
 //! ```
 
