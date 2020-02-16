@@ -25,6 +25,7 @@ use crate::PixelFormat;
 use crate::WaitKeyError;
 use crate::WindowOptions;
 use crate::oneshot;
+use crate::background_thread::BackgroundThread;
 
 mod monochrome;
 mod key_code;
@@ -127,40 +128,6 @@ struct WindowInner {
 
 	/// If true, preserve aspect ratio when scaling image.
 	preserve_aspect_ratio: bool,
-}
-
-struct BackgroundThread<T> {
-	done: Arc<std::sync::atomic::AtomicBool>,
-	handle: std::thread::JoinHandle<T>,
-}
-
-impl<T> BackgroundThread<T> {
-	fn new<F>(f: F) -> Self
-	where
-		F: FnOnce() -> T,
-		F: Send + 'static,
-		T: Send + 'static,
-	{
-		let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
-		let handle = std::thread::spawn({
-			let done = done.clone();
-			move || {
-				let result = f();
-				done.store(true, std::sync::atomic::Ordering::Release);
-				result
-			}
-		});
-
-		Self { done, handle }
-	}
-
-	fn is_done(&self) -> bool {
-		self.done.load(std::sync::atomic::Ordering::Acquire)
-	}
-
-	fn join(self) -> std::thread::Result<T> {
-		self.handle.join()
-	}
 }
 
 impl Context {

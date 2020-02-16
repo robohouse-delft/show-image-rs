@@ -85,6 +85,7 @@ pub use keyboard_types::Location as KeyLocation;
 pub use keyboard_types::Modifiers as KeyModifiers;
 
 mod backend;
+mod background_thread;
 mod features;
 mod image_info;
 mod oneshot;
