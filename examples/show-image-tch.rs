@@ -13,6 +13,7 @@ fn main() -> Result<(), String> {
 
 	let tensor = tch::vision::imagenet::load_image(path)
 		.map_err(|e| format!("failed to load image from {:?}: {}", path, e))?;
+	let tensor = tch::vision::imagenet::unnormalize(&tensor).unwrap();
 	let image = tensor.as_image_guess_rgb();
 	if let Ok(image) = &image {
 		println!("{:#?}", image.info());
