@@ -1,3 +1,11 @@
+v0.5.0
+  * Add `stop()` function to cleanly stop the background thread.
+  * Add `window.get_image()` to retrieve the displayed image.
+  * Associate a name with displayed images.
+  * Expose `save_image()` and `promp_save_image()`.
+  * Fix `window.set_image()` for windows on other workspaces.
+  * Fix handling Ctrl+S with modifiers like numlock, capslock, etc.
+
 v0.4.3
   * Add readme to Cargo manifest.
 
