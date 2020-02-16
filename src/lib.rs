@@ -27,6 +27,9 @@
 //! If the `save` feature is enabled, windows allow the displayed image to be saved using `Ctrl+S`.
 //! This will open a file dialog to save the currently displayed image.
 //!
+//! Note that images are saved in a background thread.
+//! To ensure that no data loss occurs, call [`stop`] to gracefully stop and join the background thread.
+//!
 //! # Example 1: Showing an image.
 //! This example uses a tuple of `(&[u8], `[`ImageInfo`]`)` as image,
 //! but any type that implements [`ImageData`] will do.
