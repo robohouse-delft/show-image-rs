@@ -21,13 +21,13 @@ Currently, the following types are supported:
 If you think support for a some data type is missing,
 feel free to send a PR or create an issue on GitHub.
 
-## Keyboard events.
-You can handle keyboard events for windows using `Window::wait_key` or `Window::wait_key_deadline`.
-These functions will wait for key press events while discarding key up events.
-Alternatively you can use `Window::events` to get direct access to a channel with all keyboard events,
-or use `Window::add_key_handler` to register an asynchronous key handler.
+## Event handling.
+You can receive events using `Window::events`.
+This is a general channel on which all events for that window are sent.
 
-Keyboard events are reported using types re-exported from the `keyboard-types` crate for easy interoperability with other crates.
+You can also handle keyboard events for windows using `Window::wait_key` or `Window::wait_key_deadline`.
+These functions will wait for key press events while discarding key up events.
+Alternatively you can use `Window::add_key_handler` to register an asynchronous key handler.
 
 ## Saving displayed images.
 If the `save` feature is enabled, windows allow the displayed image to be saved using `Ctrl+S`.
