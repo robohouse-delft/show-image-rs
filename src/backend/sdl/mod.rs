@@ -1,4 +1,4 @@
-use sdl2::event::Event;
+use sdl2::event::Event as SdlEvent;
 use sdl2::event::WindowEvent;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
@@ -26,6 +26,12 @@ use crate::WaitKeyError;
 use crate::WindowOptions;
 use crate::oneshot;
 use crate::background_thread::BackgroundThread;
+use crate::MouseState;
+use crate::MouseMoveEvent;
+use crate::MouseButtonState;
+use crate::MouseButton;
+use crate::MouseButtonEvent;
+use crate::Event;
 
 mod monochrome;
 mod key_code;
@@ -65,7 +71,7 @@ pub struct Window {
 	command_tx: mpsc::SyncSender<ContextCommand>,
 
 	/// Channel to receive events from the background thread.
-	event_rx: mpsc::Receiver<KeyboardEvent>,
+	event_rx: mpsc::Receiver<Event>,
 }
 
 /// Commands that can be sent to the context in the background thread.
@@ -134,7 +140,7 @@ struct WindowInner {
 	image: Option<(Arc<[u8]>, ImageInfo, String)>,
 
 	/// Channel to send keyboard events.
-	event_tx: mpsc::SyncSender<KeyboardEvent>,
+	event_tx: mpsc::SyncSender<Event>,
 
 	/// If true, preserve aspect ratio when scaling image.
 	preserve_aspect_ratio: bool,
@@ -270,8 +276,8 @@ impl Window {
 		self.close_impl()
 	}
 
-	/// Get the receiver for keyboard events.
-	pub fn events(&self) -> &mpsc::Receiver<KeyboardEvent> {
+	/// Get the receiver for events.
+	pub fn events(&self) -> &mpsc::Receiver<Event> {
 		&self.event_rx
 	}
 
@@ -302,7 +308,8 @@ impl Window {
 				return Ok(None);
 			}
 			let event = match self.events().recv_timeout(deadline - now) {
-				Ok(x) => x,
+				Ok(Event::KeyboardEvent(x)) => x,
+				Ok(_) => continue,
 				Err(mpsc::RecvTimeoutError::Timeout) => return Ok(None),
 				Err(mpsc::RecvTimeoutError::Disconnected) => return Err(WaitKeyError::WindowClosed),
 			};
@@ -374,26 +381,38 @@ impl ContextInner {
 	/// Run one iteration of the event loop.
 	fn run_one(&mut self) -> Result<(), String> {
 		// Handle all queued SDL events.
-		// Skip all key events for windows that just got focussed,
-		// because these are probably virtual events that happened while the window was not focussed.
+		// Skip all key events for windows that just got focused,
+		// because these are probably virtual events that happened while the window was not focused.
 		// Work-around for https://bugzilla.libsdl.org/show_bug.cgi?id=4989
-		let mut focussed_windows = Vec::new();
+		let mut focused_windows = Vec::new();
 		while let Some(event) = self.events.poll_event() {
 			match event {
-				Event::Window { window_id, win_event, .. } => {
+				SdlEvent::Window { window_id, win_event, .. } => {
 					match win_event {
 						WindowEvent::Close => self.destroy_window(window_id)?,
-						WindowEvent::FocusGained => focussed_windows.push(window_id),
+						WindowEvent::FocusGained => focused_windows.push(window_id),
 						_ => (),
 					}
 				},
-				Event::KeyDown { window_id, keycode, scancode, keymod, repeat, .. } if !focussed_windows.contains(&window_id) => {
+				SdlEvent::KeyDown { window_id, keycode, scancode, keymod, repeat, .. } if !focused_windows.contains(&window_id) => {
 					let event = convert_keyboard_event(KeyState::Down, keycode, scancode, keymod, repeat);
 					self.handle_sdl_keyboard_event(window_id, event)?;
 				},
-				Event::KeyUp { window_id, keycode, scancode, keymod, repeat, .. } if !focussed_windows.contains(&window_id) => {
+				SdlEvent::KeyUp { window_id, keycode, scancode, keymod, repeat, .. } if !focused_windows.contains(&window_id) => {
 					let event = convert_keyboard_event(KeyState::Up, keycode, scancode, keymod, repeat);
 					self.handle_sdl_keyboard_event(window_id, event)?;
+				},
+				SdlEvent::MouseMotion { window_id, which, mousestate, x, y, xrel, yrel, .. } if !focused_windows.contains(&window_id) => {
+					let event = convert_mouse_move_event(which, mousestate, x, y, xrel, yrel);
+					self.handle_sdl_mouse_move_event(window_id, event)?;
+				},
+				SdlEvent::MouseButtonDown { window_id, which, mouse_btn, clicks, x, y, .. } if !focused_windows.contains(&window_id) => {
+					let event = convert_mouse_button_event(which, MouseState::Down, mouse_btn, clicks, x, y);
+					self.handle_sdl_mouse_button_event(window_id, event)?;
+				},
+				SdlEvent::MouseButtonUp { window_id, which, mouse_btn, clicks, x, y, .. } if !focused_windows.contains(&window_id) => {
+					let event = convert_mouse_button_event(which, MouseState::Up, mouse_btn, clicks, x, y);
+					self.handle_sdl_mouse_button_event(window_id, event)?;
 				},
 				_ => (),
 			}
@@ -408,6 +427,26 @@ impl ContextInner {
 		}
 
 		self.clean_background_tasks();
+		Ok(())
+	}
+
+	/// Handle an SDL2 mouse move event.
+	fn handle_sdl_mouse_move_event(&mut self, window_id: u32, event: MouseMoveEvent) -> Result<(), String> {
+		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
+			if let Some(work) = window.handle_mouse_move_event(event)? {
+				self.background_tasks.push(work);
+			}
+		}
+		Ok(())
+	}
+
+	/// Handle an SDL2 mouse button event.
+	fn handle_sdl_mouse_button_event(&mut self, window_id: u32, event: MouseButtonEvent) -> Result<(), String> {
+		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
+			if let Some(work) = window.handle_mouse_button_event(event)? {
+				self.background_tasks.push(work);
+			}
+		}
 		Ok(())
 	}
 
@@ -594,7 +633,19 @@ impl WindowInner {
 			}
 		}
 		// Ignore errors, it means the receiver isn't handling events.
-		let _ = self.event_tx.try_send(event);
+		let _ = self.event_tx.try_send(Event::KeyboardEvent(event));
+		Ok(None)
+	}
+
+	fn handle_mouse_move_event(&mut self, event: MouseMoveEvent) -> Result<Option<BackgroundThread<()>>, String> {
+		// Ignore errors, it means the receiver isn't handling events.
+		let _ = self.event_tx.try_send(Event::MouseMoveEvent(event));
+		Ok(None)
+	}
+
+	fn handle_mouse_button_event(&mut self, event: MouseButtonEvent) -> Result<Option<BackgroundThread<()>>, String> {
+		// Ignore errors, it means the receiver isn't handling events.
+		let _ = self.event_tx.try_send(Event::MouseButtonEvent(event));
 		Ok(None)
 	}
 
@@ -624,6 +675,67 @@ fn convert_keyboard_event(
 		modifiers: modifiers::convert_modifiers(modifiers),
 		repeat,
 		is_composing: false,
+	}
+}
+
+/// Convert an SDL2 mouse state to the more generic MouseButtonState.
+fn convert_mouse_state(
+	mouse_state: sdl2::mouse::MouseState,
+) -> MouseButtonState {
+	MouseButtonState {
+		left: mouse_state.left(),
+		middle: mouse_state.middle(),
+		right: mouse_state.right(),
+	}
+}
+
+/// Convert an SDL2 mouse motion event to the more generic MouseMoveEvent.
+fn convert_mouse_move_event(
+	mouse_id: u32,
+	mouse_state: sdl2::mouse::MouseState,
+	x: i32,
+	y: i32,
+	xrel: i32,
+	yrel: i32,
+) -> MouseMoveEvent {
+	MouseMoveEvent {
+		mouse_id,
+		mouse_state: convert_mouse_state(mouse_state),
+		position_x: x,
+		position_y: y,
+		relative_x: xrel,
+		relative_y: yrel,
+	}
+}
+
+/// Convert an SDL2 mouse button to the more generic MouseButton.
+fn convert_mouse_button(
+	mouse_button: sdl2::mouse::MouseButton,
+) -> MouseButton {
+	match mouse_button {
+		sdl2::mouse::MouseButton::Left => MouseButton::Left,
+		sdl2::mouse::MouseButton::Middle => MouseButton::Middle,
+		sdl2::mouse::MouseButton::Right => MouseButton::Right,
+		_ => MouseButton::Unknown,
+	}
+}
+
+/// Convert an SDL2 mouse button event to the more generic MouseButtonEvent.
+fn convert_mouse_button_event(
+	mouse_id: u32,
+	state: MouseState,
+	button: sdl2::mouse::MouseButton,
+	clicks: u8,
+	x: i32,
+	y: i32,
+) -> MouseButtonEvent {
+	MouseButtonEvent {
+		mouse_id,
+		state,
+		button: convert_mouse_button(button),
+		clicks,
+		position_x: x,
+		position_y: y,
 	}
 }
 
