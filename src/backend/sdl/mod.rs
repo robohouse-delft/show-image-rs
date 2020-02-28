@@ -396,23 +396,23 @@ impl ContextInner {
 				},
 				SdlEvent::KeyDown { window_id, keycode, scancode, keymod, repeat, .. } if !focused_windows.contains(&window_id) => {
 					let event = convert_keyboard_event(KeyState::Down, keycode, scancode, keymod, repeat);
-					self.handle_sdl_keyboard_event(window_id, event)?;
+					self.handle_sdl_keyboard_event(window_id, event);
 				},
 				SdlEvent::KeyUp { window_id, keycode, scancode, keymod, repeat, .. } if !focused_windows.contains(&window_id) => {
 					let event = convert_keyboard_event(KeyState::Up, keycode, scancode, keymod, repeat);
-					self.handle_sdl_keyboard_event(window_id, event)?;
+					self.handle_sdl_keyboard_event(window_id, event);
 				},
 				SdlEvent::MouseMotion { window_id, which, mousestate, x, y, xrel, yrel, .. } if !focused_windows.contains(&window_id) => {
 					let event = convert_mouse_move_event(which, mousestate, x, y, xrel, yrel);
-					self.handle_sdl_mouse_move_event(window_id, event)?;
+					self.handle_sdl_mouse_move_event(window_id, event);
 				},
 				SdlEvent::MouseButtonDown { window_id, which, mouse_btn, clicks, x, y, .. } if !focused_windows.contains(&window_id) => {
 					let event = convert_mouse_button_event(which, MouseState::Down, mouse_btn, clicks, x, y);
-					self.handle_sdl_mouse_button_event(window_id, event)?;
+					self.handle_sdl_mouse_button_event(window_id, event);
 				},
 				SdlEvent::MouseButtonUp { window_id, which, mouse_btn, clicks, x, y, .. } if !focused_windows.contains(&window_id) => {
 					let event = convert_mouse_button_event(which, MouseState::Up, mouse_btn, clicks, x, y);
-					self.handle_sdl_mouse_button_event(window_id, event)?;
+					self.handle_sdl_mouse_button_event(window_id, event);
 				},
 				_ => (),
 			}
@@ -431,27 +431,21 @@ impl ContextInner {
 	}
 
 	/// Handle an SDL2 mouse move event.
-	fn handle_sdl_mouse_move_event(&mut self, window_id: u32, event: MouseMoveEvent) -> Result<(), String> {
+	fn handle_sdl_mouse_move_event(&mut self, window_id: u32, event: MouseMoveEvent) {
 		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
-			if let Some(work) = window.handle_mouse_move_event(event)? {
-				self.background_tasks.push(work);
-			}
+			window.handle_mouse_move_event(event);
 		}
-		Ok(())
 	}
 
 	/// Handle an SDL2 mouse button event.
-	fn handle_sdl_mouse_button_event(&mut self, window_id: u32, event: MouseButtonEvent) -> Result<(), String> {
+	fn handle_sdl_mouse_button_event(&mut self, window_id: u32, event: MouseButtonEvent) {
 		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
-			if let Some(work) = window.handle_mouse_button_event(event)? {
-				self.background_tasks.push(work);
-			}
+			window.handle_mouse_button_event(event);
 		}
-		Ok(())
 	}
 
 	/// Handle an SDL2 keyboard event.
-	fn handle_sdl_keyboard_event(&mut self, window_id: u32, event: KeyboardEvent) -> Result<(), String> {
+	fn handle_sdl_keyboard_event(&mut self, window_id: u32, event: KeyboardEvent) {
 		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
 			for (_, handler) in self.key_handlers.iter_mut().filter(|(id, _)| *id == window_id) {
 				let mut context = KeyHandlerContext::new(&mut self.background_tasks, &event, window.image.as_ref());
@@ -460,11 +454,10 @@ impl ContextInner {
 					break;
 				}
 			}
-			if let Some(work) = window.handle_keyboard_event(event)? {
+			if let Some(work) = window.handle_keyboard_event(event) {
 				self.background_tasks.push(work);
 			}
 		}
-		Ok(())
 	}
 
 	/// Handle all queued commands.
@@ -623,30 +616,28 @@ impl WindowInner {
 		self.canvas.window_mut().hide();
 	}
 
-	fn handle_keyboard_event(&mut self, event: KeyboardEvent) -> Result<Option<BackgroundThread<()>>, String> {
+	fn handle_keyboard_event(&mut self, event: KeyboardEvent) -> Option<BackgroundThread<()>> {
 		#[cfg(feature = "save")] {
 			let ctrl  = event.modifiers.contains(KeyModifiers::CONTROL);
 			let shift = event.modifiers.contains(KeyModifiers::SHIFT);
 			let alt   = event.modifiers.contains(KeyModifiers::ALT);
 			if event.state == KeyState::Down && event.key == KeyCode::Character("S".into()) && ctrl && !shift && !alt {
-				return Ok(self.save_image());
+				return self.save_image();
 			}
 		}
 		// Ignore errors, it means the receiver isn't handling events.
 		let _ = self.event_tx.try_send(Event::KeyboardEvent(event));
-		Ok(None)
+		None
 	}
 
-	fn handle_mouse_move_event(&mut self, event: MouseMoveEvent) -> Result<Option<BackgroundThread<()>>, String> {
+	fn handle_mouse_move_event(&mut self, event: MouseMoveEvent) {
 		// Ignore errors, it means the receiver isn't handling events.
 		let _ = self.event_tx.try_send(Event::MouseMoveEvent(event));
-		Ok(None)
 	}
 
-	fn handle_mouse_button_event(&mut self, event: MouseButtonEvent) -> Result<Option<BackgroundThread<()>>, String> {
+	fn handle_mouse_button_event(&mut self, event: MouseButtonEvent) {
 		// Ignore errors, it means the receiver isn't handling events.
 		let _ = self.event_tx.try_send(Event::MouseButtonEvent(event));
-		Ok(None)
 	}
 
 	#[cfg(feature = "save")]
