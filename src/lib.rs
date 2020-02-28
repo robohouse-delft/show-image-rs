@@ -88,10 +88,12 @@ mod background_thread;
 mod features;
 mod image_info;
 mod oneshot;
+mod event;
 
 pub use backend::*;
 pub use features::*;
 pub use image_info::*;
+pub use event::*;
 
 /// Error that can occur while waiting for a key press.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
