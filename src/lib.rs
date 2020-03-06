@@ -126,6 +126,37 @@ pub trait ImageData {
 	fn info(&self) -> Result<ImageInfo, String>;
 }
 
+/// A rectangle.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Rectangle {
+	x: i32,
+	y: i32,
+	width: u32,
+	height: u32
+}
+
+impl Rectangle {
+	pub fn from_xywh(x: i32, y: i32, width: u32, height: u32) -> Self {
+		Self { x, y, width, height }
+	}
+
+	pub fn x(&self) -> i32 {
+		self.x
+	}
+
+	pub fn y(&self) -> i32 {
+		self.y
+	}
+
+	pub fn width(&self) -> u32 {
+		self.width
+	}
+
+	pub fn height(&self) -> u32 {
+		self.height
+	}
+}
+
 /// Options for creating a window.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WindowOptions {

@@ -22,6 +22,7 @@ use crate::KeyboardEvent;
 #[cfg(feature = "save")]
 use crate::KeyModifiers;
 use crate::PixelFormat;
+use crate::Rectangle;
 use crate::WaitKeyError;
 use crate::WindowOptions;
 use crate::oneshot;
@@ -123,7 +124,7 @@ struct ContextInner {
 }
 
 /// Inner window doing the real work in the background thread.
-struct WindowInner {
+pub struct WindowInner {
 	/// The window ID, used to look up the window in the vector.
 	id: u32,
 
@@ -429,7 +430,7 @@ impl ContextInner {
 			}
 
 			for (_, handler) in self.event_handlers.iter_mut().filter(|(id, _)| *id == window_id) {
-				let mut context = EventHandlerContext::new(&mut self.background_tasks, &event, window.image.as_ref());
+				let mut context = EventHandlerContext::new(&mut self.background_tasks, &event, &window);
 				handler(&mut context);
 				if context.should_stop_propagation() {
 					break;
@@ -541,7 +542,49 @@ impl ContextInner {
 	}
 }
 
+impl<'a> From<&'a Rect> for Rectangle {
+	fn from(other: &'a Rect) -> Self {
+		Self::from_xywh(other.x(), other.y(), other.width(), other.height())
+	}
+}
+
+impl From<Rect> for Rectangle {
+	fn from(other: Rect) -> Self {
+		(&other).into()
+	}
+}
+
+impl<'a> From<&'a Rectangle> for Rect {
+	fn from(other: &'a Rectangle) -> Self {
+		Self::new(other.x(), other.y(), other.width(), other.height())
+	}
+}
+
+impl From<Rectangle> for Rect {
+	fn from(other: Rectangle) -> Self {
+		(&other).into()
+	}
+}
+
 impl WindowInner {
+	/// Get the size of the window.
+	pub fn size(&self) -> [u32; 2] {
+		let viewport = self.canvas.viewport();
+		[viewport.width(), viewport.height()]
+	}
+
+	/// Get the rectangle with the visible image.
+	pub fn image_area(&self) -> Option<Rectangle> {
+		let (_texture, image_size) = self.texture.as_ref()?;
+		if self.preserve_aspect_ratio {
+			let image_size = Rectangle::from(image_size);
+			let canvas_size = Rectangle::from(&self.canvas.viewport());
+			Some(compute_target_rect_with_aspect_ratio(&image_size, &canvas_size))
+		} else {
+			Some(self.canvas.viewport().into())
+		}
+	}
+
 	/// Set the displayed image.
 	fn set_image(&mut self, mono_palette: &sdl2::pixels::Palette, mut data: Box<[u8]>, info: ImageInfo, name: String) -> Result<(), String> {
 		let pixel_format = match info.pixel_format {
@@ -555,7 +598,6 @@ impl WindowInner {
 		let mut surface = Surface::from_data(&mut data, info.width as u32, info.height as u32, info.row_stride as u32, pixel_format)
 			.map_err(|e| format!("failed to create surface for pixel data: {}", e))?;
 		let image_size = surface.rect();
-
 
 		if info.pixel_format == PixelFormat::Mono8 {
 			surface.set_palette(mono_palette).map_err(|e| format!("failed to set monochrome palette on canvas: {}", e))?;
@@ -578,7 +620,7 @@ impl WindowInner {
 		// Redraw the image, if any.
 		if let Some((texture, image_size)) = &self.texture {
 			let rect = if self.preserve_aspect_ratio {
-				compute_target_rect_with_aspect_ratio(image_size, &self.canvas.viewport())
+				compute_target_rect_with_aspect_ratio(&image_size.into(), &self.canvas.viewport().into()).into()
 			} else {
 				self.canvas.viewport()
 			};
@@ -708,7 +750,7 @@ fn convert_mouse_button_event(
 	}
 }
 
-fn compute_target_rect_with_aspect_ratio(source: &Rect, canvas: &Rect) -> Rect {
+fn compute_target_rect_with_aspect_ratio(source: &Rectangle, canvas: &Rectangle) -> Rectangle {
 	let source_w = f64::from(source.width());
 	let source_h = f64::from(source.height());
 	let canvas_w = f64::from(canvas.width());
@@ -720,10 +762,10 @@ fn compute_target_rect_with_aspect_ratio(source: &Rect, canvas: &Rect) -> Rect {
 	if scale_w < scale_h {
 		let new_height = (source_h * scale_w).round() as u32;
 		let top = (canvas.height() - new_height) / 2;
-		Rect::new(canvas.x(), canvas.y() + top as i32, canvas.width(), new_height)
+		Rectangle::from_xywh(canvas.x(), canvas.y() + top as i32, canvas.width(), new_height)
 	} else {
 		let new_width = (source_w * scale_h).round() as u32;
 		let left = (canvas.width() - new_width) / 2;
-		Rect::new(canvas.x() + left as i32, canvas.y(), new_width, canvas.height())
+		Rectangle::from_xywh(canvas.x() + left as i32, canvas.y(), new_width, canvas.height())
 	}
 }

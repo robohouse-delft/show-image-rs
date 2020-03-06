@@ -6,6 +6,7 @@ static mut CONTEXT: Option<Result<Context, String>> = None;
 mod sdl;
 use sdl::Context;
 pub use sdl::Window;
+pub use sdl::WindowInner;
 pub use sdl::EventHandler;
 pub use sdl::EventHandlerContext;
 
