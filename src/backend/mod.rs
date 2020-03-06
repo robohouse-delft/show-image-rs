@@ -6,8 +6,8 @@ static mut CONTEXT: Option<Result<Context, String>> = None;
 mod sdl;
 use sdl::Context;
 pub use sdl::Window;
-pub use sdl::KeyHandler;
-pub use sdl::KeyHandlerContext;
+pub use sdl::EventHandler;
+pub use sdl::EventHandlerContext;
 
 /// Get the global context.
 ///

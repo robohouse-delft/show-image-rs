@@ -38,10 +38,10 @@ mod key_code;
 mod key_location;
 mod modifiers;
 mod scan_code;
-mod key_handler;
+mod event_handler;
 
-pub use key_handler::KeyHandler;
-pub use key_handler::KeyHandlerContext;
+pub use event_handler::EventHandler;
+pub use event_handler::EventHandlerContext;
 
 const RESULT_TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -91,8 +91,8 @@ enum ContextCommand {
 	/// Get the currently displayed image of the window.
 	GetImage(u32, oneshot::Sender<Result<Option<(Arc<[u8]>, ImageInfo, String)>, String>>),
 
-	/// Register a key handler to be run in the background contex.
-	AddKeyHandler(u32, KeyHandler, oneshot::Sender<Result<(), String>>),
+	/// Register a event handler to be run in the background context.
+	AddEventHandler(u32, EventHandler, oneshot::Sender<Result<(), String>>),
 }
 
 /// Inner context doing the real work in the background thread.
@@ -112,8 +112,8 @@ struct ContextInner {
 	/// Channel to receive commands.
 	command_rx: mpsc::Receiver<ContextCommand>,
 
-	/// Key handlers to be run in the context thread.
-	key_handlers: Vec<(u32, KeyHandler)>,
+	/// Event handlers to be run in the context thread.
+	event_handlers: Vec<(u32, EventHandler)>,
 
 	/// Background tasks that might be joined later.
 	background_tasks: Vec<BackgroundThread<()>>,
@@ -139,7 +139,7 @@ struct WindowInner {
 	/// The data of the currently displayed image.
 	image: Option<(Arc<[u8]>, ImageInfo, String)>,
 
-	/// Channel to send keyboard events.
+	/// Channel to send events.
 	event_tx: mpsc::SyncSender<Event>,
 
 	/// If true, preserve aspect ratio when scaling image.
@@ -248,24 +248,24 @@ impl Window {
 			.map_err(|e| format!("failed to receive GetImage result from context thread: {}", e))?
 	}
 
-	/// Add a handler for keyboard events.
+	/// Add a handler for events.
 	///
 	/// The added handler will be run directly in the context thread.
-	/// This allows you to handle keyboard event asynchronously,
+	/// This allows you to handle events asynchronously,
 	/// but it also means your hander shouldn't block for long.
 	///
-	/// The handler can use the [`KeyHandlerContext::spawn_task`] to perform long running operations.
+	/// The handler can use the [`EventHandlerContext::spawn_task`] to perform long running operations.
 	///
-	/// If you want to handle key events in your own thread,
+	/// If you want to handle events in your own thread,
 	/// use [`Window::wait_key`], [`Window::wait_key_deadline`] or [`Window::events`].
-	pub fn add_key_handler<Handler>(&self, handler: Handler) -> Result<(), String>
+	pub fn add_event_handler<Handler>(&self, handler: Handler) -> Result<(), String>
 	where
-		Handler: FnMut(&mut KeyHandlerContext) + Send + 'static,
+		Handler: FnMut(&mut EventHandlerContext) + Send + 'static,
 	{
 		let (result_tx, mut result_rx) = oneshot::channel();
-		self.command_tx.send(ContextCommand::AddKeyHandler(self.id, Box::new(handler), result_tx)).unwrap();
+		self.command_tx.send(ContextCommand::AddEventHandler(self.id, Box::new(handler), result_tx)).unwrap();
 		result_rx.recv_timeout(RESULT_TIMEOUT)
-			.map_err(|e| format!("failed to receive AddKeyHandler result from context thread: {}", e))?
+			.map_err(|e| format!("failed to receive AddEventHandler result from context thread: {}", e))?
 	}
 
 	/// Close the window.
@@ -351,7 +351,7 @@ impl ContextInner {
 			mono_palette,
 			windows: Vec::new(),
 			command_rx,
-			key_handlers: Vec::new(),
+			event_handlers: Vec::new(),
 			background_tasks: Vec::new(),
 			stop: false,
 		})
@@ -386,35 +386,18 @@ impl ContextInner {
 		// Work-around for https://bugzilla.libsdl.org/show_bug.cgi?id=4989
 		let mut focused_windows = Vec::new();
 		while let Some(event) = self.events.poll_event() {
-			match event {
-				SdlEvent::Window { window_id, win_event, .. } => {
-					match win_event {
-						WindowEvent::Close => self.destroy_window(window_id)?,
-						WindowEvent::FocusGained => focused_windows.push(window_id),
-						_ => (),
-					}
-				},
-				SdlEvent::KeyDown { window_id, keycode, scancode, keymod, repeat, .. } if !focused_windows.contains(&window_id) => {
-					let event = convert_keyboard_event(KeyState::Down, keycode, scancode, keymod, repeat);
-					self.handle_sdl_keyboard_event(window_id, event);
-				},
-				SdlEvent::KeyUp { window_id, keycode, scancode, keymod, repeat, .. } if !focused_windows.contains(&window_id) => {
-					let event = convert_keyboard_event(KeyState::Up, keycode, scancode, keymod, repeat);
-					self.handle_sdl_keyboard_event(window_id, event);
-				},
-				SdlEvent::MouseMotion { window_id, which, mousestate, x, y, xrel, yrel, .. } if !focused_windows.contains(&window_id) => {
-					let event = convert_mouse_move_event(which, mousestate, x, y, xrel, yrel);
-					self.handle_sdl_mouse_move_event(window_id, event);
-				},
-				SdlEvent::MouseButtonDown { window_id, which, mouse_btn, clicks, x, y, .. } if !focused_windows.contains(&window_id) => {
-					let event = convert_mouse_button_event(which, MouseState::Down, mouse_btn, clicks, x, y);
-					self.handle_sdl_mouse_button_event(window_id, event);
-				},
-				SdlEvent::MouseButtonUp { window_id, which, mouse_btn, clicks, x, y, .. } if !focused_windows.contains(&window_id) => {
-					let event = convert_mouse_button_event(which, MouseState::Up, mouse_btn, clicks, x, y);
-					self.handle_sdl_mouse_button_event(window_id, event);
-				},
-				_ => (),
+			if let SdlEvent::Window { window_id, win_event, .. } = event {
+				match win_event {
+					WindowEvent::Close => self.destroy_window(window_id)?,
+					WindowEvent::FocusGained => focused_windows.push(window_id),
+					_ => (),
+				}
+
+				continue;
+			}
+
+			if let Some((window_id, event)) = convert_event(event, &focused_windows) {
+				self.handle_event(window_id, event);
 			}
 		}
 
@@ -430,33 +413,30 @@ impl ContextInner {
 		Ok(())
 	}
 
-	/// Handle an SDL2 mouse move event.
-	fn handle_sdl_mouse_move_event(&mut self, window_id: u32, event: MouseMoveEvent) {
+	fn handle_event(&mut self, window_id: u32, event: Event) {
 		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
-			window.handle_mouse_move_event(event);
-		}
-	}
+			#[cfg(feature = "save")] {
+				if let Event::KeyboardEvent(event) = &event {
+					let ctrl  = event.modifiers.contains(KeyModifiers::CONTROL);
+					let shift = event.modifiers.contains(KeyModifiers::SHIFT);
+					let alt   = event.modifiers.contains(KeyModifiers::ALT);
+					if event.state == KeyState::Down && event.key == KeyCode::Character("S".into()) && ctrl && !shift && !alt {
+						if let Some(work) = window.save_image() {
+							self.background_tasks.push(work);
+						}
+					}
+				}
+			}
 
-	/// Handle an SDL2 mouse button event.
-	fn handle_sdl_mouse_button_event(&mut self, window_id: u32, event: MouseButtonEvent) {
-		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
-			window.handle_mouse_button_event(event);
-		}
-	}
-
-	/// Handle an SDL2 keyboard event.
-	fn handle_sdl_keyboard_event(&mut self, window_id: u32, event: KeyboardEvent) {
-		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
-			for (_, handler) in self.key_handlers.iter_mut().filter(|(id, _)| *id == window_id) {
-				let mut context = KeyHandlerContext::new(&mut self.background_tasks, &event, window.image.as_ref());
+			for (_, handler) in self.event_handlers.iter_mut().filter(|(id, _)| *id == window_id) {
+				let mut context = EventHandlerContext::new(&mut self.background_tasks, &event, window.image.as_ref());
 				handler(&mut context);
 				if context.should_stop_propagation() {
 					break;
 				}
 			}
-			if let Some(work) = window.handle_keyboard_event(event) {
-				self.background_tasks.push(work);
-			}
+
+			let _ = window.event_tx.try_send(event);
 		}
 	}
 
@@ -492,11 +472,11 @@ impl ContextInner {
 					Some(window) => result_tx.send(Ok(window.image.clone())),
 				}
 			},
-			ContextCommand::AddKeyHandler(id, handler, result_tx) => {
+			ContextCommand::AddEventHandler(id, handler, result_tx) => {
 				match self.windows.iter_mut().find(|x| x.id == id) {
 					None => result_tx.send(Err(format!("failed to find window with ID {}", id))),
 					Some(_) => {
-						self.key_handlers.push((id, handler));
+						self.event_handlers.push((id, handler));
 						result_tx.send(Ok(()))
 					}
 				}
@@ -535,7 +515,7 @@ impl ContextInner {
 
 	/// Destroy a window by ID.
 	fn destroy_window(&mut self, id: u32) -> Result<(), String> {
-		self.key_handlers.retain(|(handler_window_id, _)| *handler_window_id != id);
+		self.event_handlers.retain(|(handler_window_id, _)| *handler_window_id != id);
 		let index = self.windows.iter().position(|x| x.id == id)
 			.ok_or_else(|| format!("failed to find window with ID {}", id))?;
 		let mut window = self.windows.remove(index);
@@ -616,30 +596,6 @@ impl WindowInner {
 		self.canvas.window_mut().hide();
 	}
 
-	fn handle_keyboard_event(&mut self, event: KeyboardEvent) -> Option<BackgroundThread<()>> {
-		#[cfg(feature = "save")] {
-			let ctrl  = event.modifiers.contains(KeyModifiers::CONTROL);
-			let shift = event.modifiers.contains(KeyModifiers::SHIFT);
-			let alt   = event.modifiers.contains(KeyModifiers::ALT);
-			if event.state == KeyState::Down && event.key == KeyCode::Character("S".into()) && ctrl && !shift && !alt {
-				return self.save_image();
-			}
-		}
-		// Ignore errors, it means the receiver isn't handling events.
-		let _ = self.event_tx.try_send(Event::KeyboardEvent(event));
-		None
-	}
-
-	fn handle_mouse_move_event(&mut self, event: MouseMoveEvent) {
-		// Ignore errors, it means the receiver isn't handling events.
-		let _ = self.event_tx.try_send(Event::MouseMoveEvent(event));
-	}
-
-	fn handle_mouse_button_event(&mut self, event: MouseButtonEvent) {
-		// Ignore errors, it means the receiver isn't handling events.
-		let _ = self.event_tx.try_send(Event::MouseButtonEvent(event));
-	}
-
 	#[cfg(feature = "save")]
 	fn save_image(&mut self) -> Option<BackgroundThread<()>> {
 		let (data, info, name) = self.image.as_ref()?.clone();
@@ -647,6 +603,28 @@ impl WindowInner {
 		Some(BackgroundThread::new(move || {
 			let _ = crate::prompt_save_image(&format!("{}.png", name), &data, info);
 		}))
+	}
+}
+
+/// Convert an SDL2 event to the more generic Event.
+fn convert_event(event: SdlEvent, focused_windows: &Vec<u32>) -> Option<(u32, Event)> {
+	match event {
+		SdlEvent::KeyDown { window_id, keycode, scancode, keymod, repeat, .. } if !focused_windows.contains(&window_id) => {
+			Some((window_id, Event::KeyboardEvent(convert_keyboard_event(KeyState::Down, keycode, scancode, keymod, repeat))))
+		},
+		SdlEvent::KeyUp { window_id, keycode, scancode, keymod, repeat, .. } if !focused_windows.contains(&window_id) => {
+			Some((window_id, Event::KeyboardEvent(convert_keyboard_event(KeyState::Up, keycode, scancode, keymod, repeat))))
+		},
+		SdlEvent::MouseMotion { window_id, which, mousestate, x, y, xrel, yrel, .. } if !focused_windows.contains(&window_id) => {
+			Some((window_id, Event::MouseMoveEvent(convert_mouse_move_event(which, mousestate, x, y, xrel, yrel))))
+		},
+		SdlEvent::MouseButtonDown { window_id, which, mouse_btn, clicks, x, y, .. } if !focused_windows.contains(&window_id) => {
+			Some((window_id, Event::MouseButtonEvent(convert_mouse_button_event(which, MouseState::Down, mouse_btn, clicks, x, y))))
+		},
+		SdlEvent::MouseButtonUp { window_id, which, mouse_btn, clicks, x, y, .. } if !focused_windows.contains(&window_id) => {
+			Some((window_id, Event::MouseButtonEvent(convert_mouse_button_event(which, MouseState::Up, mouse_btn, clicks, x, y))))
+		},
+		_ => None,
 	}
 }
 

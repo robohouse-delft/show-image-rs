@@ -19,10 +19,11 @@
 //! # Event handling.
 //! You can receive events using [`Window::events`].
 //! This is a general channel on which all events for that window are sent.
+//! Alternatively you can use [`Window::add_event_handler`] to register an asynchronous event handler.
+//! This event handler will run in the context thread, so shouldn't block for too long.
 //!
 //! You can also handle keyboard events for windows using [`Window::wait_key`] or [`Window::wait_key_deadline`].
 //! These functions will wait for key press events while discarding key up events.
-//! Alternatively you can use [`Window::add_key_handler`] to register an asynchronous key handler.
 //!
 //! # Saving displayed images.
 //! If the `save` feature is enabled, windows allow the displayed image to be saved using `Ctrl+S`.
