@@ -1,6 +1,6 @@
 [package]
 name          = "show-image"
-version       = "0.5.1"
+version       = "0.6.0"
 license       = "BSD-2-Clause"
 description   = "quickly show images in a window for debugging"
 edition       = "2018"
@@ -11,6 +11,7 @@ readme        = "README.md"
 
 authors = [
 	"Maarten de Vries <maarten@de-vri.es>",
+	"Hans Gaiser <hans.gaiser@robovalley.com>",
 	"RoboHouse <robohouse@robovalley.com>",
 ]
 
