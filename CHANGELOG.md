@@ -1,3 +1,7 @@
+v0.6.0
+  * Add support for handling mouse events.
+  * Replace (data, info, name) tuple for displayed images with a struct.
+
 v0.5.1
   * Add `window.add_key_handler`to register asynchronous key handlers.
   * Ignore key events that happened while a window was out of focus.
