@@ -152,22 +152,27 @@ pub struct Rectangle {
 }
 
 impl Rectangle {
+	/// Create a rectangle from X, Y coordinates and the width and height.
 	pub fn from_xywh(x: i32, y: i32, width: u32, height: u32) -> Self {
 		Self { x, y, width, height }
 	}
 
+	/// Get the X location of the rectangle.
 	pub fn x(&self) -> i32 {
 		self.x
 	}
 
+	/// Get the Y location of the rectangle.
 	pub fn y(&self) -> i32 {
 		self.y
 	}
 
+	/// Get the width of the rectangle.
 	pub fn width(&self) -> u32 {
 		self.width
 	}
 
+	/// Get the height of the rectangle.
 	pub fn height(&self) -> u32 {
 		self.height
 	}
@@ -217,7 +222,7 @@ impl Default for WindowOptions {
 impl WindowOptions {
 	/// Set the name of the window.
 	///
-	/// This function consumed and returns `self` to allow daisy chaining.
+	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_name(mut self, name: String) -> Self {
 		self.name = name;
 		self
@@ -227,7 +232,7 @@ impl WindowOptions {
 	///
 	/// This property may be ignored by a window manager.
 	///
-	/// This function consumed and returns `self` to allow daisy chaining.
+	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_size(mut self, size: [u32; 2]) -> Self {
 		self.size = size;
 		self
@@ -237,7 +242,7 @@ impl WindowOptions {
 	///
 	/// This property may be ignored by a window manager.
 	///
-	/// This function consumed and returns `self` to allow daisy chaining.
+	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_width(mut self, width: u32) -> Self {
 		self.size[0] = width;
 		self
@@ -247,7 +252,7 @@ impl WindowOptions {
 	///
 	/// This property may be ignored by a window manager.
 	///
-	/// This function consumed and returns `self` to allow daisy chaining.
+	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_height(mut self, height: u32) -> Self {
 		self.size[1] = height;
 		self
@@ -257,7 +262,7 @@ impl WindowOptions {
 	///
 	/// This property may be ignored by a window manager.
 	///
-	/// This function consumed and returns `self` to allow daisy chaining.
+	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_resizable(mut self, resizable: bool) -> Self {
 		self.resizable = resizable;
 		self
@@ -265,7 +270,7 @@ impl WindowOptions {
 
 	/// Preserve the aspect ratio of displayed images, or not.
 	///
-	/// This function consumed and returns `self` to allow daisy chaining.
+	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_preserve_aspect_ratio(mut self, preserve_aspect_ratio: bool) -> Self {
 		self.preserve_aspect_ratio = preserve_aspect_ratio;
 		self
