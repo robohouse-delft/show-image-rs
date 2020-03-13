@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
 use crate::background_thread::BackgroundThread;
 use crate::Event;
-use crate::ImageInfo;
+use crate::Image;
 use super::WindowInner;
 
 /// A event handler.
@@ -53,8 +51,8 @@ impl<'a> EventHandlerContext<'a> {
 	}
 
 	/// Get the currently displayed image for the window.
-	pub fn image(&self) -> Option<&'a (Arc<[u8]>, ImageInfo, String)> {
-		self.window.image.as_ref()
+	pub fn image(&self) -> Option<&Image> {
+		self.window.image()
 	}
 
 	/// Get the window that triggered the event.

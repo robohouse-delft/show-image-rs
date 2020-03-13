@@ -7,8 +7,10 @@ mod sdl;
 use sdl::Context;
 pub use sdl::Window;
 pub use sdl::WindowInner;
-pub use sdl::EventHandler;
-pub use sdl::EventHandlerContext;
+
+mod event_handler;
+pub use event_handler::EventHandler;
+pub use event_handler::EventHandlerContext;
 
 /// Get the global context.
 ///

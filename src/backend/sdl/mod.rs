@@ -13,6 +13,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 use std::time::Instant;
 
+use crate::Image;
 use crate::ImageData;
 use crate::ImageInfo;
 #[cfg(feature = "save")]
@@ -39,10 +40,9 @@ mod key_code;
 mod key_location;
 mod modifiers;
 mod scan_code;
-mod event_handler;
 
-pub use event_handler::EventHandler;
-pub use event_handler::EventHandlerContext;
+pub use super::EventHandler;
+pub use super::EventHandlerContext;
 
 const RESULT_TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -90,7 +90,7 @@ enum ContextCommand {
 	SetImage(u32, Box<[u8]>, ImageInfo, String, oneshot::Sender<Result<(), String>>),
 
 	/// Get the currently displayed image of the window.
-	GetImage(u32, oneshot::Sender<Result<Option<(Arc<[u8]>, ImageInfo, String)>, String>>),
+	GetImage(u32, oneshot::Sender<Result<Option<Image>, String>>),
 
 	/// Register a event handler to be run in the background context.
 	AddEventHandler(u32, EventHandler, oneshot::Sender<Result<(), String>>),
@@ -138,7 +138,7 @@ pub struct WindowInner {
 	texture: Option<(Texture<'static>, Rect)>,
 
 	/// The data of the currently displayed image.
-	image: Option<(Arc<[u8]>, ImageInfo, String)>,
+	image: Option<Image>,
 
 	/// Channel to send events.
 	event_tx: mpsc::SyncSender<Event>,
@@ -242,7 +242,7 @@ impl Window {
 	}
 
 	/// Get the currently displayed image of the window.
-	pub fn get_image(&self) -> Result<Option<(Arc<[u8]>, ImageInfo, String)>, String> {
+	pub fn get_image(&self) -> Result<Option<Image>, String> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		self.command_tx.send(ContextCommand::GetImage(self.id, result_tx)).unwrap();
 		result_rx.recv_timeout(RESULT_TIMEOUT)
@@ -567,6 +567,9 @@ impl From<Rectangle> for Rect {
 }
 
 impl WindowInner {
+	pub fn image(&self) -> Option<&Image> {
+		self.image.as_ref()
+	}
 	/// Get the size of the window.
 	pub fn size(&self) -> [u32; 2] {
 		let viewport = self.canvas.viewport();
@@ -607,7 +610,7 @@ impl WindowInner {
 			.map_err(|e| format!("failed to create texture from surface: {}", e))?;
 		let texture = unsafe { std::mem::transmute::<_, Texture<'static>>(texture) };
 		self.texture = Some((texture, image_size));
-		self.image = Some((Arc::from(data), info, name));
+		self.image = Some(Image { data: Arc::from(data), info, name });
 
 		Ok(())
 	}
@@ -640,10 +643,10 @@ impl WindowInner {
 
 	#[cfg(feature = "save")]
 	fn save_image(&mut self) -> Option<BackgroundThread<()>> {
-		let (data, info, name) = self.image.as_ref()?.clone();
+		let image = self.image.as_ref()?.clone();
 
 		Some(BackgroundThread::new(move || {
-			let _ = crate::prompt_save_image(&format!("{}.png", name), &data, info);
+			let _ = crate::prompt_save_image(&format!("{}.png", image.name), &image.data, image.info);
 		}))
 	}
 }

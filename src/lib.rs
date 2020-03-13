@@ -126,6 +126,22 @@ pub trait ImageData {
 	fn info(&self) -> Result<ImageInfo, String>;
 }
 
+/// An image currently being shown by a window.
+///
+/// This struct isn't meant to be created manually.
+/// It is available in event handlers or through a [`Window`] object.
+#[derive(Clone, Debug)]
+pub struct Image {
+	/// The image data.
+	pub data: std::sync::Arc<[u8]>,
+
+	/// The image info, describing the raw data.
+	pub info: ImageInfo,
+
+	/// The name of the image.
+	pub name: String,
+}
+
 /// A rectangle.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Rectangle {
