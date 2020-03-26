@@ -1,3 +1,6 @@
+v0.6.2
+  * Add support for `raqote::DrawTarget` and `raqote::Image`.
+
 v0.6.1
   * Update keyboard-types dependency to 0.5.0.
   * Update sdl2 dependency to 0.33.0.

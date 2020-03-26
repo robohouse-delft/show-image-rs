@@ -24,7 +24,7 @@ categories = [
 ]
 
 [features]
-full     = ["save", "image", "tch"]
+full     = ["save", "image", "tch", "raqote"]
 save     = ["tinyfiledialogs", "image"]
 doc-only = ["tch/doc-only"]
 
@@ -32,6 +32,7 @@ doc-only = ["tch/doc-only"]
 keyboard-types  = "0.5.0"
 sdl2            = "0.33.0"
 image           = { version="0.23.0", optional=true }
+raqote          = { version="0.7.14", optional=true }
 tch             = { version="0.1.6",  optional=true }
 tinyfiledialogs = { version="3.3.9",  optional=true }
 
