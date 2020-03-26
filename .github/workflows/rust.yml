@@ -18,9 +18,9 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --all-features --color=always
+          args: --release --features full --color=always
       - name: Test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --release --all-features --color=always
+          args: --release --features full --color=always
