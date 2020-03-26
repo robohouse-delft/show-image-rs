@@ -1,4 +1,4 @@
-[![Docs.rs](https://docs.rs/com/badge.svg)](https://docs.rs/crate/show-image/)
+[![Docs.rs](https://docs.rs/show-image/badge.svg)](https://docs.rs/crate/show-image/)
 [![CI](https://github.com/robohouse-delft/show-image-rs/workflows/CI/badge.svg)](https://github.com/robohouse-delft/show-image-rs/actions?query=workflow%3ACI+branch%3Amaster)
 
 # show-image
