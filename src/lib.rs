@@ -45,7 +45,7 @@
 //!
 //! // Create a window and display the image.
 //! let window = make_window("image")?;
-//! window.set_image(image, "image-001")?;
+//! window.set_image("image-001", image)?;
 //!
 //! # Result::<(), String>::Ok(())
 //! ```
@@ -59,7 +59,7 @@
 //! // Create a window and display the image.
 //! # let image = (&[0u8][..], ImageInfo::rgb8(1920, 1080));
 //! let window = make_window("image")?;
-//! window.set_image(&image, "image-001")?;
+//! window.set_image("image-001", &image)?;
 //!
 //! // Print keyboard events until Escape is pressed, then exit.
 //! // If the user closes the window, wait_key() will return an error and the loop also exits.
