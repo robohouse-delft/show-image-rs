@@ -87,7 +87,7 @@ enum ContextCommand {
 	DestroyWindow(u32, oneshot::Sender<Result<(), String>>),
 
 	/// Set the image of the window.
-	SetImage(u32, String, ImageInfo, Box<[u8]>, oneshot::Sender<Result<(), String>>),
+	SetImage(u32, String, ImageInfo, Box<[u8]>, Option<Vec<(Box<[u8]>, ImageInfo)>>, oneshot::Sender<Result<(), String>>),
 
 	/// Get the currently displayed image of the window.
 	GetImage(u32, oneshot::Sender<Result<Option<Image>, String>>),
@@ -238,12 +238,12 @@ impl Window {
 	/// It is also returned again by [`Window::get_image`].
 	///
 	/// Setting the image with this function also clears any added overlays.
-	pub fn set_image(&self, image: impl ImageData, name: impl Into<String>) -> Result<(), String> {
+	pub fn set_image(&self, name: impl Into<String>, image: impl ImageData) -> Result<(), String> {
 		let info = image.info().map_err(|e| format!("failed to display image: {}", e))?;
 		let data = image.data();
 
 		let (result_tx, mut result_rx) = oneshot::channel();
-		self.command_tx.send(ContextCommand::SetImage(self.id, name.into(), info, data, result_tx)).unwrap();
+		self.command_tx.send(ContextCommand::SetImage(self.id, name.into(), info, data, None, result_tx)).unwrap();
 		result_rx.recv_timeout(RESULT_TIMEOUT)
 			.map_err(|e| format!("failed to receive SetImage result from context thread: {}", e))?
 			.map_err(|e| format!("failed to display image: {}", e))
@@ -484,13 +484,16 @@ impl ContextInner {
 			ContextCommand::DestroyWindow(id, result_tx) => {
 				result_tx.send(self.destroy_window(id));
 			},
-			ContextCommand::SetImage(id, name, info, data, result_tx) => {
+			ContextCommand::SetImage(id, name, info, data, overlays, result_tx) => {
 				match self.windows.iter_mut().find(|x| x.id == id) {
 					None => result_tx.send(Err(format!("failed to find window with ID {}", id))),
 					Some(window) => {
-						window.clear_overlays();
-						result_tx.send(window.set_image_from_data(name, info, data));
-					}
+						if let Some(overlays) = overlays {
+							result_tx.send(window.set_image_with_overlays(name, (data, info), overlays))
+						} else {
+							result_tx.send(window.set_image(name, (data, info)))
+						}
+					},
 				}
 			},
 			ContextCommand::GetImage(id, result_tx) => {
@@ -619,10 +622,26 @@ impl WindowInner {
 		}
 	}
 
-	pub fn set_image(&mut self, image: impl ImageData, name: String) -> Result<(), String> {
+	/// Set the displayed image of the window.
+	pub fn set_image(&mut self, name: String, image: impl ImageData) -> Result<(), String> {
 		let info = image.info()?;
 		let data = image.data();
 		self.set_image_from_data(name, info, data)
+	}
+
+	/// Set the displayed image and the overlays of the window.
+	pub fn set_image_with_overlays(&mut self, name: String, image: impl ImageData, overlays: Vec<impl ImageData>) -> Result<(), String> {
+		let info = image.info()?;
+		let data = image.data();
+		self.set_image_from_data(name, info, data)?;
+
+		self.overlays.clear();
+		self.overlays.reserve(overlays.len());
+		for overlay in overlays {
+			self.add_overlay(overlay)?;
+		}
+
+		Ok(())
 	}
 
 	/// Set the displayed image.

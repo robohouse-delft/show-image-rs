@@ -53,7 +53,7 @@ fn main() -> Result<(), String> {
 	println!("{:#?}", image.info());
 
 	let window = make_window("image")?;
-	window.set_image(image, "mondriaan")?;
+	window.set_image("mondriaan", image)?;
 
 	while let Ok(event) = window.wait_key(std::time::Duration::from_millis(100)) {
 		if let Some(event) = event {

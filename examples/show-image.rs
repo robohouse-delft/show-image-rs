@@ -16,7 +16,7 @@ fn main() -> Result<(), String> {
 	println!("{:#?}", image.info());
 
 	let window = make_window("image")?;
-	window.set_image(&image, name)?;
+	window.set_image(name, &image)?;
 
 	while let Ok(event) = window.wait_key(std::time::Duration::from_millis(100)) {
 		if let Some(event) = event {
