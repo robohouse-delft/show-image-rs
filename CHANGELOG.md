@@ -1,5 +1,6 @@
 v0.6.3
   * Increase timeout on communication with background thread to 1 second.
+  * Divide `raqote` images by their alpha component to undo pre-multiplication.
 
 v0.6.2
   * Add support for `raqote::DrawTarget` and `raqote::Image`.
