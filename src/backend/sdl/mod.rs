@@ -1,7 +1,7 @@
 use sdl2::event::Event as SdlEvent;
 use sdl2::event::WindowEvent;
 use sdl2::pixels::PixelFormatEnum;
-use sdl2::rect::Rect;
+use sdl2::rect::Rect as SdlRect;
 use sdl2::render::Canvas;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
@@ -87,13 +87,16 @@ enum ContextCommand {
 	DestroyWindow(u32, oneshot::Sender<Result<(), String>>),
 
 	/// Set the image of the window.
-	SetImage(u32, Box<[u8]>, ImageInfo, String, oneshot::Sender<Result<(), String>>),
+	SetImage(u32, String, ImageInfo, Box<[u8]>, oneshot::Sender<Result<(), String>>),
 
 	/// Get the currently displayed image of the window.
 	GetImage(u32, oneshot::Sender<Result<Option<Image>, String>>),
 
 	/// Register a event handler to be run in the background context.
 	AddEventHandler(u32, EventHandler, oneshot::Sender<Result<(), String>>),
+
+	/// Run a custom function on the inner context.
+	Custom(Box<dyn FnOnce(&mut ContextInner) + Send>),
 }
 
 /// Inner context doing the real work in the background thread.
@@ -103,9 +106,6 @@ struct ContextInner {
 
 	/// SDL2 event pump to handle events with.
 	events: sdl2::EventPump,
-
-	/// The palette to use for drawing monochrome pictures.
-	mono_palette: sdl2::pixels::Palette,
 
 	/// List of created windows.
 	windows: Vec<WindowInner>,
@@ -134,8 +134,14 @@ pub struct WindowInner {
 	/// A texture creator for the window.
 	texture_creator: TextureCreator<sdl2::video::WindowContext>,
 
+	/// Monochrome palette.
+	mono_palette: sdl2::pixels::Palette,
+
 	/// A texture representing the current image to be drawn.
-	texture: Option<(Texture<'static>, Rect)>,
+	texture: Option<(Texture<'static>, Rectangle)>,
+
+	/// Overlays to be drawn on top of the current image.
+	overlays: Vec<(Texture<'static>, Rectangle)>,
 
 	/// The data of the currently displayed image.
 	image: Option<Image>,
@@ -230,12 +236,14 @@ impl Window {
 	///
 	/// The name is used to suggest a defaullt file name when saving images.
 	/// It is also returned again by [`Window::get_image`].
+	///
+	/// Setting the image with this function also clears any added overlays.
 	pub fn set_image(&self, image: impl ImageData, name: impl Into<String>) -> Result<(), String> {
 		let info = image.info().map_err(|e| format!("failed to display image: {}", e))?;
 		let data = image.data();
 
 		let (result_tx, mut result_rx) = oneshot::channel();
-		self.command_tx.send(ContextCommand::SetImage(self.id, data, info, name.into(), result_tx)).unwrap();
+		self.command_tx.send(ContextCommand::SetImage(self.id, name.into(), info, data, result_tx)).unwrap();
 		result_rx.recv_timeout(RESULT_TIMEOUT)
 			.map_err(|e| format!("failed to receive SetImage result from context thread: {}", e))?
 			.map_err(|e| format!("failed to display image: {}", e))
@@ -275,6 +283,23 @@ impl Window {
 	/// but this function allows you to handle errors that may occur.
 	pub fn close(self) -> Result<(), String> {
 		self.close_impl()
+	}
+
+	/// Execute a custom function on the window from inside the context thread.
+	pub fn execute<F, T>(&self, function: F) -> Result<T, String>
+	where
+		F: FnOnce(&mut WindowInner) -> Result<T, String> + Send + 'static,
+		T: Send + 'static,
+	{
+		let (result_tx, result_rx) = oneshot::channel::<Result<T, String>>();
+		let window_id = self.id;
+		self.command_tx.send(ContextCommand::Custom(Box::new(move |context| {
+			match context.windows.iter_mut().find(|x| x.id == window_id) {
+				None => result_tx.send(Err(format!("failed to find window with ID {}", window_id))),
+				Some(x) => result_tx.send(function(x))
+			}
+		}))).unwrap();
+		result_rx.recv().unwrap()
 	}
 
 	/// Get the receiver for events.
@@ -344,12 +369,10 @@ impl ContextInner {
 		let context = sdl2::init().map_err(|e| format!("failed to initialize SDL2: {}", e))?;
 		let video = context.video().map_err(|e| format!("failed to get SDL2 video subsystem: {}", e))?;
 		let events = context.event_pump().map_err(|e| format!("failed to get SDL2 event pump: {}", e))?;
-		let mono_palette = monochrome::mono_palette().map_err(|e| format!("failed to create monochrome palette: {}", e))?;
 
 		Ok(Self {
 			video,
 			events,
-			mono_palette,
 			windows: Vec::new(),
 			command_rx,
 			event_handlers: Vec::new(),
@@ -461,10 +484,13 @@ impl ContextInner {
 			ContextCommand::DestroyWindow(id, result_tx) => {
 				result_tx.send(self.destroy_window(id));
 			},
-			ContextCommand::SetImage(id, data, info, name, result_tx) => {
+			ContextCommand::SetImage(id, name, info, data, result_tx) => {
 				match self.windows.iter_mut().find(|x| x.id == id) {
 					None => result_tx.send(Err(format!("failed to find window with ID {}", id))),
-					Some(window) => result_tx.send(window.set_image(&self.mono_palette, data, info, name)),
+					Some(window) => {
+						window.clear_overlays();
+						result_tx.send(window.set_image_from_data(name, info, data));
+					}
 				}
 			},
 			ContextCommand::GetImage(id, result_tx) => {
@@ -482,6 +508,9 @@ impl ContextInner {
 					}
 				}
 			},
+			ContextCommand::Custom(function) => {
+				function(self)
+			},
 		}
 	}
 
@@ -496,6 +525,7 @@ impl ContextInner {
 		let id = window.id();
 		let canvas = window.into_canvas().build().map_err(|e| format!("failed to create canvas for window {:?}: {}", options.name, e))?;
 		let texture_creator = canvas.texture_creator();
+		let mono_palette = monochrome::mono_palette().map_err(|e| format!("failed to create monochrome palette: {}", e))?;
 		let (event_tx, event_rx) = mpsc::sync_channel(10);
 
 
@@ -503,8 +533,10 @@ impl ContextInner {
 			id,
 			canvas,
 			texture_creator,
+			mono_palette,
 			texture: None,
 			image: None,
+			overlays: Vec::new(),
 			event_tx,
 			preserve_aspect_ratio: options.preserve_aspect_ratio,
 		};
@@ -542,25 +574,25 @@ impl ContextInner {
 	}
 }
 
-impl<'a> From<&'a Rect> for Rectangle {
-	fn from(other: &'a Rect) -> Self {
+impl<'a> From<&'a SdlRect> for Rectangle {
+	fn from(other: &'a SdlRect) -> Self {
 		Self::from_xywh(other.x(), other.y(), other.width(), other.height())
 	}
 }
 
-impl From<Rect> for Rectangle {
-	fn from(other: Rect) -> Self {
+impl From<SdlRect> for Rectangle {
+	fn from(other: SdlRect) -> Self {
 		(&other).into()
 	}
 }
 
-impl<'a> From<&'a Rectangle> for Rect {
+impl<'a> From<&'a Rectangle> for SdlRect {
 	fn from(other: &'a Rectangle) -> Self {
 		Self::new(other.x(), other.y(), other.width(), other.height())
 	}
 }
 
-impl From<Rectangle> for Rect {
+impl From<Rectangle> for SdlRect {
 	fn from(other: Rectangle) -> Self {
 		(&other).into()
 	}
@@ -580,16 +612,41 @@ impl WindowInner {
 	pub fn image_area(&self) -> Option<Rectangle> {
 		let (_texture, image_size) = self.texture.as_ref()?;
 		if self.preserve_aspect_ratio {
-			let image_size = Rectangle::from(image_size);
 			let canvas_size = Rectangle::from(&self.canvas.viewport());
-			Some(compute_target_rect_with_aspect_ratio(&image_size, &canvas_size))
+			Some(compute_target_rect_with_aspect_ratio(image_size, &canvas_size))
 		} else {
 			Some(self.canvas.viewport().into())
 		}
 	}
 
+	pub fn set_image(&mut self, image: impl ImageData, name: String) -> Result<(), String> {
+		let info = image.info()?;
+		let data = image.data();
+		self.set_image_from_data(name, info, data)
+	}
+
 	/// Set the displayed image.
-	fn set_image(&mut self, mono_palette: &sdl2::pixels::Palette, mut data: Box<[u8]>, info: ImageInfo, name: String) -> Result<(), String> {
+	pub fn set_image_from_data(&mut self, name: String, info: ImageInfo, mut data: Box<[u8]>) -> Result<(), String> {
+		self.texture = Some(self.make_texture(&info, &mut data)?);
+		self.image = Some(Image { data: Arc::from(data), info, name });
+		Ok(())
+	}
+
+	/// Add an overlay to be drawn over the displayed image.
+	pub fn add_overlay(&mut self, image: impl ImageData) -> Result<(), String> {
+		let info = image.info()?;
+		let mut data = image.data();
+		let overlay = self.make_texture(&info, &mut data)?;
+		self.overlays.push(overlay);
+		Ok(())
+	}
+
+	pub fn clear_overlays(&mut self) {
+		self.overlays.clear();
+	}
+
+	/// Turn an image into a texture.
+	fn make_texture(&mut self, info: &ImageInfo, data: &mut [u8]) -> Result<(Texture<'static>, Rectangle), String> {
 		let pixel_format = match info.pixel_format {
 			PixelFormat::Mono8 => PixelFormatEnum::Index8,
 			PixelFormat::Rgb8  => PixelFormatEnum::RGB24,
@@ -598,21 +655,18 @@ impl WindowInner {
 			PixelFormat::Bgra8 => PixelFormatEnum::BGRA32,
 		};
 
-		let mut surface = Surface::from_data(&mut data, info.width as u32, info.height as u32, info.row_stride as u32, pixel_format)
+		let mut surface = Surface::from_data(data, info.width as u32, info.height as u32, info.row_stride as u32, pixel_format)
 			.map_err(|e| format!("failed to create surface for pixel data: {}", e))?;
-		let image_size = surface.rect();
+		let image_size = Rectangle::from(surface.rect());
 
 		if info.pixel_format == PixelFormat::Mono8 {
-			surface.set_palette(mono_palette).map_err(|e| format!("failed to set monochrome palette on canvas: {}", e))?;
+			surface.set_palette(&self.mono_palette).map_err(|e| format!("failed to set monochrome palette on canvas: {}", e))?;
 		}
 
 		let texture = self.texture_creator.create_texture_from_surface(surface)
 			.map_err(|e| format!("failed to create texture from surface: {}", e))?;
 		let texture = unsafe { std::mem::transmute::<_, Texture<'static>>(texture) };
-		self.texture = Some((texture, image_size));
-		self.image = Some(Image { data: Arc::from(data), info, name });
-
-		Ok(())
+		Ok((texture, image_size))
 	}
 
 	/// Draw the contents of the window.
@@ -622,14 +676,27 @@ impl WindowInner {
 
 		// Redraw the image, if any.
 		if let Some((texture, image_size)) = &self.texture {
-			let rect = if self.preserve_aspect_ratio {
-				compute_target_rect_with_aspect_ratio(&image_size.into(), &self.canvas.viewport().into()).into()
+			let image_area = if self.preserve_aspect_ratio {
+				compute_target_rect_with_aspect_ratio(&image_size, &self.canvas.viewport().into())
 			} else {
-				self.canvas.viewport()
+				self.canvas.viewport().into()
 			};
 
-			self.canvas.copy(&texture, image_size.clone(), rect)
-				.map_err(|e| format!("failed to copy data to self: {}", e))?;
+			let scale_x = f64::from(image_area.width()) / f64::from(image_size.width());
+			let scale_y = f64::from(image_area.height()) / f64::from(image_size.height());
+			eprintln!("scale_x: {}, scale_y: {}", scale_x, scale_y);
+
+			self.canvas.copy(&texture, None, SdlRect::from(&image_area))
+				.map_err(|e| format!("failed to draw image: {}", e))?;
+
+			for (i, (texture, size)) in self.overlays.iter().enumerate() {
+				// Draw overlays with the same scaling applied.
+				let dest_width = (f64::from(size.width()) * scale_x) as u32;
+				let dest_height = (f64::from(size.height()) * scale_y) as u32;
+				let dest_area = SdlRect::from(Rectangle::from_xywh(image_area.x(), image_area.y(), dest_width, dest_height));
+				self.canvas.copy(&texture, None, SdlRect::from(dest_area))
+					.map_err(|e| format!("failed to draw overlay {}: {}", i, e))?;
+			}
 		}
 
 		self.canvas.present();

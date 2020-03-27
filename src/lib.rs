@@ -124,6 +124,12 @@ pub trait ImageData {
 	///
 	/// This function may fail at runtime if the data can not be described properly.
 	fn info(&self) -> Result<ImageInfo, String>;
+
+	/// Convert the image into a tuple containing the image info and data.
+	fn into_image_tuple(self) -> Result<(Box<[u8]>, ImageInfo), String> where Self: Sized {
+		let info = self.info()?;
+		Ok((self.data(), info))
+	}
 }
 
 /// An image currently being shown by a window.
