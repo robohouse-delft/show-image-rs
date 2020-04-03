@@ -409,6 +409,7 @@ impl ContextInner {
 		// because these are probably virtual events that happened while the window was not focused.
 		// Work-around for https://bugzilla.libsdl.org/show_bug.cgi?id=4989
 		let mut focused_windows = Vec::new();
+		let mut prev_event = None;
 		while let Some(event) = self.events.poll_event() {
 			if let SdlEvent::Window { window_id, win_event, .. } = event {
 				match win_event {
@@ -420,10 +421,34 @@ impl ContextInner {
 				continue;
 			}
 
-			if let Some((window_id, event)) = convert_event(event, &focused_windows) {
-				self.handle_event(window_id, event);
+			let should_fold = |a: &MouseMoveEvent, b: &MouseMoveEvent| {
+				a.mouse_id == b.mouse_id && a.mouse_state == b.mouse_state
+			};
+
+			match (prev_event.take(), convert_event(event, &focused_windows)) {
+				(Some((old_window_id, Event::MouseMoveEvent(old))), Some((new_window_id, Event::MouseMoveEvent(new)))) if old_window_id == new_window_id && should_fold(&old, &new) => {
+					prev_event = Some((old_window_id, Event::MouseMoveEvent(MouseMoveEvent {
+						mouse_id: old.mouse_id,
+						mouse_state: old.mouse_state,
+						position_x: new.position_x,
+						position_y: new.position_y,
+						relative_x: old.relative_x + new.relative_x,
+						relative_y: old.relative_y + new.relative_y,
+					})));
+				},
+				(old_event, new_event) => {
+					if let Some((old_window, old_event)) = old_event {
+						self.handle_event(old_window, old_event);
+					}
+					prev_event = new_event;
+				},
 			}
 		}
+
+		if let Some((window_id, event)) = prev_event {
+			self.handle_event(window_id, event)
+		}
+
 
 		// Handle all queued commands for the context.
 		self.poll_commands();
