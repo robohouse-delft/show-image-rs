@@ -13,7 +13,10 @@ fn main() -> Result<(), String> {
 		return Err(format!("usage: {}", args[0]));
 	}
 
-	let mut image = DrawTarget::new(1920, 1080);
+	let mut image   = DrawTarget::new(1000, 1000);
+	let mut overlay = DrawTarget::new(500, 1000);
+	image.set_transform(&raqote::Transform::create_scale(1000.0, 1000.0));
+	overlay.set_transform(&raqote::Transform::create_scale(1000.0, 1000.0));
 
 	let black  = Source::Solid(SolidSource::from_unpremultiplied_argb(255,   0,   0,   0));
 	let white  = Source::Solid(SolidSource::from_unpremultiplied_argb(255, 255, 255, 255));
@@ -23,7 +26,6 @@ fn main() -> Result<(), String> {
 
 	let draw_options = DrawOptions::new();
 
-	image.set_transform(&raqote::Transform::create_scale(1920.0, 1080.0));
 	image.fill_rect(0.0, 0.0, 1.0, 1.0, &white, &draw_options);
 
 	image.fill_rect(0.00, 0.00, 0.25, 0.30, &red,    &draw_options);
@@ -50,10 +52,22 @@ fn main() -> Result<(), String> {
 	path.line_to(0.85, 1.00);
 	image.stroke(&path.finish(), &black, &StrokeStyle { width: 0.03, ..Default::default() }, &draw_options);
 
+	let mut path = PathBuilder::new();
+	path.move_to(0.85, 0.70);
+	path.line_to(0.85, 1.00);
+	image.stroke(&path.finish(), &black, &StrokeStyle { width: 0.03, ..Default::default() }, &draw_options);
+
+	let mut path = PathBuilder::new();
+	path.move_to(0.00, 0.00);
+	path.line_to(1.00, 1.00);
+	overlay.stroke(&path.finish(), &yellow, &StrokeStyle { width: 0.03, ..Default::default() }, &draw_options);
+
 	println!("{:#?}", image.info());
 
 	let window = make_window("image")?;
 	window.set_image("mondriaan", image)?;
+	let overlay = overlay.into_image_tuple()?;
+	window.execute(move |window| window.add_overlay(overlay))?;
 
 	while let Ok(event) = window.wait_key(std::time::Duration::from_millis(100)) {
 		if let Some(event) = event {
