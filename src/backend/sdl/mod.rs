@@ -438,7 +438,7 @@ impl ContextInner {
 	}
 
 	fn handle_event(&mut self, window_id: u32, event: Event) {
-		if let Some(window) = self.windows.iter_mut().find(|x| x.id == window_id) {
+		if let Some(mut window) = self.windows.iter_mut().find(|x| x.id == window_id) {
 			#[cfg(feature = "save")] {
 				if let Event::KeyboardEvent(event) = &event {
 					let ctrl  = event.modifiers.contains(KeyModifiers::CONTROL);
@@ -453,7 +453,7 @@ impl ContextInner {
 			}
 
 			for (_, handler) in self.event_handlers.iter_mut().filter(|(id, _)| *id == window_id) {
-				let mut context = EventHandlerContext::new(&mut self.background_tasks, &event, &window);
+				let mut context = EventHandlerContext::new(&mut self.background_tasks, &event, &mut window);
 				handler(&mut context);
 				if context.should_stop_propagation() {
 					break;

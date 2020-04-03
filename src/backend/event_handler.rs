@@ -18,14 +18,14 @@ pub struct EventHandlerContext<'a> {
 	event: &'a Event,
 
 	/// The window that triggered the event.
-	window: &'a WindowInner,
+	window: &'a mut WindowInner,
 }
 
 impl<'a> EventHandlerContext<'a> {
 	pub(crate) fn new(
 		background_tasks: &'a mut Vec<BackgroundThread<()>>,
 		event: &'a Event,
-		window: &'a WindowInner,
+		window: &'a mut WindowInner,
 	) -> Self {
 		Self {
 			background_tasks,
@@ -56,7 +56,12 @@ impl<'a> EventHandlerContext<'a> {
 	}
 
 	/// Get the window that triggered the event.
-	pub fn window(&self) -> &'a WindowInner {
+	pub fn window<'b>(&'b self) -> &'b WindowInner {
+		self.window
+	}
+
+	/// Get the window that triggered the event.
+	pub fn window_mut<'b>(&'b mut self) -> &'b mut WindowInner {
 		self.window
 	}
 
