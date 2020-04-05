@@ -728,7 +728,6 @@ impl WindowInner {
 
 			let scale_x = f64::from(image_area.width()) / f64::from(image_size.width());
 			let scale_y = f64::from(image_area.height()) / f64::from(image_size.height());
-			eprintln!("scale_x: {}, scale_y: {}", scale_x, scale_y);
 
 			self.canvas.copy(&texture, None, SdlRect::from(&image_area))
 				.map_err(|e| format!("failed to draw image: {}", e))?;
