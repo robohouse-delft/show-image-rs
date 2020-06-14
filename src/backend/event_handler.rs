@@ -14,6 +14,9 @@ pub struct EventHandlerContext<'a> {
 	/// Flag to indicate if the event should be passed to other handlers.
 	stop_propagation: bool,
 
+	/// Flag to indicate the handler should be removed.
+	remove_handler: bool,
+
 	/// The event to be handled.
 	event: &'a Event,
 
@@ -30,6 +33,7 @@ impl<'a> EventHandlerContext<'a> {
 		Self {
 			background_tasks,
 			stop_propagation: false,
+			remove_handler: false,
 			event,
 			window,
 		}
@@ -42,6 +46,16 @@ impl<'a> EventHandlerContext<'a> {
 
 	/// Check if we should stop propagation of the event.
 	pub(crate) fn should_stop_propagation(&self) -> bool {
+		self.stop_propagation
+	}
+
+	/// Remove the event handler after it returns.
+	pub fn remove_handler(&mut self) {
+		self.remove_handler = true;
+	}
+
+	/// Check if we should remove the event handler after it returns.
+	pub(crate) fn should_remove_handler(&self) -> bool {
 		self.stop_propagation
 	}
 

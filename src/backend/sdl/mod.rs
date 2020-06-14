@@ -477,15 +477,33 @@ impl ContextInner {
 				}
 			}
 
-			for (_, handler) in self.event_handlers.iter_mut().filter(|(id, _)| *id == window_id) {
+			let mut delete_handlers = Vec::new();
+			for (handler_index, (handler_window_id, handler)) in &mut self.event_handlers.iter_mut().enumerate() {
+				if *handler_window_id != window_id {
+					continue;
+				}
 				let mut context = EventHandlerContext::new(&mut self.background_tasks, &event, &mut window);
 				handler(&mut context);
+				if context.should_remove_handler() {
+					delete_handlers.push(handler_index);
+				}
 				if context.should_stop_propagation() {
 					break;
 				}
 			}
 
-			let _ = window.event_tx.try_send(event);
+			let mut index = 0;
+			let mut delete_handlers = delete_handlers.as_slice();
+			self.event_handlers.retain(|_| {
+				if Some(&index) == delete_handlers.first() {
+					index += 1;
+					delete_handlers = &delete_handlers[1..];
+					true
+				} else {
+					index += 1;
+					false
+				}
+			});
 		}
 	}
 

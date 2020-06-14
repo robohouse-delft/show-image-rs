@@ -2,6 +2,7 @@ v0.7.0
   * Fix interpretation of `raquote` data with alpha channel.
   * Add support for showing overlays on top of images.
   * Fold consecutive mouse move events to reduce number of events.
+  * Allow registered event handlers to remove themselves.
 
 v0.6.2
   * Add support for `raqote::DrawTarget` and `raqote::Image`.
