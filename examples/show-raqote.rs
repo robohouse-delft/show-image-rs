@@ -4,6 +4,7 @@ use raqote::PathBuilder;
 use raqote::SolidSource;
 use raqote::Source;
 use raqote::StrokeStyle;
+use show_image::Event;
 use show_image::ImageData;
 use show_image::make_window;
 
@@ -69,8 +70,8 @@ fn main() -> Result<(), String> {
 	let overlay = overlay.into_image_tuple()?;
 	window.execute(move |window| window.add_overlay(overlay))?;
 
-	while let Ok(event) = window.wait_key(std::time::Duration::from_millis(100)) {
-		if let Some(event) = event {
+	for event in window.events()? {
+		if let Event::KeyboardEvent(event) = event {
 			println!("{:#?}", event);
 			if event.key == show_image::KeyCode::Escape {
 				break;

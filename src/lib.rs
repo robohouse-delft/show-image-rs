@@ -54,7 +54,7 @@
 //! ```no_run
 //! # use std::time::Duration;
 //! # use show_image::ImageInfo;
-//! use show_image::{KeyCode, make_window};
+//! use show_image::{Event, KeyCode, make_window};
 //!
 //! // Create a window and display the image.
 //! # let image = (&[0u8][..], ImageInfo::rgb8(1920, 1080));
@@ -62,9 +62,9 @@
 //! window.set_image("image-001", &image)?;
 //!
 //! // Print keyboard events until Escape is pressed, then exit.
-//! // If the user closes the window, wait_key() will return an error and the loop also exits.
-//! while let Ok(event) = window.wait_key(Duration::from_millis(100)) {
-//!     if let Some(event) = event {
+//! // If the user closes the window, the channel is closed and the loop also exits.
+//! for event in window.events()? {
+//!     if let Event::KeyboardEvent(event) = event {
 //!         println!("{:#?}", event);
 //!         if event.key == KeyCode::Escape {
 //!             break;

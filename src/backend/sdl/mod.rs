@@ -24,7 +24,6 @@ use crate::KeyboardEvent;
 use crate::KeyModifiers;
 use crate::PixelFormat;
 use crate::Rectangle;
-use crate::WaitKeyError;
 use crate::WindowOptions;
 use crate::oneshot;
 use crate::background_thread::BackgroundThread;
@@ -64,15 +63,13 @@ pub struct Context {
 /// handle key events and to close the window.
 ///
 /// If the handle is dropped, the window is closed.
+#[derive(Clone)]
 pub struct Window {
 	/// The window ID.
 	id: u32,
 
 	/// Channel to send commands to the background thread.
 	command_tx: mpsc::SyncSender<ContextCommand>,
-
-	/// Channel to receive events from the background thread.
-	event_rx: mpsc::Receiver<Event>,
 }
 
 /// Commands that can be sent to the context in the background thread.
@@ -145,9 +142,6 @@ pub struct WindowInner {
 
 	/// The data of the currently displayed image.
 	image: Option<Image>,
-
-	/// Channel to send events.
-	event_tx: mpsc::SyncSender<Event>,
 
 	/// If true, preserve aspect ratio when scaling image.
 	preserve_aspect_ratio: bool,
@@ -272,7 +266,8 @@ impl Window {
 		Handler: FnMut(&mut EventHandlerContext) + Send + 'static,
 	{
 		let (result_tx, mut result_rx) = oneshot::channel();
-		self.command_tx.send(ContextCommand::AddEventHandler(self.id, Box::new(handler), result_tx)).unwrap();
+		self.command_tx.send(ContextCommand::AddEventHandler(self.id, Box::new(handler), result_tx))
+			.map_err(|e| format!("failed to send AddEventHandler command to window: {}", e))?;
 		result_rx.recv_timeout(RESULT_TIMEOUT)
 			.map_err(|e| format!("failed to receive AddEventHandler result from context thread: {}", e))?
 	}
@@ -302,48 +297,23 @@ impl Window {
 		result_rx.recv().unwrap()
 	}
 
-	/// Get the receiver for events.
-	pub fn events(&self) -> &mpsc::Receiver<Event> {
-		&self.event_rx
-	}
-
-	/// Wait for a key-down event with a timeout.
+	/// Create a new channel for receiving events.
 	///
-	/// If an error is returned, no further key events will be received.
-	/// Any loop processing keyboard input should terminate.
+	/// When called multiple times, this will create multiple channels.
+	/// Each channel will receive all events.
 	///
-	/// If no key press was available within the timeout, `Ok(None)` is returned.
-	///
-	/// This function discards all key-up events and blocks until a key is pressed or the timeout occurs.
-	pub fn wait_key(&self, timeout: Duration) -> Result<Option<KeyboardEvent>, WaitKeyError> {
-		self.wait_key_deadline(Instant::now() + timeout)
-	}
-
-	/// Wait for a key-down event with a deadline.
-	///
-	/// If an error is returned, no further key events will be received.
-	/// Any loop processing keyboard input should terminate.
-	///
-	/// If no key press was available within the timeout, `Ok(None)` is returned.
-	///
-	/// This function discards all key-up events and blocks until a key is pressed or the deadline passes.
-	pub fn wait_key_deadline(&self, deadline: Instant) -> Result<Option<KeyboardEvent>, WaitKeyError> {
-		loop {
-			let now = Instant::now();
-			if now >= deadline {
-				return Ok(None);
+	/// To disable the created channel, simply drop the receiver.
+	pub fn events(&self) -> Result<mpsc::Receiver<Event>, String> {
+		let (event_tx, event_rx) = mpsc::sync_channel(10);
+		let handler = move |context: &mut EventHandlerContext| {
+			// Try to send the event, and remove the handler if the receiver is dropped.
+			if let Err(mpsc::TrySendError::Disconnected(_)) = event_tx.try_send(context.event().clone()) {
+				context.remove_handler();
 			}
-			let event = match self.events().recv_timeout(deadline - now) {
-				Ok(Event::KeyboardEvent(x)) => x,
-				Ok(_) => continue,
-				Err(mpsc::RecvTimeoutError::Timeout) => return Ok(None),
-				Err(mpsc::RecvTimeoutError::Disconnected) => return Err(WaitKeyError::WindowClosed),
-			};
+		};
 
-			if event.state == KeyState::Down {
-				return Ok(Some(event))
-			}
-		}
+		self.add_event_handler(handler)?;
+		Ok(event_rx)
 	}
 
 	/// Close the window without dropping the handle.
@@ -492,18 +462,20 @@ impl ContextInner {
 				}
 			}
 
-			let mut index = 0;
-			let mut delete_handlers = delete_handlers.as_slice();
-			self.event_handlers.retain(|_| {
-				if Some(&index) == delete_handlers.first() {
-					index += 1;
-					delete_handlers = &delete_handlers[1..];
-					true
-				} else {
-					index += 1;
-					false
-				}
-			});
+			if !delete_handlers.is_empty() {
+				let mut index = 0;
+				let mut delete_handlers = delete_handlers.as_slice();
+				self.event_handlers.retain(|_| {
+					if Some(&index) == delete_handlers.first() {
+						index += 1;
+						delete_handlers = &delete_handlers[1..];
+						false
+					} else {
+						index += 1;
+						true
+					}
+				});
+			}
 		}
 	}
 
@@ -572,8 +544,6 @@ impl ContextInner {
 		let canvas = window.into_canvas().build().map_err(|e| format!("failed to create canvas for window {:?}: {}", options.name, e))?;
 		let texture_creator = canvas.texture_creator();
 		let mono_palette = monochrome::mono_palette().map_err(|e| format!("failed to create monochrome palette: {}", e))?;
-		let (event_tx, event_rx) = mpsc::sync_channel(10);
-
 
 		let inner = WindowInner {
 			id,
@@ -583,13 +553,12 @@ impl ContextInner {
 			texture: None,
 			image: None,
 			overlays: Vec::new(),
-			event_tx,
 			preserve_aspect_ratio: options.preserve_aspect_ratio,
 		};
 
 		self.windows.push(inner);
 
-		Ok(Window { id, command_tx, event_rx })
+		Ok(Window { id, command_tx })
 	}
 
 	/// Destroy a window by ID.
