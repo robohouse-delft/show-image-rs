@@ -1,10 +1,13 @@
 v0.7.0
-  * Fix interpretation of `raquote` data with alpha channel.
   * Add support for showing overlays on top of images.
   * Fold consecutive mouse move events to reduce number of events.
   * Allow registered event handlers to remove themselves.
   * Remove implicit event channel of window handles.
   * Make window handles Clone.
+
+v0.6.3
+  * Increase timeout on communication with background thread to 1 second.
+  * Divide `raqote` images by their alpha component to undo pre-multiplication.
 
 v0.6.2
   * Add support for `raqote::DrawTarget` and `raqote::Image`.
