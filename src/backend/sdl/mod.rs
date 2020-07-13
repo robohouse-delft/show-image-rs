@@ -43,7 +43,7 @@ mod scan_code;
 pub use super::EventHandler;
 pub use super::EventHandlerContext;
 
-const RESULT_TIMEOUT: Duration = Duration::from_millis(500);
+const RESULT_TIMEOUT: Duration = Duration::from_millis(1_000);
 
 /// A context for creating windows.
 ///
