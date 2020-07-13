@@ -1,3 +1,6 @@
+v0.6.3
+  * Increase timeout on communication with background thread to 1 second.
+
 v0.6.2
   * Add support for `raqote::DrawTarget` and `raqote::Image`.
 
