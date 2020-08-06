@@ -1,3 +1,6 @@
+v0.6.4
+  * Accept `tch` versions 0.1.6 through 0.2.x.
+
 v0.6.3
   * Increase timeout on communication with background thread to 1 second.
   * Divide `raqote` images by their alpha component to undo pre-multiplication.
