@@ -1,9 +1,13 @@
+<<<<<<< HEAD
 v0.7.0
   * Add support for showing overlays on top of images.
   * Fold consecutive mouse move events to reduce number of events.
   * Allow registered event handlers to remove themselves.
   * Remove implicit event channel of window handles.
   * Make window handles Clone.
+
+v0.6.4
+  * Accept `tch` versions 0.1.6 through 0.2.x.
 
 v0.6.3
   * Increase timeout on communication with background thread to 1 second.
