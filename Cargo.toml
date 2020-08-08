@@ -1,0 +1,11 @@
+[package]
+name = "wgpu-image"
+version = "0.1.0"
+authors = ["Maarten de Vries <maarten@de-vri.es>"]
+edition = "2018"
+
+[dependencies]
+wgpu = "0.5.2"
+winit = "0.22.2"
+futures = "0.3.5"
+image = "0.23.8"
