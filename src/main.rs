@@ -2,11 +2,15 @@ use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowId;
 
+pub mod error;
 mod texture;
-use texture::Texture;
+mod proxy;
 
-mod command;
-use command::ContextCommand;
+pub use proxy::ContextProxy;
+use error::InvalidWindowIdError;
+use error::NoSuitableAdapterFoundError;
+use proxy::ContextCommand;
+use texture::Texture;
 
 pub mod oneshot;
 
@@ -21,35 +25,21 @@ fn main() {
 	let args : Vec<_> = std::env::args().collect();
 	let image = image::open(args.get(1).unwrap()).unwrap();
 
-	let event_loop = EventLoop::with_user_event();
-	let proxy = event_loop.create_proxy();
-
 	let context = Context::new(wgpu::TextureFormat::Bgra8UnormSrgb).unwrap();
+	let proxy = context.proxy();
 
 	std::thread::spawn(move || fake_main(image, proxy));
-	context.run(event_loop, |_context, _command: ()| ());
+	context.run(|_context, _command: ()| ());
 }
 
-fn fake_main(image: image::DynamicImage, proxy: winit::event_loop::EventLoopProxy<ContextCommand<()>>) {
-	let (result_tx, result_rx) = oneshot::channel();
-	proxy.send_event(command::CreateWindow {
-		title: "Show Image".to_string(),
-		preserve_aspect_ratio: true,
-		result_tx,
-	}.into()).map_err(|_| ()).unwrap();
-	let window_id = result_rx.recv().unwrap().unwrap();
-
-	let (result_tx, result_rx) = oneshot::channel();
-	proxy.send_event(command::SetWindowImage {
-		window_id,
-		name: "image".to_string(),
-		image,
-		result_tx,
-	}.into()).map_err(|_| ()).unwrap();
-	result_rx.recv().unwrap().unwrap();
+fn fake_main(image: image::DynamicImage, proxy: ContextProxy<()>) {
+	let window_id = proxy.create_window("Show Image", true).unwrap();
+	proxy.set_window_image(window_id, "image", image).unwrap();
 }
 
-pub struct Context {
+pub struct Context<CustomEvent: 'static> {
+	event_loop: Option<EventLoop<ContextCommand<CustomEvent>>>,
+	proxy: ContextProxy<CustomEvent>,
 	device: wgpu::Device,
 	queue: wgpu::Queue,
 	swap_chain_format: wgpu::TextureFormat,
@@ -73,24 +63,11 @@ impl Window {
 	}
 }
 
-#[derive(Debug, Clone)]
-pub struct InvalidWindowId {
-	window_id: WindowId,
-}
+impl<CustomEvent> Context<CustomEvent> {
+	fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, NoSuitableAdapterFoundError> {
+		let event_loop = EventLoop::with_user_event();
+		let proxy = ContextProxy::new(event_loop.create_proxy());
 
-#[derive(Debug, Clone)]
-pub struct NoSuitableAdapterFound {
-	_priv: (),
-}
-
-impl NoSuitableAdapterFound {
-	fn new() -> Self {
-		Self { _priv: () }
-	}
-}
-
-impl Context {
-	fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, NoSuitableAdapterFound> {
 		let (device, queue) = futures::executor::block_on(async {
 			// Find a suitable display adapter.
 			let adapter = wgpu::Adapter::request(
@@ -103,7 +80,7 @@ impl Context {
 
 			let adapter = match adapter {
 				Some(x) => x,
-				None => return Err(NoSuitableAdapterFound::new()),
+				None => return Err(NoSuitableAdapterFoundError),
 			};
 
 			// Create the logical device and command queue
@@ -177,6 +154,8 @@ impl Context {
 		});
 
 		Ok(Self {
+			event_loop: Some(event_loop),
+			proxy,
 			device,
 			queue,
 			swap_chain_format,
@@ -186,7 +165,11 @@ impl Context {
 		})
 	}
 
-	fn create_window<T>(&mut self, event_loop: &winit::event_loop::EventLoopWindowTarget<T>) -> Result<WindowId, winit::error::OsError> {
+	pub fn proxy(&self) -> ContextProxy<CustomEvent> {
+		self.proxy.clone()
+	}
+
+	pub fn create_window<T>(&mut self, event_loop: &winit::event_loop::EventLoopWindowTarget<T>) -> Result<WindowId, winit::error::OsError> {
 		let window = winit::window::WindowBuilder::new()
 			.build(event_loop)?;
 
@@ -217,18 +200,29 @@ impl Context {
 		Ok(window_id)
 	}
 
-	fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
+	pub fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
 		let index = self.windows.iter().position(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 		self.windows.remove(index);
 		Ok(())
 	}
 
-	fn resize_window(&mut self, window_id: WindowId, new_size: winit::dpi::PhysicalSize<u32>) -> Result<(), InvalidWindowId> {
+	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &image::DynamicImage) -> Result<(), InvalidWindowIdError> {
+		let window = self.windows.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+
+		let (texture, load_commands) = Texture::from_image(&self.device, &self.bind_group_layout, name, image);
+		window.load_texture = Some(load_commands);
+		window.image = Some(texture);
+		Ok(())
+	}
+
+	fn resize_window(&mut self, window_id: WindowId, new_size: winit::dpi::PhysicalSize<u32>) -> Result<(), InvalidWindowIdError> {
 		let window = self.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
 		// Recreate the swap chain with the new size
 		let swap_chain_desc = wgpu::SwapChainDescriptor {
@@ -243,10 +237,10 @@ impl Context {
 		Ok(())
 	}
 
-	fn render_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
+	fn render_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
 		let window = self.windows.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
 		let image = match &window.image {
 			Some(x) => x,
@@ -282,26 +276,14 @@ impl Context {
 		Ok(())
 	}
 
-	fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &image::DynamicImage) -> Result<(), InvalidWindowId> {
-		let window = self.windows.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
-
-		let (texture, load_commands) = Texture::from_image(&self.device, &self.bind_group_layout, name, image);
-		window.load_texture = Some(load_commands);
-		window.image = Some(texture);
-		Ok(())
-	}
-
-	fn run<CustomCommand, CustomHandler>(
+	fn run<CustomHandler>(
 		mut self,
-		event_loop: EventLoop<ContextCommand<CustomCommand>>,
 		mut custom_handler: CustomHandler
 	) -> !
 	where
-		CustomCommand: 'static + Send,
-		CustomHandler: 'static + FnMut(&mut Self, CustomCommand),
+		CustomHandler: 'static + FnMut(&mut Self, CustomEvent),
 	{
+		let event_loop = self.event_loop.take().unwrap();
 		event_loop.run(move |event, event_loop, control_flow| {
 			*control_flow = ControlFlow::Poll;
 			match event {
@@ -325,7 +307,7 @@ impl Context {
 						ContextCommand::SetWindowImage(command) => {
 							let _ = command.result_tx.send(self.set_window_image(command.window_id, &command.name, &command.image));
 						}
-						ContextCommand::RunContextFunction(command) => {
+						ContextCommand::RunFunction(command) => {
 							(command.function)(&mut self);
 						},
 						ContextCommand::Custom(command) => {
