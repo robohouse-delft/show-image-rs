@@ -12,6 +12,12 @@ pub struct ContextProxy<CustomEvent: 'static> {
 	event_loop: EventLoopProxy<ContextCommand<CustomEvent>>,
 }
 
+#[derive(Clone)]
+pub struct WindowProxy<CustomEvent: 'static> {
+	window_id: WindowId,
+	context_proxy: ContextProxy<CustomEvent>,
+}
+
 impl<CustomEvent: 'static> Clone for ContextProxy<CustomEvent> {
 	fn clone(&self) -> Self {
 		Self { event_loop: self.event_loop.clone() }
@@ -35,12 +41,19 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 		&self,
 		title: impl Into<String>,
 		preserve_aspect_ratio: bool,
-	) -> Result<WindowId, ProxyError<winit::error::OsError>> {
+	) -> Result<WindowProxy<CustomEvent>, ProxyError<winit::error::OsError>> {
 		let title = title.into();
+
 		let (result_tx, mut result_rx) = oneshot::channel();
 		let command = CreateWindow { title, preserve_aspect_ratio, result_tx };
 		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)?;
-		map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))
+
+		let window_id = map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))?;
+
+		Ok(WindowProxy {
+			window_id,
+			context_proxy: self.clone(),
+		})
 	}
 
 	pub fn destroy_window(
@@ -50,6 +63,7 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		let command = DestroyWindow { window_id, result_tx };
 		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)?;
+
 		map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))
 	}
 
@@ -60,9 +74,11 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 		image: image::DynamicImage,
 	) -> Result<(), ProxyError<InvalidWindowIdError>> {
 		let name = name.into();
+
 		let (result_tx, mut result_rx) = oneshot::channel();
 		let command = SetWindowImage { window_id, name, image, result_tx };
 		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)?;
+
 		map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))
 	}
 
@@ -86,6 +102,28 @@ fn map_channel_error<T, E>(result: Result<Result<T, E>, oneshot::TryReceiveError
 		oneshot::TryReceiveError::Disconnected => ProxyError::EventLoopClosed(EventLoopClosedError),
 		oneshot::TryReceiveError::AlreadyRetrieved => unreachable!("oneshot result is already retrieved"),
 	})?.map_err(ProxyError::Inner)
+}
+
+impl<CustomEvent: 'static> WindowProxy<CustomEvent> {
+	pub fn id(&self) -> WindowId {
+		self.window_id
+	}
+
+	pub fn context_proxy(&self) -> &ContextProxy<CustomEvent> {
+		&self.context_proxy
+	}
+
+	pub fn destroy(&self) -> Result<(), ProxyError<InvalidWindowIdError>> {
+		self.context_proxy.destroy_window(self.window_id)
+	}
+
+	pub fn set_image(
+		&self,
+		name: impl Into<String>,
+		image: image::DynamicImage,
+	) -> Result<(), ProxyError<InvalidWindowIdError>> {
+		self.context_proxy.set_window_image(self.window_id, name, image)
+	}
 }
 
 pub struct CreateWindow {

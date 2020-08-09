@@ -33,8 +33,8 @@ fn main() {
 }
 
 fn fake_main(image: image::DynamicImage, proxy: ContextProxy<()>) {
-	let window_id = proxy.create_window("Show Image", true).unwrap();
-	proxy.set_window_image(window_id, "image", image).unwrap();
+	let window = proxy.create_window("Show Image", true).unwrap();
+	window.set_image("image", image).unwrap();
 }
 
 pub struct Context<CustomEvent: 'static> {
