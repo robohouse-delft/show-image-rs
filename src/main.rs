@@ -68,31 +68,7 @@ impl<CustomEvent> Context<CustomEvent> {
 		let event_loop = EventLoop::with_user_event();
 		let proxy = ContextProxy::new(event_loop.create_proxy());
 
-		let (device, queue) = futures::executor::block_on(async {
-			// Find a suitable display adapter.
-			let adapter = wgpu::Adapter::request(
-				&wgpu::RequestAdapterOptions {
-					power_preference: wgpu::PowerPreference::Default,
-					compatible_surface: None, // TODO: can we use a hidden window or something?
-				},
-				wgpu::BackendBit::PRIMARY
-			).await;
-
-			let adapter = match adapter {
-				Some(x) => x,
-				None => return Err(NoSuitableAdapterFoundError),
-			};
-
-			// Create the logical device and command queue
-			let (device, queue) = adapter.request_device(
-				&wgpu::DeviceDescriptor {
-					limits: wgpu::Limits::default(),
-					extensions: wgpu::Extensions::default(),
-				},
-			).await;
-
-			Ok((device, queue))
-		})?;
+		let (device, queue) = futures::executor::block_on(get_device())?;
 
 		let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 			label: Some("bind_group_layout"),
@@ -173,18 +149,7 @@ impl<CustomEvent> Context<CustomEvent> {
 			.build(event_loop)?;
 
 		let surface = wgpu::Surface::create(&window);
-
-		let size = window.inner_size();
-
-		let swap_chain_desc = wgpu::SwapChainDescriptor {
-			usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-			format: self.swap_chain_format,
-			width: size.width,
-			height: size.height,
-			present_mode: wgpu::PresentMode::Mailbox,
-		};
-
-		let swap_chain = self.device.create_swap_chain(&surface, &swap_chain_desc);
+		let swap_chain = make_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
 
 		let window = Window {
 			window,
@@ -223,16 +188,7 @@ impl<CustomEvent> Context<CustomEvent> {
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
-		// Recreate the swap chain with the new size
-		let swap_chain_desc = wgpu::SwapChainDescriptor {
-			usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-			format: self.swap_chain_format,
-			width: new_size.width,
-			height: new_size.height,
-			present_mode: wgpu::PresentMode::Mailbox,
-		};
-
-		window.swap_chain = self.device.create_swap_chain(&window.surface, &swap_chain_desc);
+		window.swap_chain = make_swap_chain(new_size, &window.surface, self.swap_chain_format, &self.device);
 		Ok(())
 	}
 
@@ -318,4 +274,39 @@ impl<CustomEvent> Context<CustomEvent> {
 			}
 		});
 	}
+}
+
+async fn get_device() -> Result<(wgpu::Device, wgpu::Queue), NoSuitableAdapterFoundError> {
+	// Find a suitable display adapter.
+	let adapter = wgpu::Adapter::request(
+		&wgpu::RequestAdapterOptions {
+			power_preference: wgpu::PowerPreference::Default,
+			compatible_surface: None, // TODO: can we use a hidden window or something?
+		},
+		wgpu::BackendBit::PRIMARY
+	).await;
+
+	let adapter = adapter.ok_or(NoSuitableAdapterFoundError)?;
+
+	// Create the logical device and command queue
+	let (device, queue) = adapter.request_device(
+		&wgpu::DeviceDescriptor {
+			limits: wgpu::Limits::default(),
+			extensions: wgpu::Extensions::default(),
+		},
+	).await;
+
+	Ok((device, queue))
+}
+
+fn make_swap_chain(size: winit::dpi::PhysicalSize<u32>, surface: &wgpu::Surface, format: wgpu::TextureFormat, device: &wgpu::Device) -> wgpu::SwapChain {
+	let swap_chain_desc = wgpu::SwapChainDescriptor {
+		usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+		format,
+		width: size.width,
+		height: size.height,
+		present_mode: wgpu::PresentMode::Mailbox,
+	};
+
+	device.create_swap_chain(&surface, &swap_chain_desc)
 }
