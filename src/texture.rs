@@ -20,7 +20,7 @@ impl Texture {
 			mip_level_count: 1,
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
-			format: wgpu::TextureFormat::Rgba8Uint,
+			format: wgpu::TextureFormat::Rgba8UnormSrgb,
 			usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
 		});
 

@@ -134,7 +134,6 @@ impl<CustomEvent> Context<CustomEvent> {
 				entry_point: "main",
 			}),
 
-			// Use the default rasterizer state: no culling, no depth bias
 			rasterization_state: None,
 			primitive_topology: wgpu::PrimitiveTopology::TriangleList,
 			color_states: &[wgpu::ColorStateDescriptor {
