@@ -116,8 +116,8 @@ impl<CustomEvent> Context<CustomEvent> {
 			],
 		});
 
-		let vertex_shader = device.create_shader_module(&include_spirv!("shader.vert.spv"));
-		let fragment_shader = device.create_shader_module(&include_spirv!("shader.frag.spv"));
+		let vertex_shader = device.create_shader_module(&include_spirv!("../shaders/shader.vert.spv"));
+		let fragment_shader = device.create_shader_module(&include_spirv!("../shaders/shader.frag.spv"));
 
 		let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			bind_group_layouts: &[&bind_group_layout],
