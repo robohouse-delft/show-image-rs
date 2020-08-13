@@ -72,20 +72,14 @@ impl<CustomEvent> Context<CustomEvent> {
 		self.proxy.clone()
 	}
 
-	pub fn run<CustomHandler>(self, custom_handler: CustomHandler) -> !
-	where
-		CustomHandler: FnMut(&mut Self, CustomEvent) + 'static,
-	{
+	pub fn run(self) -> ! {
 		let event_loop = winit::event_loop::EventLoop::with_user_event();
-		self.run_with(event_loop, custom_handler)
+		self.run_with(event_loop)
 	}
 
-	pub fn run_with<CustomHandler>(mut self, event_loop: EventLoop<ContextCommand<CustomEvent>>, mut custom_handler: CustomHandler) -> !
-	where
-		CustomHandler: FnMut(&mut Self, CustomEvent) + 'static,
-	{
+	pub fn run_with(mut self, event_loop: EventLoop<ContextCommand<CustomEvent>>) -> ! {
 		event_loop.run(move |event, event_loop, control_flow| {
-			self.handle_event(event, event_loop, control_flow, &mut custom_handler)
+			self.handle_event(event, event_loop, control_flow)
 		});
 	}
 }
@@ -236,16 +230,12 @@ impl<CustomEvent> Context<CustomEvent> {
 		Ok(())
 	}
 
-	fn handle_event<CustomHandler>(
+	fn handle_event(
 		&mut self,
 		event: winit::event::Event<ContextCommand<CustomEvent>>,
 		event_loop: &winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
 		control_flow: &mut winit::event_loop::ControlFlow,
-		custom_handler: &mut CustomHandler,
-	)
-	where
-		CustomHandler: FnMut(&mut Self, CustomEvent) + 'static,
-	{
+	) {
 		*control_flow = ControlFlow::Poll;
 		match event {
 			Event::WindowEvent { window_id, event: WindowEvent::Resized(new_size) } => {
@@ -274,8 +264,8 @@ impl<CustomEvent> Context<CustomEvent> {
 					ContextCommand::ExecuteFunction(command) => {
 						(command.function)(ContextHandle::new(self, event_loop));
 					},
-					ContextCommand::Custom(command) => {
-						custom_handler(self, command);
+					ContextCommand::Custom(_command) => {
+						// TODO: dispatch to registered event handlers.
 					},
 				}
 			}

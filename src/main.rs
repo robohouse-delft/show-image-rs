@@ -24,7 +24,7 @@ fn main() {
 	let proxy = context.proxy();
 
 	std::thread::spawn(move || fake_main(image, proxy));
-	context.run(|_context, _command: ()| ());
+	context.run();
 }
 
 fn fake_main(image: image::DynamicImage, proxy: ContextProxy<()>) {
