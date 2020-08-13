@@ -1,12 +1,13 @@
 pub struct Texture {
-	pub texture: wgpu::Texture,
-	pub sampler: wgpu::Sampler,
-	pub bind_group: wgpu::BindGroup,
+	size: wgpu::Extent3d,
+	_texture: wgpu::Texture,
+	_sampler: wgpu::Sampler,
+	bind_group: wgpu::BindGroup,
 }
 
 impl Texture {
 	pub fn from_image(device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, name: &str, image: &image::DynamicImage) -> (Self, wgpu::CommandBuffer) {
-		let image = image.to_bgra();
+		let image = image.to_rgba();
 		let size = wgpu::Extent3d {
 			width: image.width(),
 			height: image.height(),
@@ -52,14 +53,14 @@ impl Texture {
 		});
 
 		// Copy the texture data.
-		let buffer = device.create_buffer_with_data(&image, wgpu::BufferUsage::COPY_SRC);
+		let image_buffer = device.create_buffer_with_data(&image, wgpu::BufferUsage::COPY_SRC);
 		let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-			label: Some("copy_image")
+			label: Some("copy_image_data")
 		});
 
 		encoder.copy_buffer_to_texture(
 			wgpu::BufferCopyView {
-				buffer: &buffer,
+				buffer: &image_buffer,
 				offset: 0,
 				bytes_per_row: 4 * image.width(),
 				rows_per_image: image.height(),
@@ -75,11 +76,20 @@ impl Texture {
 		let commands = encoder.finish();
 
 		let result = Self {
-			texture,
-			sampler,
+			size,
+			_texture: texture,
+			_sampler: sampler,
 			bind_group,
 		};
 
 		(result, commands)
+	}
+
+	pub fn size(&self) -> &wgpu::Extent3d {
+		&self.size
+	}
+
+	pub fn bind_group(&self) -> &wgpu::BindGroup {
+		&self.bind_group
 	}
 }

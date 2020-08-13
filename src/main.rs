@@ -3,10 +3,14 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowId;
 
 pub mod error;
-mod texture;
+
+mod buffer;
 mod proxy;
+mod texture;
 
 pub use proxy::ContextProxy;
+
+use buffer::create_buffer_with_value;
 use error::InvalidWindowIdError;
 use error::NoSuitableAdapterFoundError;
 use proxy::ContextCommand;
@@ -33,7 +37,7 @@ fn main() {
 }
 
 fn fake_main(image: image::DynamicImage, proxy: ContextProxy<()>) {
-	let window = proxy.create_window("Show Image", true).unwrap();
+	let window = proxy.create_window("Show Image").unwrap();
 	window.set_image("image", image).unwrap();
 }
 
@@ -43,7 +47,8 @@ pub struct Context<CustomEvent: 'static> {
 	device: wgpu::Device,
 	queue: wgpu::Queue,
 	swap_chain_format: wgpu::TextureFormat,
-	bind_group_layout: wgpu::BindGroupLayout,
+	window_bind_group_layout: wgpu::BindGroupLayout,
+	image_bind_group_layout: wgpu::BindGroupLayout,
 	render_pipeline: wgpu::RenderPipeline,
 
 	windows: Vec<Window>,
@@ -51,15 +56,111 @@ pub struct Context<CustomEvent: 'static> {
 
 pub struct Window {
 	window: winit::window::Window,
+	options: WindowOptions,
 	surface: wgpu::Surface,
 	swap_chain: wgpu::SwapChain,
+	uniforms: Uniforms<WindowUniforms>,
 	image: Option<Texture>,
 	load_texture: Option<wgpu::CommandBuffer>,
+}
+
+#[derive(Debug, Clone)]
+pub struct WindowOptions {
+	preserve_aspect_ratio: bool,
 }
 
 impl Window {
 	fn id(&self) -> WindowId {
 		self.window.id()
+	}
+
+	fn calculate_uniforms(&self) -> WindowUniforms {
+		WindowUniforms {
+			scale: self.calculate_scale(),
+		}
+	}
+
+	fn calculate_scale(&self) -> [f32; 2] {
+		if !self.options.preserve_aspect_ratio {
+			[1.0, 1.0]
+		} else if let Some(image) = &self.image {
+			let image_size = [image.size().width as f32, image.size().height as f32];
+			let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
+			let ratios = [image_size[0] / window_size[0], image_size[1] / window_size[1]];
+
+			if ratios[0] >= ratios[1] {
+				[1.0, ratios[1] / ratios[0]]
+			} else {
+				[ratios[0] / ratios[1], 1.0]
+			}
+		} else {
+			[1.0, 1.0]
+		}
+	}
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct WindowUniforms {
+	scale: [f32; 2],
+}
+
+impl Default for WindowUniforms {
+	fn default() -> Self {
+		Self {
+			scale: [1.0, 1.0],
+		}
+	}
+}
+
+struct Uniforms<T> {
+	buffer: wgpu::Buffer,
+	bind_group: wgpu::BindGroup,
+	dirty: bool,
+	_phantom: std::marker::PhantomData<fn (&T)>,
+}
+
+impl<T> Uniforms<T> {
+	fn from_value(device: &wgpu::Device, value: &T, layout: &wgpu::BindGroupLayout) -> Self {
+		let buffer = create_buffer_with_value(device, value, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST);
+		let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+			label: Some("uniforms_bind_group"),
+			layout,
+			bindings: &[
+				wgpu::Binding {
+					binding: 0,
+					resource: wgpu::BindingResource::Buffer {
+						buffer: &buffer,
+						range: 0..std::mem::size_of::<T>() as wgpu::BufferAddress,
+					}
+				},
+			],
+		});
+
+		Self {
+			buffer,
+			bind_group,
+			dirty: false,
+			_phantom: std::marker::PhantomData,
+		}
+	}
+
+	fn bind_group(&self) -> &wgpu::BindGroup {
+		&self.bind_group
+	}
+
+	fn is_dirty(&self) -> bool {
+		self.dirty
+	}
+
+	fn mark_dirty(&mut self, dirty: bool) {
+		self.dirty = dirty;
+	}
+
+	fn update_from(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, value: &T) {
+		let buffer = create_buffer_with_value(device, value, wgpu::BufferUsage::COPY_SRC);
+		encoder.copy_buffer_to_buffer(&buffer, 0, &self.buffer, 0, std::mem::size_of::<T>() as wgpu::BufferAddress);
+		self.mark_dirty(false);
 	}
 }
 
@@ -70,8 +171,21 @@ impl<CustomEvent> Context<CustomEvent> {
 
 		let (device, queue) = futures::executor::block_on(get_device())?;
 
-		let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-			label: Some("bind_group_layout"),
+		let window_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+			label: Some("window_bind_group_layout"),
+			bindings: &[
+				wgpu::BindGroupLayoutEntry {
+					binding: 0,
+					visibility: wgpu::ShaderStage::VERTEX,
+					ty: wgpu::BindingType::UniformBuffer {
+						dynamic: false,
+					},
+				},
+			],
+		});
+
+		let image_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+			label: Some("image_bind_group_layout"),
 			bindings: &[
 				wgpu::BindGroupLayoutEntry {
 					binding: 0,
@@ -96,7 +210,10 @@ impl<CustomEvent> Context<CustomEvent> {
 		let fragment_shader = device.create_shader_module(&include_spirv!("../shaders/shader.frag.spv"));
 
 		let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-			bind_group_layouts: &[&bind_group_layout],
+			bind_group_layouts: &[
+				&window_bind_group_layout,
+				&image_bind_group_layout,
+			],
 		});
 
 		let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -134,7 +251,8 @@ impl<CustomEvent> Context<CustomEvent> {
 			device,
 			queue,
 			swap_chain_format,
-			bind_group_layout,
+			window_bind_group_layout,
+			image_bind_group_layout,
 			render_pipeline,
 			windows: Vec::new(),
 		})
@@ -144,17 +262,21 @@ impl<CustomEvent> Context<CustomEvent> {
 		self.proxy.clone()
 	}
 
-	pub fn create_window<T>(&mut self, event_loop: &winit::event_loop::EventLoopWindowTarget<T>) -> Result<WindowId, winit::error::OsError> {
+	pub fn create_window<T>(&mut self, event_loop: &winit::event_loop::EventLoopWindowTarget<T>, name: String, options: WindowOptions) -> Result<WindowId, winit::error::OsError> {
 		let window = winit::window::WindowBuilder::new()
+			.with_title(name)
 			.build(event_loop)?;
 
 		let surface = wgpu::Surface::create(&window);
 		let swap_chain = make_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
+		let uniforms = Uniforms::from_value(&self.device, &WindowUniforms::default(), &self.window_bind_group_layout);
 
 		let window = Window {
 			window,
+			options,
 			surface,
 			swap_chain,
+			uniforms,
 			image: None,
 			load_texture: None,
 		};
@@ -176,9 +298,10 @@ impl<CustomEvent> Context<CustomEvent> {
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
-		let (texture, load_commands) = Texture::from_image(&self.device, &self.bind_group_layout, name, image);
+		let (texture, load_commands) = Texture::from_image(&self.device, &self.image_bind_group_layout, name, image);
 		window.load_texture = Some(load_commands);
 		window.image = Some(texture);
+		window.uniforms.mark_dirty(true);
 		Ok(())
 	}
 
@@ -189,6 +312,7 @@ impl<CustomEvent> Context<CustomEvent> {
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
 		window.swap_chain = make_swap_chain(new_size, &window.surface, self.swap_chain_format, &self.device);
+		window.uniforms.mark_dirty(true);
 		Ok(())
 	}
 
@@ -207,6 +331,11 @@ impl<CustomEvent> Context<CustomEvent> {
 			.expect("Failed to acquire next swap chain texture");
 
 		let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+		if window.uniforms.is_dirty() {
+			window.uniforms.update_from(&self.device, &mut encoder, &window.calculate_uniforms());
+		}
+
 		let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 			color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
 				load_op: wgpu::LoadOp::Clear,
@@ -218,7 +347,8 @@ impl<CustomEvent> Context<CustomEvent> {
 			depth_stencil_attachment: None,
 		});
 		render_pass.set_pipeline(&self.render_pipeline);
-		render_pass.set_bind_group(0, &image.bind_group, &[]);
+		render_pass.set_bind_group(0, window.uniforms.bind_group(), &[]);
+		render_pass.set_bind_group(1, image.bind_group(), &[]);
 		render_pass.draw(0..6, 0..1);
 		drop(render_pass);
 		let render_window = encoder.finish();
@@ -254,7 +384,7 @@ impl<CustomEvent> Context<CustomEvent> {
 				Event::UserEvent(command) => {
 					match command {
 						ContextCommand::CreateWindow(command) => {
-							let _ = command.result_tx.send(self.create_window(event_loop));
+							let _ = command.result_tx.send(self.create_window(event_loop, command.title, command.options));
 						},
 						ContextCommand::DestroyWindow(command) => {
 							let _ = command.result_tx.send(self.destroy_window(command.window_id));

@@ -1,12 +1,13 @@
 use crate::Context;
+use crate::WindowOptions;
 use crate::error::EventLoopClosedError;
 use crate::error::InvalidWindowIdError;
 use crate::error::ProxyError;
 use crate::error::TimeoutError;
 use crate::oneshot;
 use std::time::Duration;
-use winit::window::WindowId;
 use winit::event_loop::EventLoopProxy;
+use winit::window::WindowId;
 
 pub struct ContextProxy<CustomEvent: 'static> {
 	event_loop: EventLoopProxy<ContextCommand<CustomEvent>>,
@@ -40,12 +41,21 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 	pub fn create_window(
 		&self,
 		title: impl Into<String>,
-		preserve_aspect_ratio: bool,
+	) -> Result<WindowProxy<CustomEvent>, ProxyError<winit::error::OsError>> {
+		self.create_window_with_options(title, WindowOptions {
+			preserve_aspect_ratio: true,
+		})
+	}
+
+	pub fn create_window_with_options(
+		&self,
+		title: impl Into<String>,
+		options: WindowOptions,
 	) -> Result<WindowProxy<CustomEvent>, ProxyError<winit::error::OsError>> {
 		let title = title.into();
 
 		let (result_tx, mut result_rx) = oneshot::channel();
-		let command = CreateWindow { title, preserve_aspect_ratio, result_tx };
+		let command = CreateWindow { title, options, result_tx };
 		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)?;
 
 		let window_id = map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))?;
@@ -128,7 +138,7 @@ impl<CustomEvent: 'static> WindowProxy<CustomEvent> {
 
 pub struct CreateWindow {
 	pub title: String,
-	pub preserve_aspect_ratio: bool,
+	pub options: crate::WindowOptions,
 	pub result_tx: oneshot::Sender<Result<WindowId, winit::error::OsError>>
 
 }
