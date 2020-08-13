@@ -28,6 +28,7 @@ impl<CustomEvent: 'static> Clone for ContextProxy<CustomEvent> {
 pub enum ContextCommand<CustomEvent: 'static> {
 	CreateWindow(CreateWindow),
 	DestroyWindow(DestroyWindow),
+	SetWindowVisible(SetWindowVisible),
 	SetWindowImage(SetWindowImage),
 	RunFunction(RunFunction<CustomEvent>),
 	Custom(CustomEvent),
@@ -72,6 +73,18 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 	) -> Result<(), ProxyError<InvalidWindowIdError>> {
 		let (result_tx, mut result_rx) = oneshot::channel();
 		let command = DestroyWindow { window_id, result_tx };
+		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)?;
+
+		map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))
+	}
+
+	pub fn set_window_visible(
+		&self,
+		window_id: WindowId,
+		visible: bool,
+	) -> Result<(), ProxyError<InvalidWindowIdError>> {
+		let (result_tx, mut result_rx) = oneshot::channel();
+		let command = SetWindowVisible { window_id, visible, result_tx };
 		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)?;
 
 		map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))
@@ -148,6 +161,12 @@ pub struct DestroyWindow {
 	pub result_tx: oneshot::Sender<Result<(), InvalidWindowIdError>>
 }
 
+pub struct SetWindowVisible {
+	pub window_id: WindowId,
+	pub visible: bool,
+	pub result_tx: oneshot::Sender<Result<(), InvalidWindowIdError>>
+}
+
 pub struct SetWindowImage {
 	pub window_id: WindowId,
 	pub name: String,
@@ -168,6 +187,12 @@ impl<CustomEvent> From<CreateWindow> for ContextCommand<CustomEvent> {
 impl<CustomEvent> From<DestroyWindow> for ContextCommand<CustomEvent> {
 	fn from(other: DestroyWindow) -> Self {
 		Self::DestroyWindow(other)
+	}
+}
+
+impl<CustomEvent> From<SetWindowVisible> for ContextCommand<CustomEvent> {
+	fn from(other: SetWindowVisible) -> Self {
+		Self::SetWindowVisible(other)
 	}
 }
 

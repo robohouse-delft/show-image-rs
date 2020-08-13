@@ -68,6 +68,16 @@ pub struct Window {
 #[derive(Debug, Clone)]
 pub struct WindowOptions {
 	preserve_aspect_ratio: bool,
+	start_hidden: bool,
+}
+
+impl Default for WindowOptions {
+	fn default() -> Self {
+		Self {
+			preserve_aspect_ratio: true,
+			start_hidden: false,
+		}
+	}
 }
 
 impl Window {
@@ -212,9 +222,15 @@ impl<CustomEvent> Context<CustomEvent> {
 		self.proxy.clone()
 	}
 
-	pub fn create_window<T>(&mut self, event_loop: &winit::event_loop::EventLoopWindowTarget<T>, name: String, options: WindowOptions) -> Result<WindowId, winit::error::OsError> {
+	pub fn create_window(
+		&mut self,
+		event_loop: &winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
+		title: impl Into<String>,
+		options: WindowOptions,
+	) -> Result<WindowId, winit::error::OsError> {
 		let window = winit::window::WindowBuilder::new()
-			.with_title(name)
+			.with_title(title)
+			.with_visible(!options.start_hidden)
 			.build(event_loop)?;
 
 		let surface = wgpu::Surface::create(&window);
@@ -240,6 +256,14 @@ impl<CustomEvent> Context<CustomEvent> {
 		let index = self.windows.iter().position(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 		self.windows.remove(index);
+		Ok(())
+	}
+
+	pub fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowIdError> {
+		let window = self.windows.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+		window.window.set_visible(visible);
 		Ok(())
 	}
 
@@ -339,6 +363,9 @@ impl<CustomEvent> Context<CustomEvent> {
 						ContextCommand::DestroyWindow(command) => {
 							let _ = command.result_tx.send(self.destroy_window(command.window_id));
 						},
+						ContextCommand::SetWindowVisible(command) => {
+							let _ = command.result_tx.send(self.set_window_visible(command.window_id, command.visible));
+						}
 						ContextCommand::SetWindowImage(command) => {
 							let _ = command.result_tx.send(self.set_window_image(command.window_id, &command.name, &command.image));
 						}
