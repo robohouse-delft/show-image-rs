@@ -21,7 +21,6 @@ macro_rules! include_spirv {
 }
 
 pub struct Context<CustomEvent: 'static> {
-	event_loop: Option<EventLoop<ContextCommand<CustomEvent>>>,
 	proxy: ContextProxy<CustomEvent>,
 	device: wgpu::Device,
 	queue: wgpu::Queue,
@@ -58,7 +57,6 @@ impl<CustomEvent> Context<CustomEvent> {
 		let render_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader, swap_chain_format);
 
 		Ok(Self {
-			event_loop: Some(event_loop),
 			proxy,
 			device,
 			queue,
@@ -74,11 +72,18 @@ impl<CustomEvent> Context<CustomEvent> {
 		self.proxy.clone()
 	}
 
-	pub fn run<CustomHandler>(mut self, mut custom_handler: CustomHandler) -> !
+	pub fn run<CustomHandler>(self, custom_handler: CustomHandler) -> !
 	where
 		CustomHandler: FnMut(&mut Self, CustomEvent) + 'static,
 	{
-		let event_loop = self.event_loop.take().unwrap();
+		let event_loop = winit::event_loop::EventLoop::with_user_event();
+		self.run_with(event_loop, custom_handler)
+	}
+
+	pub fn run_with<CustomHandler>(mut self, event_loop: EventLoop<ContextCommand<CustomEvent>>, mut custom_handler: CustomHandler) -> !
+	where
+		CustomHandler: FnMut(&mut Self, CustomEvent) + 'static,
+	{
 		event_loop.run(move |event, event_loop, control_flow| {
 			self.handle_event(event, event_loop, control_flow, &mut custom_handler)
 		});
