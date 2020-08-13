@@ -76,45 +76,11 @@ impl<CustomEvent> Context<CustomEvent> {
 
 	pub fn run<CustomHandler>(mut self, mut custom_handler: CustomHandler) -> !
 	where
-		CustomHandler: 'static + FnMut(&mut Self, CustomEvent),
+		CustomHandler: FnMut(&mut Self, CustomEvent) + 'static,
 	{
 		let event_loop = self.event_loop.take().unwrap();
 		event_loop.run(move |event, event_loop, control_flow| {
-			*control_flow = ControlFlow::Poll;
-			match event {
-				Event::WindowEvent { window_id, event: WindowEvent::Resized(new_size) } => {
-					let _  = self.resize_window(window_id, new_size);
-				}
-				Event::RedrawRequested(window_id) => {
-					let _ = self.render_window(window_id);
-				}
-				Event::WindowEvent { window_id, event: WindowEvent::CloseRequested } => {
-					let _ = self.destroy_window(window_id);
-				},
-				Event::UserEvent(command) => {
-					match command {
-						ContextCommand::CreateWindow(command) => {
-							let _ = command.result_tx.send(self.create_window(event_loop, command.title, command.options));
-						},
-						ContextCommand::DestroyWindow(command) => {
-							let _ = command.result_tx.send(self.destroy_window(command.window_id));
-						},
-						ContextCommand::SetWindowVisible(command) => {
-							let _ = command.result_tx.send(self.set_window_visible(command.window_id, command.visible));
-						}
-						ContextCommand::SetWindowImage(command) => {
-							let _ = command.result_tx.send(self.set_window_image(command.window_id, &command.name, &command.image));
-						}
-						ContextCommand::ExecuteFunction(command) => {
-							(command.function)(ContextHandle::new(&mut self, event_loop));
-						},
-						ContextCommand::Custom(command) => {
-							custom_handler(&mut self, command);
-						},
-					}
-				}
-				_ => {},
-			}
+			self.handle_event(event, event_loop, control_flow, &mut custom_handler)
 		});
 	}
 }
@@ -263,6 +229,53 @@ impl<CustomEvent> Context<CustomEvent> {
 		}
 
 		Ok(())
+	}
+
+	fn handle_event<CustomHandler>(
+		&mut self,
+		event: winit::event::Event<ContextCommand<CustomEvent>>,
+		event_loop: &winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
+		control_flow: &mut winit::event_loop::ControlFlow,
+		custom_handler: &mut CustomHandler,
+	)
+	where
+		CustomHandler: FnMut(&mut Self, CustomEvent) + 'static,
+	{
+		*control_flow = ControlFlow::Poll;
+		match event {
+			Event::WindowEvent { window_id, event: WindowEvent::Resized(new_size) } => {
+				let _  = self.resize_window(window_id, new_size);
+			}
+			Event::RedrawRequested(window_id) => {
+				let _ = self.render_window(window_id);
+			}
+			Event::WindowEvent { window_id, event: WindowEvent::CloseRequested } => {
+				let _ = self.destroy_window(window_id);
+			},
+			Event::UserEvent(command) => {
+				match command {
+					ContextCommand::CreateWindow(command) => {
+						let _ = command.result_tx.send(self.create_window(event_loop, command.title, command.options));
+					},
+					ContextCommand::DestroyWindow(command) => {
+						let _ = command.result_tx.send(self.destroy_window(command.window_id));
+					},
+					ContextCommand::SetWindowVisible(command) => {
+						let _ = command.result_tx.send(self.set_window_visible(command.window_id, command.visible));
+					}
+					ContextCommand::SetWindowImage(command) => {
+						let _ = command.result_tx.send(self.set_window_image(command.window_id, &command.name, &command.image));
+					}
+					ContextCommand::ExecuteFunction(command) => {
+						(command.function)(ContextHandle::new(self, event_loop));
+					},
+					ContextCommand::Custom(command) => {
+						custom_handler(self, command);
+					},
+				}
+			}
+			_ => {},
+		}
 	}
 }
 
