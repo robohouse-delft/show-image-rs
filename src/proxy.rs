@@ -30,7 +30,7 @@ pub enum ContextCommand<CustomEvent: 'static> {
 	DestroyWindow(DestroyWindow),
 	SetWindowVisible(SetWindowVisible),
 	SetWindowImage(SetWindowImage),
-	RunFunction(RunFunction<CustomEvent>),
+	ExecuteFunction(ExecuteFunction<CustomEvent>),
 	Custom(CustomEvent),
 }
 
@@ -105,12 +105,15 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 		map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))
 	}
 
-	pub fn run<F>(&self, function: F) -> Result<(), EventLoopClosedError>
+	pub fn execute_function<F>(&self, function: F) -> Result<(), EventLoopClosedError>
 	where
-		F: Into<Box<dyn 'static + FnOnce(&mut Context<CustomEvent>) + Send>>,
+		F: 'static + FnOnce(&mut Context<CustomEvent>) + Send,
 	{
-		let function = function.into();
-		let command = RunFunction { function };
+		self.execute_boxed_function(Box::new(function))
+	}
+
+	pub fn execute_boxed_function(&self, function: Box<dyn FnOnce(&mut Context<CustomEvent>) + Send + 'static>) -> Result<(), EventLoopClosedError> {
+		let command = ExecuteFunction { function };
 		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)
 	}
 
@@ -174,7 +177,7 @@ pub struct SetWindowImage {
 	pub result_tx: oneshot::Sender<Result<(), InvalidWindowIdError>>
 }
 
-pub struct RunFunction<CustomEvent: 'static> {
+pub struct ExecuteFunction<CustomEvent: 'static> {
 	pub function: Box<dyn FnOnce(&mut Context<CustomEvent>) + Send>,
 }
 
@@ -202,8 +205,8 @@ impl<CustomEvent> From<SetWindowImage> for ContextCommand<CustomEvent> {
 	}
 }
 
-impl<CustomEvent> From<RunFunction<CustomEvent>> for ContextCommand<CustomEvent> {
-	fn from(other: RunFunction<CustomEvent>) -> Self {
-		Self::RunFunction(other)
+impl<CustomEvent> From<ExecuteFunction<CustomEvent>> for ContextCommand<CustomEvent> {
+	fn from(other: ExecuteFunction<CustomEvent>) -> Self {
+		Self::ExecuteFunction(other)
 	}
 }

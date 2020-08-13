@@ -372,7 +372,7 @@ impl<CustomEvent> Context<CustomEvent> {
 						ContextCommand::SetWindowImage(command) => {
 							let _ = command.result_tx.send(self.set_window_image(command.window_id, &command.name, &command.image));
 						}
-						ContextCommand::RunFunction(command) => {
+						ContextCommand::ExecuteFunction(command) => {
 							(command.function)(&mut self);
 						},
 						ContextCommand::Custom(command) => {
