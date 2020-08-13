@@ -18,6 +18,7 @@ use texture::Texture;
 use uniforms_buffer::UniformsBuffer;
 
 pub mod oneshot;
+pub use wgpu::Color;
 
 macro_rules! include_spirv {
 	($path:literal) => {{
@@ -68,6 +69,7 @@ pub struct Window {
 #[derive(Debug, Clone)]
 pub struct WindowOptions {
 	preserve_aspect_ratio: bool,
+	background_color: Color,
 	start_hidden: bool,
 }
 
@@ -75,6 +77,7 @@ impl Default for WindowOptions {
 	fn default() -> Self {
 		Self {
 			preserve_aspect_ratio: true,
+			background_color: Color::BLACK,
 			start_hidden: false,
 		}
 	}
@@ -314,7 +317,7 @@ impl<CustomEvent> Context<CustomEvent> {
 			color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
 				load_op: wgpu::LoadOp::Clear,
 				store_op: wgpu::StoreOp::Store,
-				clear_color: Default::default(),
+				clear_color: window.options.background_color,
 				attachment: &frame.view,
 				resolve_target: None,
 			}],
