@@ -1,4 +1,4 @@
-use crate::Context;
+use crate::ContextHandle;
 use crate::WindowOptions;
 use crate::error::EventLoopClosedError;
 use crate::error::InvalidWindowIdError;
@@ -107,12 +107,12 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 
 	pub fn execute_function<F>(&self, function: F) -> Result<(), EventLoopClosedError>
 	where
-		F: 'static + FnOnce(&mut Context<CustomEvent>) + Send,
+		F: 'static + FnOnce(ContextHandle<CustomEvent>) + Send,
 	{
 		self.execute_boxed_function(Box::new(function))
 	}
 
-	pub fn execute_boxed_function(&self, function: Box<dyn FnOnce(&mut Context<CustomEvent>) + Send + 'static>) -> Result<(), EventLoopClosedError> {
+	pub fn execute_boxed_function(&self, function: Box<dyn FnOnce(ContextHandle<CustomEvent>) + Send + 'static>) -> Result<(), EventLoopClosedError> {
 		let command = ExecuteFunction { function };
 		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)
 	}
@@ -178,7 +178,7 @@ pub struct SetWindowImage {
 }
 
 pub struct ExecuteFunction<CustomEvent: 'static> {
-	pub function: Box<dyn FnOnce(&mut Context<CustomEvent>) + Send>,
+	pub function: Box<dyn FnOnce(ContextHandle<CustomEvent>) + Send>,
 }
 
 impl<CustomEvent> From<CreateWindow> for ContextCommand<CustomEvent> {

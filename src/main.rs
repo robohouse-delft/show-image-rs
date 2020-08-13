@@ -56,6 +56,11 @@ pub struct Context<CustomEvent: 'static> {
 	windows: Vec<Window>,
 }
 
+pub struct ContextHandle<'a, CustomEvent: 'static> {
+	context: &'a mut Context<CustomEvent>,
+	event_loop: &'a winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
+}
+
 pub struct Window {
 	window: winit::window::Window,
 	options: WindowOptions,
@@ -373,7 +378,7 @@ impl<CustomEvent> Context<CustomEvent> {
 							let _ = command.result_tx.send(self.set_window_image(command.window_id, &command.name, &command.image));
 						}
 						ContextCommand::ExecuteFunction(command) => {
-							(command.function)(&mut self);
+							(command.function)(ContextHandle::new(&mut self, event_loop));
 						},
 						ContextCommand::Custom(command) => {
 							custom_handler(&mut self, command);
@@ -383,6 +388,35 @@ impl<CustomEvent> Context<CustomEvent> {
 				_ => {},
 			}
 		});
+	}
+}
+
+impl<'a, CustomEvent: 'static> ContextHandle<'a, CustomEvent> {
+	pub fn new(
+		context: &'a mut Context<CustomEvent>,
+		event_loop: &'a winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
+	) -> Self {
+		Self { context, event_loop }
+	}
+
+	pub fn proxy(&self) -> ContextProxy<CustomEvent> {
+		self.context.proxy()
+	}
+
+	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowId, winit::error::OsError> {
+		self.context.create_window(self.event_loop, title, options)
+	}
+
+	pub fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
+		self.context.destroy_window(window_id)
+	}
+
+	pub fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowIdError> {
+		self.context.set_window_visible(window_id, visible)
+	}
+
+	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &image::DynamicImage) -> Result<(), InvalidWindowIdError> {
+		self.context.set_window_image(window_id, name, image)
 	}
 }
 
