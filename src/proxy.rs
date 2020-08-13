@@ -42,15 +42,6 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 	pub fn create_window(
 		&self,
 		title: impl Into<String>,
-	) -> Result<WindowProxy<CustomEvent>, ProxyError<winit::error::OsError>> {
-		self.create_window_with_options(title, WindowOptions {
-			preserve_aspect_ratio: true,
-		})
-	}
-
-	pub fn create_window_with_options(
-		&self,
-		title: impl Into<String>,
 		options: WindowOptions,
 	) -> Result<WindowProxy<CustomEvent>, ProxyError<winit::error::OsError>> {
 		let title = title.into();
