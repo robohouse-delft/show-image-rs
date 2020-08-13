@@ -1,4 +1,5 @@
 use crate::ContextHandle;
+use crate::WindowId;
 use crate::WindowOptions;
 use crate::error::EventLoopClosedError;
 use crate::error::InvalidWindowIdError;
@@ -7,7 +8,6 @@ use crate::error::TimeoutError;
 use crate::oneshot;
 use std::time::Duration;
 use winit::event_loop::EventLoopProxy;
-use winit::window::WindowId;
 
 pub struct ContextProxy<CustomEvent: 'static> {
 	event_loop: EventLoopProxy<ContextCommand<CustomEvent>>,

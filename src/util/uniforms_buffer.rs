@@ -1,4 +1,4 @@
-use crate::buffer::create_buffer_with_value;
+use crate::util::buffer::create_buffer_with_value;
 
 /// A buffer holding uniform data and matching bind group.
 ///

@@ -1,8 +1,7 @@
-use winit::window::WindowId;
-
 use crate::Color;
-use crate::texture::Texture;
-use crate::uniforms_buffer::UniformsBuffer;
+use crate::WindowId;
+use crate::util::Texture;
+use crate::util::UniformsBuffer;
 
 pub struct Window {
 	pub(crate) window: winit::window::Window,

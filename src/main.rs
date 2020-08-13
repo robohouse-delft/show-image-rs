@@ -1,9 +1,7 @@
-mod buffer;
 mod context;
 mod proxy;
-mod texture;
-mod uniforms_buffer;
 mod window;
+mod util;
 
 pub mod oneshot;
 pub mod error;

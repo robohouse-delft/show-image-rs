@@ -1,6 +1,8 @@
+use crate::WindowId;
+
 #[derive(Debug, Clone)]
 pub struct InvalidWindowIdError {
-	pub window_id: winit::window::WindowId,
+	pub window_id: WindowId,
 }
 
 #[derive(Debug, Clone)]

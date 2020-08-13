@@ -1,15 +1,15 @@
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::WindowId;
 
 use crate::ContextProxy;
 use crate::Window;
+use crate::WindowId;
 use crate::WindowOptions;
 use crate::error::InvalidWindowIdError;
 use crate::error::NoSuitableAdapterFoundError;
 use crate::proxy::ContextCommand;
-use crate::texture::Texture;
-use crate::uniforms_buffer::UniformsBuffer;
+use crate::util::Texture;
+use crate::util::UniformsBuffer;
 use crate::window::WindowUniforms;
 
 macro_rules! include_spirv {
@@ -130,65 +130,6 @@ impl<CustomEvent> Context<CustomEvent> {
 		Ok(())
 	}
 
-	fn resize_window(&mut self, window_id: WindowId, new_size: winit::dpi::PhysicalSize<u32>) -> Result<(), InvalidWindowIdError> {
-		let window = self.windows
-			.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
-
-		window.swap_chain = create_swap_chain(new_size, &window.surface, self.swap_chain_format, &self.device);
-		window.uniforms.mark_dirty(true);
-		Ok(())
-	}
-
-	fn render_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
-		let window = self.windows.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
-
-		let image = match &window.image {
-			Some(x) => x,
-			None => return Ok(()),
-		};
-
-		let frame = window.swap_chain
-			.get_next_texture()
-			.expect("Failed to acquire next swap chain texture");
-
-		let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-		if window.uniforms.is_dirty() {
-			window.uniforms.update_from(&self.device, &mut encoder, &window.calculate_uniforms());
-		}
-
-		let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-			color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-				load_op: wgpu::LoadOp::Clear,
-				store_op: wgpu::StoreOp::Store,
-				clear_color: window.options.background_color,
-				attachment: &frame.view,
-				resolve_target: None,
-			}],
-			depth_stencil_attachment: None,
-		});
-
-		render_pass.set_pipeline(&self.render_pipeline);
-		render_pass.set_bind_group(0, window.uniforms.bind_group(), &[]);
-		render_pass.set_bind_group(1, image.bind_group(), &[]);
-		render_pass.draw(0..6, 0..1);
-		drop(render_pass);
-
-		let render_window = encoder.finish();
-
-		if let Some(load_texture) = window.load_texture.take() {
-			self.queue.submit(&[load_texture, render_window]);
-		} else {
-			self.queue.submit(&[render_window]);
-		}
-
-		Ok(())
-	}
-
 	pub fn run<CustomHandler>(mut self, mut custom_handler: CustomHandler) -> !
 	where
 		CustomHandler: 'static + FnMut(&mut Self, CustomEvent),
@@ -260,6 +201,67 @@ impl<'a, CustomEvent: 'static> ContextHandle<'a, CustomEvent> {
 
 	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &image::DynamicImage) -> Result<(), InvalidWindowIdError> {
 		self.context.set_window_image(window_id, name, image)
+	}
+}
+
+impl<CustomEvent> Context<CustomEvent> {
+	fn resize_window(&mut self, window_id: WindowId, new_size: winit::dpi::PhysicalSize<u32>) -> Result<(), InvalidWindowIdError> {
+		let window = self.windows
+			.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+
+		window.swap_chain = create_swap_chain(new_size, &window.surface, self.swap_chain_format, &self.device);
+		window.uniforms.mark_dirty(true);
+		Ok(())
+	}
+
+	fn render_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
+		let window = self.windows.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+
+		let image = match &window.image {
+			Some(x) => x,
+			None => return Ok(()),
+		};
+
+		let frame = window.swap_chain
+			.get_next_texture()
+			.expect("Failed to acquire next swap chain texture");
+
+		let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+		if window.uniforms.is_dirty() {
+			window.uniforms.update_from(&self.device, &mut encoder, &window.calculate_uniforms());
+		}
+
+		let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+			color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+				load_op: wgpu::LoadOp::Clear,
+				store_op: wgpu::StoreOp::Store,
+				clear_color: window.options.background_color,
+				attachment: &frame.view,
+				resolve_target: None,
+			}],
+			depth_stencil_attachment: None,
+		});
+
+		render_pass.set_pipeline(&self.render_pipeline);
+		render_pass.set_bind_group(0, window.uniforms.bind_group(), &[]);
+		render_pass.set_bind_group(1, image.bind_group(), &[]);
+		render_pass.draw(0..6, 0..1);
+		drop(render_pass);
+
+		let render_window = encoder.finish();
+
+		if let Some(load_texture) = window.load_texture.take() {
+			self.queue.submit(&[load_texture, render_window]);
+		} else {
+			self.queue.submit(&[render_window]);
+		}
+
+		Ok(())
 	}
 }
 
