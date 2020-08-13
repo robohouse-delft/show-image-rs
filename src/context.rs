@@ -1,6 +1,3 @@
-use winit::event::{Event, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
-
 use crate::ContextProxy;
 use crate::Window;
 use crate::WindowId;
@@ -20,7 +17,11 @@ macro_rules! include_spirv {
 	}};
 }
 
+type EventLoop<CustomEvent> = winit::event_loop::EventLoop<ContextCommand<CustomEvent>>;
+type EventLoopWindowTarget<CustomEvent> = winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>;
+
 pub struct Context<CustomEvent: 'static> {
+	event_loop: Option<EventLoop<CustomEvent>>,
 	proxy: ContextProxy<CustomEvent>,
 	device: wgpu::Device,
 	queue: wgpu::Queue,
@@ -34,7 +35,7 @@ pub struct Context<CustomEvent: 'static> {
 
 pub struct ContextHandle<'a, CustomEvent: 'static> {
 	context: &'a mut Context<CustomEvent>,
-	event_loop: &'a winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
+	event_loop: &'a EventLoopWindowTarget<CustomEvent>,
 }
 
 impl<CustomEvent> Context<CustomEvent> {
@@ -57,6 +58,7 @@ impl<CustomEvent> Context<CustomEvent> {
 		let render_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader, swap_chain_format);
 
 		Ok(Self {
+			event_loop: Some(event_loop),
 			proxy,
 			device,
 			queue,
@@ -72,12 +74,8 @@ impl<CustomEvent> Context<CustomEvent> {
 		self.proxy.clone()
 	}
 
-	pub fn run(self) -> ! {
-		let event_loop = winit::event_loop::EventLoop::with_user_event();
-		self.run_with(event_loop)
-	}
-
-	pub fn run_with(mut self, event_loop: EventLoop<ContextCommand<CustomEvent>>) -> ! {
+	pub fn run(mut self) -> ! {
+		let event_loop = self.event_loop.take().unwrap();
 		event_loop.run(move |event, event_loop, control_flow| {
 			self.handle_event(event, event_loop, control_flow)
 		});
@@ -87,7 +85,7 @@ impl<CustomEvent> Context<CustomEvent> {
 impl<'a, CustomEvent: 'static> ContextHandle<'a, CustomEvent> {
 	fn new(
 		context: &'a mut Context<CustomEvent>,
-		event_loop: &'a winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
+		event_loop: &'a EventLoopWindowTarget<CustomEvent>,
 	) -> Self {
 		Self { context, event_loop }
 	}
@@ -116,7 +114,7 @@ impl<'a, CustomEvent: 'static> ContextHandle<'a, CustomEvent> {
 impl<CustomEvent> Context<CustomEvent> {
 	fn create_window(
 		&mut self,
-		event_loop: &winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
+		event_loop: &EventLoopWindowTarget<CustomEvent>,
 		title: impl Into<String>,
 		options: WindowOptions,
 	) -> Result<WindowId, OsError> {
@@ -233,10 +231,13 @@ impl<CustomEvent> Context<CustomEvent> {
 	fn handle_event(
 		&mut self,
 		event: winit::event::Event<ContextCommand<CustomEvent>>,
-		event_loop: &winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
+		event_loop: &EventLoopWindowTarget<CustomEvent>,
 		control_flow: &mut winit::event_loop::ControlFlow,
 	) {
-		*control_flow = ControlFlow::Poll;
+		use winit::event::Event;
+		use winit::event::WindowEvent;
+
+		*control_flow = winit::event_loop::ControlFlow::Poll;
 		match event {
 			Event::WindowEvent { window_id, event: WindowEvent::Resized(new_size) } => {
 				let _  = self.resize_window(window_id, new_size);

@@ -7,10 +7,11 @@ use crate::error::ProxyError;
 use crate::error::TimeoutError;
 use crate::oneshot;
 use std::time::Duration;
-use winit::event_loop::EventLoopProxy;
+
+type EventLoopProxy<CustomEvent> = winit::event_loop::EventLoopProxy<ContextCommand<CustomEvent>>;
 
 pub struct ContextProxy<CustomEvent: 'static> {
-	event_loop: EventLoopProxy<ContextCommand<CustomEvent>>,
+	event_loop: EventLoopProxy<CustomEvent>,
 }
 
 #[derive(Clone)]
@@ -35,7 +36,7 @@ pub enum ContextCommand<CustomEvent: 'static> {
 }
 
 impl<CustomEvent> ContextProxy<CustomEvent> {
-	pub(crate) fn new(event_loop: EventLoopProxy<ContextCommand<CustomEvent>>) -> Self {
+	pub(crate) fn new(event_loop: EventLoopProxy<CustomEvent>) -> Self {
 		Self { event_loop }
 	}
 

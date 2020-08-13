@@ -15,7 +15,6 @@ pub use window::WindowOptions;
 pub use wgpu::Color;
 pub use winit::window::WindowId;
 
-
 fn main() {
 	let args : Vec<_> = std::env::args().collect();
 	let image = image::open(args.get(1).unwrap()).unwrap();
