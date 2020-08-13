@@ -7,14 +7,15 @@ pub mod error;
 mod buffer;
 mod proxy;
 mod texture;
+mod uniforms_buffer;
 
 pub use proxy::ContextProxy;
 
-use buffer::create_buffer_with_value;
 use error::InvalidWindowIdError;
 use error::NoSuitableAdapterFoundError;
 use proxy::ContextCommand;
 use texture::Texture;
+use uniforms_buffer::UniformsBuffer;
 
 pub mod oneshot;
 
@@ -59,7 +60,7 @@ pub struct Window {
 	options: WindowOptions,
 	surface: wgpu::Surface,
 	swap_chain: wgpu::SwapChain,
-	uniforms: Uniforms<WindowUniforms>,
+	uniforms: UniformsBuffer<WindowUniforms>,
 	image: Option<Texture>,
 	load_texture: Option<wgpu::CommandBuffer>,
 }
@@ -110,57 +111,6 @@ impl Default for WindowUniforms {
 		Self {
 			scale: [1.0, 1.0],
 		}
-	}
-}
-
-struct Uniforms<T> {
-	buffer: wgpu::Buffer,
-	bind_group: wgpu::BindGroup,
-	dirty: bool,
-	_phantom: std::marker::PhantomData<fn (&T)>,
-}
-
-impl<T> Uniforms<T> {
-	fn from_value(device: &wgpu::Device, value: &T, layout: &wgpu::BindGroupLayout) -> Self {
-		let buffer = create_buffer_with_value(device, value, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST);
-		let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-			label: Some("uniforms_bind_group"),
-			layout,
-			bindings: &[
-				wgpu::Binding {
-					binding: 0,
-					resource: wgpu::BindingResource::Buffer {
-						buffer: &buffer,
-						range: 0..std::mem::size_of::<T>() as wgpu::BufferAddress,
-					}
-				},
-			],
-		});
-
-		Self {
-			buffer,
-			bind_group,
-			dirty: false,
-			_phantom: std::marker::PhantomData,
-		}
-	}
-
-	fn bind_group(&self) -> &wgpu::BindGroup {
-		&self.bind_group
-	}
-
-	fn is_dirty(&self) -> bool {
-		self.dirty
-	}
-
-	fn mark_dirty(&mut self, dirty: bool) {
-		self.dirty = dirty;
-	}
-
-	fn update_from(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, value: &T) {
-		let buffer = create_buffer_with_value(device, value, wgpu::BufferUsage::COPY_SRC);
-		encoder.copy_buffer_to_buffer(&buffer, 0, &self.buffer, 0, std::mem::size_of::<T>() as wgpu::BufferAddress);
-		self.mark_dirty(false);
 	}
 }
 
@@ -269,7 +219,7 @@ impl<CustomEvent> Context<CustomEvent> {
 
 		let surface = wgpu::Surface::create(&window);
 		let swap_chain = make_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
-		let uniforms = Uniforms::from_value(&self.device, &WindowUniforms::default(), &self.window_bind_group_layout);
+		let uniforms = UniformsBuffer::from_value(&self.device, &WindowUniforms::default(), &self.window_bind_group_layout);
 
 		let window = Window {
 			window,
