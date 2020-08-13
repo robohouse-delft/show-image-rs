@@ -131,6 +131,10 @@ fn map_channel_error<T, E>(result: Result<Result<T, E>, oneshot::TryReceiveError
 }
 
 impl<CustomEvent: 'static> WindowProxy<CustomEvent> {
+	pub fn new(window_id: WindowId, context_proxy: ContextProxy<CustomEvent>) -> Self {
+		Self { window_id, context_proxy }
+	}
+
 	pub fn id(&self) -> WindowId {
 		self.window_id
 	}
