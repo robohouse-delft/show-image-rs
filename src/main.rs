@@ -39,8 +39,19 @@ fn main() {
 }
 
 fn fake_main(image: image::DynamicImage, proxy: ContextProxy<()>) {
-	let window = proxy.create_window("Show Image").unwrap();
-	window.set_image("image", image).unwrap();
+	proxy.execute_function(move |mut context: ContextHandle<()>| {
+		eprintln!("Making new window.");
+		let window_id = context.create_window("Show Image", WindowOptions {
+			preserve_aspect_ratio: true,
+			background_color: Color::BLACK,
+			start_hidden: true,
+		}).unwrap();
+		eprintln!("Setting image.");
+		context.set_window_image(window_id, "image", &image).unwrap();
+		eprintln!("Making window visible.");
+		context.set_window_visible(window_id, true).unwrap();
+		eprintln!("Done, waiting to be killed.");
+	}).unwrap();
 }
 
 pub struct Context<CustomEvent: 'static> {
