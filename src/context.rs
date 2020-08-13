@@ -7,6 +7,7 @@ use crate::WindowId;
 use crate::WindowOptions;
 use crate::error::InvalidWindowIdError;
 use crate::error::NoSuitableAdapterFoundError;
+use crate::error::OsError;
 use crate::proxy::ContextCommand;
 use crate::util::Texture;
 use crate::util::UniformsBuffer;
@@ -73,63 +74,6 @@ impl<CustomEvent> Context<CustomEvent> {
 		self.proxy.clone()
 	}
 
-	pub fn create_window(
-		&mut self,
-		event_loop: &winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
-		title: impl Into<String>,
-		options: WindowOptions,
-	) -> Result<WindowId, winit::error::OsError> {
-		let window = winit::window::WindowBuilder::new()
-			.with_title(title)
-			.with_visible(!options.start_hidden)
-			.build(event_loop)?;
-
-		let surface = wgpu::Surface::create(&window);
-		let swap_chain = create_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
-		let uniforms = UniformsBuffer::from_value(&self.device, &WindowUniforms::default(), &self.window_bind_group_layout);
-
-		let window = Window {
-			window,
-			options,
-			surface,
-			swap_chain,
-			uniforms,
-			image: None,
-			load_texture: None,
-		};
-
-		let window_id = window.id();
-		self.windows.push(window);
-		Ok(window_id)
-	}
-
-	pub fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
-		let index = self.windows.iter().position(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
-		self.windows.remove(index);
-		Ok(())
-	}
-
-	pub fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowIdError> {
-		let window = self.windows.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
-		window.set_visible(visible);
-		Ok(())
-	}
-
-	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &image::DynamicImage) -> Result<(), InvalidWindowIdError> {
-		let window = self.windows.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
-
-		let (texture, load_commands) = Texture::from_image(&self.device, &self.image_bind_group_layout, name, image);
-		window.load_texture = Some(load_commands);
-		window.image = Some(texture);
-		window.uniforms.mark_dirty(true);
-		Ok(())
-	}
-
 	pub fn run<CustomHandler>(mut self, mut custom_handler: CustomHandler) -> !
 	where
 		CustomHandler: 'static + FnMut(&mut Self, CustomEvent),
@@ -176,7 +120,7 @@ impl<CustomEvent> Context<CustomEvent> {
 }
 
 impl<'a, CustomEvent: 'static> ContextHandle<'a, CustomEvent> {
-	pub fn new(
+	fn new(
 		context: &'a mut Context<CustomEvent>,
 		event_loop: &'a winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
 	) -> Self {
@@ -187,7 +131,7 @@ impl<'a, CustomEvent: 'static> ContextHandle<'a, CustomEvent> {
 		self.context.proxy()
 	}
 
-	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowId, winit::error::OsError> {
+	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowId, OsError> {
 		self.context.create_window(self.event_loop, title, options)
 	}
 
@@ -205,6 +149,63 @@ impl<'a, CustomEvent: 'static> ContextHandle<'a, CustomEvent> {
 }
 
 impl<CustomEvent> Context<CustomEvent> {
+	fn create_window(
+		&mut self,
+		event_loop: &winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>,
+		title: impl Into<String>,
+		options: WindowOptions,
+	) -> Result<WindowId, OsError> {
+		let window = winit::window::WindowBuilder::new()
+			.with_title(title)
+			.with_visible(!options.start_hidden)
+			.build(event_loop)?;
+
+		let surface = wgpu::Surface::create(&window);
+		let swap_chain = create_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
+		let uniforms = UniformsBuffer::from_value(&self.device, &WindowUniforms::default(), &self.window_bind_group_layout);
+
+		let window = Window {
+			window,
+			options,
+			surface,
+			swap_chain,
+			uniforms,
+			image: None,
+			load_texture: None,
+		};
+
+		let window_id = window.id();
+		self.windows.push(window);
+		Ok(window_id)
+	}
+
+	fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
+		let index = self.windows.iter().position(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+		self.windows.remove(index);
+		Ok(())
+	}
+
+	fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowIdError> {
+		let window = self.windows.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+		window.set_visible(visible);
+		Ok(())
+	}
+
+	fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &image::DynamicImage) -> Result<(), InvalidWindowIdError> {
+		let window = self.windows.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+
+		let (texture, load_commands) = Texture::from_image(&self.device, &self.image_bind_group_layout, name, image);
+		window.load_texture = Some(load_commands);
+		window.image = Some(texture);
+		window.uniforms.mark_dirty(true);
+		Ok(())
+	}
+
 	fn resize_window(&mut self, window_id: WindowId, new_size: winit::dpi::PhysicalSize<u32>) -> Result<(), InvalidWindowIdError> {
 		let window = self.windows
 			.iter_mut()
