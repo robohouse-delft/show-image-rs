@@ -1,41 +1,49 @@
+use crate::Image;
+use crate::PixelFormat;
+use super::buffer::create_buffer_with_value;
+
 pub struct Texture {
-	size: wgpu::Extent3d,
-	_texture: wgpu::Texture,
-	_sampler: wgpu::Sampler,
+	size: [u32; 2],
 	bind_group: wgpu::BindGroup,
+	_uniforms: wgpu::Buffer,
+	_data: wgpu::Buffer,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct TextureUniforms {
+	format: u32,
+	width: u32,
+	height: u32,
+	stride_x: u32,
+	stride_y: u32,
 }
 
 impl Texture {
-	pub fn from_image(device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, name: &str, image: &image::DynamicImage) -> (Self, wgpu::CommandBuffer) {
-		let image = image.to_rgba();
-		let size = wgpu::Extent3d {
-			width: image.width(),
-			height: image.height(),
-			depth: 1,
+	pub fn from_data(
+		device: &wgpu::Device,
+		bind_group_layout: &wgpu::BindGroupLayout,
+		name: &str,
+		image: &Image,
+	) -> Self {
+
+		let format = match image.info().pixel_format {
+			PixelFormat::Mono8 => 0,
+			PixelFormat::Bgr8 => 1,
+			PixelFormat::Bgra8 => 2,
+			PixelFormat::Rgb8 => 3,
+			PixelFormat::Rgba8 => 4,
 		};
 
-		let texture = device.create_texture(&wgpu::TextureDescriptor {
-			label: Some(name),
-			size,
-			array_layer_count: 1,
-			mip_level_count: 1,
-			sample_count: 1,
-			dimension: wgpu::TextureDimension::D2,
-			format: wgpu::TextureFormat::Rgba8UnormSrgb,
-			usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
-		});
+		let uniforms = TextureUniforms {
+			format,
+			width: image.info().width,
+			height: image.info().height,
+			stride_x: image.info().stride_x,
+			stride_y: image.info().stride_y,
+		};
+		let uniforms = create_buffer_with_value(device, &uniforms, wgpu::BufferUsage::UNIFORM);
 
-		let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-			address_mode_u: wgpu::AddressMode::ClampToEdge,
-			address_mode_v: wgpu::AddressMode::ClampToEdge,
-			address_mode_w: wgpu::AddressMode::ClampToEdge,
-			mag_filter: wgpu::FilterMode::Nearest,
-			min_filter: wgpu::FilterMode::Nearest,
-			mipmap_filter: wgpu::FilterMode::Nearest,
-			lod_min_clamp: -100.0,
-			lod_max_clamp: 100.0,
-			compare: wgpu::CompareFunction::Always,
-		});
+		let data = device.create_buffer_with_data(image.buffer(), wgpu::BufferUsage::STORAGE_READ);
 
 		let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 			label: Some(&format!("{}_bind_group", name)),
@@ -43,50 +51,39 @@ impl Texture {
 			bindings: &[
 				wgpu::Binding {
 					binding: 0,
-					resource: wgpu::BindingResource::TextureView(&texture.create_default_view()),
+					resource: wgpu::BindingResource::Buffer {
+						buffer: &uniforms,
+						range: 0..std::mem::size_of::<TextureUniforms>() as u64,
+					},
 				},
 				wgpu::Binding {
 					binding: 1,
-					resource: wgpu::BindingResource::Sampler(&sampler),
+					resource: wgpu::BindingResource::Buffer {
+						buffer: &data,
+						range: 0..image.info().byte_size(),
+					},
 				},
 			],
 		});
 
-		// Copy the texture data.
-		let image_buffer = device.create_buffer_with_data(&image, wgpu::BufferUsage::COPY_SRC);
-		let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-			label: Some("copy_image_data")
-		});
-
-		encoder.copy_buffer_to_texture(
-			wgpu::BufferCopyView {
-				buffer: &image_buffer,
-				offset: 0,
-				bytes_per_row: 4 * image.width(),
-				rows_per_image: image.height(),
-			},
-			wgpu::TextureCopyView {
-				texture: &texture,
-				mip_level: 0,
-				array_layer: 0,
-				origin: wgpu::Origin3d::ZERO,
-			},
-			size,
-		);
-		let commands = encoder.finish();
-
-		let result = Self {
-			size,
-			_texture: texture,
-			_sampler: sampler,
+		Self {
+			size: [image.info().width, image.info().height],
 			bind_group,
-		};
-
-		(result, commands)
+			_uniforms: uniforms,
+			_data: data,
+		}
 	}
 
-	pub fn size(&self) -> &wgpu::Extent3d {
-		&self.size
+	pub fn size(&self) -> [u32; 2] {
+		self.size
+	}
+
+	pub fn width(&self) -> u32 {
+		self.size[0]
+	}
+
+	pub fn height(&self) -> u32 {
+		self.size[1]
 	}
 
 	pub fn bind_group(&self) -> &wgpu::BindGroup {

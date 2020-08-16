@@ -115,7 +115,7 @@ impl Window {
 		if !self.options.preserve_aspect_ratio {
 			[1.0, 1.0]
 		} else if let Some(image) = &self.image {
-			let image_size = [image.size().width as f32, image.size().height as f32];
+			let image_size = [image.width() as f32, image.height() as f32];
 			let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
 			let ratios = [image_size[0] / window_size[0], image_size[1] / window_size[1]];
 

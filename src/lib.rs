@@ -81,113 +81,42 @@ mod backend;
 mod error;
 //mod event;
 mod features;
+mod image;
 mod image_info;
 mod oneshot;
 
-pub use error::*;
-pub use backend::*;
-pub use features::*;
-pub use image_info::*;
+pub use self::error::*;
+pub use self::backend::*;
+pub use self::features::*;
+pub use self::image::*;
+pub use self::image_info::*;
 //pub use event::*;
 
 pub use wgpu::Color;
 pub use winit::window::WindowId;
 
-/// Error that can occur while waiting for a key press.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum WaitKeyError {
-	/// The window is closed.
-	///
-	/// No further key events will happen,
-	/// and any loop waiting for keys should terminate.
-	WindowClosed,
-}
-
 /// Allows a type to be displayed as an image.
-///
-/// This trait is implemented for tuples of `(Data, ImageInfo)` if `Data` can be converted into a `Box<[u8]>`,
-/// and for `&(Data, ImageInfo)` if `Data` is `AsRef<[u8]>`.
-/// Amongst others, that includes `&[u8]`, `Box<[u8]>`, `Vec<u8>`.
 ///
 /// Implementations for types from third-party libraries can be enabled using feature flags.
 pub trait ImageData {
-	/// Get the image data as boxed slice.
+	type Error;
+
+	/// Get a potentially borrowed [`Image`].
+	fn image<'a>(&'a self) -> Result<Image<'a>, Self::Error>;
+
+	/// Consumse self and return an [`Image`] object.
 	///
-	/// This function takes self by value to prevent copying if possible.
-	/// If the data can not be moved into a box, consider implementing the trait for references.
-	fn data(self) -> Box<[u8]>;
+	/// This function is used to avoid copying the image data when `self` can be consumed.
+	fn into_image(self) -> Result<Image<'static>, Self::Error>;
 
-	/// Get the [`ImageInfo`] describing the binary data.
+	/// Get an owning [`Image`] object.
 	///
-	/// This function may fail at runtime if the data can not be described properly.
-	fn info(&self) -> Result<ImageInfo, String>;
-
-	/// Convert the image into a tuple containing the image info and data.
-	fn into_image_tuple(self) -> Result<(Box<[u8]>, ImageInfo), String> where Self: Sized {
-		let info = self.info()?;
-		Ok((self.data(), info))
-	}
-}
-
-/// An image currently being shown by a window.
-///
-/// This struct isn't meant to be created manually.
-/// It is available in event handlers or through a [`Window`] object.
-#[derive(Clone, Debug)]
-pub struct Image {
-	/// The image data.
-	pub data: std::sync::Arc<[u8]>,
-
-	/// The image info, describing the raw data.
-	pub info: ImageInfo,
-
-	/// The name of the image.
-	pub name: String,
-}
-
-/// A rectangle.
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Rectangle {
-	x: i32,
-	y: i32,
-	width: u32,
-	height: u32
-}
-
-impl Rectangle {
-	/// Create a rectangle from X, Y coordinates and the width and height.
-	pub fn from_xywh(x: i32, y: i32, width: u32, height: u32) -> Self {
-		Self { x, y, width, height }
-	}
-
-	/// Get the X location of the rectangle.
-	pub fn x(&self) -> i32 {
-		self.x
-	}
-
-	/// Get the Y location of the rectangle.
-	pub fn y(&self) -> i32 {
-		self.y
-	}
-
-	/// Get the width of the rectangle.
-	pub fn width(&self) -> u32 {
-		self.width
-	}
-
-	/// Get the height of the rectangle.
-	pub fn height(&self) -> u32 {
-		self.height
-	}
-}
-
-impl std::error::Error for WaitKeyError {}
-
-impl std::fmt::Display for WaitKeyError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			WaitKeyError::WindowClosed => write!(f, "window closed"),
-		}
+	/// This function is not allowed to return a value that borrows self.
+	///
+	/// The default implemention delegates to `self.image()` and copies the data.
+	/// Types that own an `Arc<[u8]>` should override this to avoid copying the data.
+	fn owned_image(&self) -> Result<Image<'static>, Self::Error> {
+		Ok(self.image()?.into_owned())
 	}
 }
 
@@ -195,24 +124,46 @@ impl std::fmt::Display for WaitKeyError {
 #[cfg(feature = "save")]
 pub fn save_image(path: &std::path::Path, data: &[u8], info: ImageInfo) -> Result<(), String> {
 	let color_type = match info.pixel_format {
-		PixelFormat::Mono8 => image::ColorType::L8,
-		PixelFormat::Rgb8  => image::ColorType::Rgb8,
-		PixelFormat::Rgba8 => image::ColorType::Rgba8,
-		PixelFormat::Bgr8  => image::ColorType::Bgr8,
-		PixelFormat::Bgra8 => image::ColorType::Bgra8,
+		PixelFormat::Mono8 => ::image::ColorType::L8,
+		PixelFormat::Rgb8  => ::image::ColorType::Rgb8,
+		PixelFormat::Rgba8 => ::image::ColorType::Rgba8,
+		PixelFormat::Bgr8  => ::image::ColorType::Bgr8,
+		PixelFormat::Bgra8 => ::image::ColorType::Bgra8,
 	};
 
-	let bytes_per_pixel = usize::from(info.pixel_format.bytes_per_pixel());
+	let bytes_per_pixel = u32::from(info.pixel_format.bytes_per_pixel());
 
-	if info.row_stride == info.width * bytes_per_pixel {
-		image::save_buffer(path, data, info.width as u32, info.height as u32, color_type)
+	if info.stride_x == info.width * bytes_per_pixel && info.stride_y == bytes_per_pixel {
+		::image::save_buffer(path, data, info.width, info.height, color_type)
 			.map_err(|e| format!("failed to save image: {}", e))
+
 	} else {
-		let mut packed = Vec::with_capacity(info.width * info.height * bytes_per_pixel);
-		for row in 0..info.height {
-			packed.extend_from_slice(&data[info.row_stride * row..][..info.width * bytes_per_pixel]);
+		let bytes_per_pixel = bytes_per_pixel as usize;
+		let stride_x = info.stride_x as usize;
+		let stride_y = info.stride_y as usize;
+		let width = info.width as usize;
+		let height = info.height as usize;
+
+		let mut packed = Vec::with_capacity(width * height * bytes_per_pixel);
+		if stride_y == bytes_per_pixel {
+			for row in 0..height {
+				packed.extend_from_slice(&data[stride_x * row..][..width * bytes_per_pixel]);
+			}
+		} else if stride_x > stride_y {
+			for x in 0..width {
+				for y in 0..height {
+					packed.extend_from_slice(&data[stride_x * x + stride_y * y..][..bytes_per_pixel])
+				}
+			}
+		} else {
+			for y in 0..height {
+				for x in 0..width {
+					packed.extend_from_slice(&data[stride_x * x + stride_y * y..][..bytes_per_pixel])
+				}
+			}
 		}
-		image::save_buffer(path, &packed, info.width as u32, info.height as u32, color_type)
+
+		::image::save_buffer(path, &packed, info.width as u32, info.height as u32, color_type)
 			.map_err(|e| format!("failed to save image: {}", e))
 	}
 }
@@ -230,54 +181,62 @@ pub fn prompt_save_image(name_hint: &str, data: &[u8], info: ImageInfo) -> Resul
 	save_image(path.as_ref(), &data, info)
 }
 
-impl<Container> ImageData for (Container, ImageInfo)
-where
-	Box<[u8]>: From<Container>,
-{
-	fn data(self) -> Box<[u8]> {
-		Box::from(self.0)
+impl ImageData for Image<'_> {
+	type Error = ();
+
+	fn image(&self) -> Result<Image, Self::Error> {
+		Ok(self.as_ref().into())
 	}
 
-	fn info(&self) -> Result<ImageInfo, String> {
-		Ok(self.1.clone())
-	}
-}
-
-impl<Container> ImageData for (Container, &ImageInfo)
-where
-	Box<[u8]>: From<Container>,
-{
-	fn data(self) -> Box<[u8]> {
-		Box::from(self.0)
+	fn into_image(self) -> Result<Image<'static>, Self::Error> {
+		Ok(self.into_owned())
 	}
 
-	fn info(&self) -> Result<ImageInfo, String> {
-		Ok(self.1.clone())
+	fn owned_image(&self) -> Result<Image<'static>, Self::Error> {
+		Ok(self.clone().into_owned())
 	}
 }
 
-impl<Container> ImageData for &(Container, ImageInfo)
-where
-	Container: AsRef<[u8]>,
-{
-	fn data(self) -> Box<[u8]> {
-		Box::from(self.0.as_ref())
+impl ImageData for RefImage<'_> {
+	type Error = ();
+
+	fn image(&self) -> Result<Image, Self::Error> {
+		Ok(Image::Ref(*self))
 	}
 
-	fn info(&self) -> Result<ImageInfo, String> {
-		Ok(self.1.clone())
+	fn into_image(self) -> Result<Image<'static>, Self::Error> {
+		Ok(Image::from(self.image()?).into_owned())
 	}
 }
 
-impl<Container> ImageData for &(Container, &ImageInfo)
-where
-	Container: AsRef<[u8]>,
-{
-	fn data(self) -> Box<[u8]> {
-		Box::from(self.0.as_ref())
+impl ImageData for BoxImage {
+	type Error = ();
+
+	fn image(&self) -> Result<Image, Self::Error> {
+		Ok(Image::Ref(RefImage::from(self)))
 	}
 
-	fn info(&self) -> Result<ImageInfo, String> {
-		Ok(self.1.clone())
+	fn into_image(self) -> Result<Image<'static>, Self::Error> {
+		Ok(self.into())
+	}
+
+	fn owned_image(&self) -> Result<Image<'static>, Self::Error> {
+		Ok(self.clone().into())
+	}
+}
+
+impl ImageData for ArcImage {
+	type Error = ();
+
+	fn image(&self) -> Result<Image, Self::Error> {
+		Ok(Image::Ref(RefImage::from(self)))
+	}
+
+	fn into_image(self) -> Result<Image<'static>, Self::Error> {
+		Ok(self.into())
+	}
+
+	fn owned_image(&self) -> Result<Image<'static>, Self::Error> {
+		Ok(self.clone().into())
 	}
 }

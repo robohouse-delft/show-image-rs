@@ -1,4 +1,5 @@
 use crate::ContextHandle;
+use crate::Image;
 use crate::WindowId;
 use crate::WindowOptions;
 use crate::error::EventLoopClosedError;
@@ -86,7 +87,7 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 		&self,
 		window_id: WindowId,
 		name: impl Into<String>,
-		image: image::DynamicImage,
+		image: Image<'static>,
 	) -> Result<(), ProxyError<InvalidWindowIdError>> {
 		let name = name.into();
 
@@ -142,7 +143,7 @@ impl<CustomEvent: 'static> WindowProxy<CustomEvent> {
 	pub fn set_image(
 		&self,
 		name: impl Into<String>,
-		image: image::DynamicImage,
+		image: Image<'static>,
 	) -> Result<(), ProxyError<InvalidWindowIdError>> {
 		self.context_proxy.set_window_image(self.window_id, name, image)
 	}
@@ -169,7 +170,7 @@ pub struct SetWindowVisible {
 pub struct SetWindowImage {
 	pub window_id: WindowId,
 	pub name: String,
-	pub image: image::DynamicImage,
+	pub image: Image<'static>,
 	pub result_tx: oneshot::Sender<Result<(), InvalidWindowIdError>>
 }
 

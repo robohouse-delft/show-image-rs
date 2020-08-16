@@ -2,6 +2,7 @@ use show_image::Context;
 use show_image::ContextProxy;
 use show_image::ContextHandle;
 use show_image::WindowOptions;
+use show_image::ImageData;
 
 
 fn main() {
@@ -20,7 +21,7 @@ fn fake_main(image: image::DynamicImage, proxy: ContextProxy<()>) {
 		eprintln!("Making new window.");
 		let window_id = context.create_window("Show Image", WindowOptions::default()).unwrap();
 		eprintln!("Setting image.");
-		context.set_window_image(window_id, "image", &image).unwrap();
+		context.set_window_image(window_id, "image", &image.image().unwrap()).unwrap();
 		eprintln!("Making window visible.");
 		context.set_window_visible(window_id, true).unwrap();
 		eprintln!("Done, waiting to be killed.");

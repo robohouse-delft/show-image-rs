@@ -1,20 +1,20 @@
 /// Information describing the binary data of an image.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct ImageInfo {
-	/// The width of the image in pixels.
-	pub width: usize,
-
-	/// The height of the image in pixels.
-	pub height: usize,
-
-	/// The row stride of the image data in bytes.
-	///
-	/// The data is assumed to be stored row-major.
-	/// The stride is the byte offset between two rows in the data.
-	pub row_stride: usize,
-
 	/// The pixel format of the image data.
 	pub pixel_format: PixelFormat,
+
+	/// The width of the image in pixels.
+	pub width: u32,
+
+	/// The height of the image in pixels.
+	pub height: u32,
+
+	/// The X stride of the image data in bytes.
+	pub stride_x: u32,
+
+	/// The Y stride of the image data in bytes.
+	pub stride_y: u32,
 }
 
 /// Supported pixel formats.
@@ -41,34 +41,44 @@ impl ImageInfo {
 	///
 	/// The row stride is automatically calculated based on the image width and pixel format.
 	/// If you wish to use a different row stride, construct the struct directly.
-	pub fn new(pixel_format: PixelFormat, width: usize, height: usize) -> Self {
-		let row_stride = usize::from(pixel_format.bytes_per_pixel()) * width;
-		Self { pixel_format, width, height, row_stride}
+	pub fn new(pixel_format: PixelFormat, width: u32, height: u32) -> Self {
+		let stride_x = u32::from(pixel_format.bytes_per_pixel());
+		let stride_y = stride_x * width;
+		Self { pixel_format, width, height, stride_x, stride_y }
 	}
 
 	/// Create a new 8-bit RGB info struct with the given width and height.
-	pub fn rgb8(width: usize, height: usize) -> Self {
+	pub fn rgb8(width: u32, height: u32) -> Self {
 		Self::new(PixelFormat::Rgb8, width, height)
 	}
 
 	/// Create a new 8-bit RGBA info struct with the given width and height.
-	pub fn rgba8(width: usize, height: usize) -> Self {
+	pub fn rgba8(width: u32, height: u32) -> Self {
 		Self::new(PixelFormat::Rgba8, width, height)
 	}
 
 	/// Create a new 8-bit BGR info struct with the given width and height.
-	pub fn bgr8(width: usize, height: usize) -> Self {
+	pub fn bgr8(width: u32, height: u32) -> Self {
 		Self::new(PixelFormat::Bgr8, width, height)
 	}
 
 	/// Create a new 8-bit BGRA info struct with the given width and height.
-	pub fn bgra8(width: usize, height: usize) -> Self {
+	pub fn bgra8(width: u32, height: u32) -> Self {
 		Self::new(PixelFormat::Bgra8, width, height)
 	}
 
 	/// Create a new 8-bit monochrome info struct with the given width and height.
-	pub fn mono8(width: usize, height: usize) -> Self {
+	pub fn mono8(width: u32, height: u32) -> Self {
 		Self::new(PixelFormat::Mono8, width, height)
+	}
+
+	/// Get the image size in bytes.
+	pub fn byte_size(self) -> u64 {
+		if self.stride_y >= self.stride_x {
+			u64::from(self.stride_y) * u64::from(self.height)
+		} else {
+			u64::from(self.stride_x) * u64::from(self.width)
+		}
 	}
 }
 

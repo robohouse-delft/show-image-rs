@@ -1,3 +1,5 @@
+use crate::BoxImage;
+use crate::Image;
 use crate::ImageData;
 use crate::ImageInfo;
 use crate::PixelFormat;
@@ -14,62 +16,83 @@ fn divide_by_alpha(data: &mut [u8]) {
 }
 
 impl ImageData for raqote::DrawTarget {
-	fn info(&self) -> Result<ImageInfo, String> {
-		if self.width() < 0 || self.height() < 0 {
-			Err(format!("DrawTarget has negative size: [{}, {}]", self.width(), self.height()))
-		} else {
-			Ok(ImageInfo::new(PixelFormat::Bgra8, self.width() as usize, self.height() as usize))
-		}
+	type Error = String;
+
+	fn image(&self) -> Result<Image, String> {
+		let info = draw_target_info(self)?;
+
+		let mut buffer = Box::from(self.get_data_u8());
+		divide_by_alpha(&mut buffer);
+
+		Ok(BoxImage::new(info, buffer).into())
 	}
 
-	fn data(self) -> Box<[u8]> {
+	fn into_image(self) -> Result<Image<'static>, String> {
+		let info = draw_target_info(&self)?;
+
 		let length = self.get_data_u8().len();
-		let data = Box::into_raw(self.into_vec().into_boxed_slice()) as *mut u8;
-		unsafe {
-			let mut data = Box::from_raw(std::slice::from_raw_parts_mut(data, length));
-			divide_by_alpha(&mut data);
-			data
-		}
+		let buffer = Box::into_raw(self.into_vec().into_boxed_slice()) as *mut u8;
+		let mut buffer = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(buffer, length)) };
+		divide_by_alpha(&mut buffer);
+
+		Ok(BoxImage::new(info, buffer).into())
 	}
 }
 
 impl ImageData for &'_ raqote::DrawTarget {
-	fn info(&self) -> Result<ImageInfo, String> {
-		(*self).info()
+	type Error = String;
+
+	fn image(&self) -> Result<Image, String> {
+		(*self).image()
 	}
 
-	fn data(self) -> Box<[u8]> {
-		let mut data = Box::from(self.get_data_u8());
-		divide_by_alpha(&mut data);
-		data
+	fn into_image(self) -> Result<Image<'static>, String> {
+		Ok(self.image()?.into_owned())
 	}
 }
 
 impl<'a> ImageData for raqote::Image<'a> {
-	fn info(&self) -> Result<ImageInfo, String> {
-		if self.width < 0 || self.height < 0 {
-			Err(format!("image has negative size: [{}, {}]", self.width, self.height))
-		} else {
-			Ok(ImageInfo::new(PixelFormat::Bgra8, self.width as usize, self.height as usize))
-		}
+	type Error = String;
+
+	fn image(&self) -> Result<Image, String> {
+		let info = image_info(self)?;
+
+		let buffer = self.data.as_ptr() as *const u8;
+		let mut buffer = unsafe { Box::from(std::slice::from_raw_parts(buffer, self.data.len() * 4)) };
+		divide_by_alpha(&mut buffer);
+
+		Ok(BoxImage::new(info, buffer).into())
 	}
 
-	fn data(self) -> Box<[u8]> {
-		let data = self.data.as_ptr() as *const u8;
-		unsafe {
-			let mut data = Box::from(std::slice::from_raw_parts(data, self.data.len() * 4));
-			divide_by_alpha(&mut data);
-			data
-		}
+	fn into_image(self) -> Result<Image<'static>, String> {
+		Ok(self.image()?.into_owned())
 	}
 }
 
 impl<'a> ImageData for &'_ raqote::Image<'a> {
-	fn info(&self) -> Result<ImageInfo, String> {
-		(*self).info()
+	type Error = String;
+
+	fn image(&self) -> Result<Image, String> {
+		(*self).image()
 	}
 
-	fn data(self) -> Box<[u8]> {
-		(*self).data()
+	fn into_image(self) -> Result<Image<'static>, String> {
+		Ok(self.image()?.into_owned())
+	}
+}
+
+fn draw_target_info(draw_target: &raqote::DrawTarget) -> Result<ImageInfo, String> {
+	if draw_target.width() < 0 || draw_target.height() < 0 {
+		Err(format!("DrawTarget has negative size: [{}, {}]", draw_target.width(), draw_target.height()))
+	} else {
+		Ok(ImageInfo::new(PixelFormat::Bgra8, draw_target.width() as u32, draw_target.height() as u32))
+	}
+}
+
+fn image_info(&image: &raqote::Image) -> Result<ImageInfo, String> {
+	if image.width < 0 || image.height < 0 {
+		Err(format!("DrawTarget has negative size: [{}, {}]", image.width, image.height))
+	} else {
+		Ok(ImageInfo::new(PixelFormat::Bgra8, image.width as u32, image.height as u32))
 	}
 }

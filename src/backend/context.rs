@@ -1,4 +1,5 @@
 use crate::ContextProxy;
+use crate::Image;
 use crate::Window;
 use crate::WindowId;
 use crate::WindowOptions;
@@ -106,7 +107,7 @@ impl<'a, CustomEvent: 'static> ContextHandle<'a, CustomEvent> {
 		self.context.set_window_visible(window_id, visible)
 	}
 
-	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &image::DynamicImage) -> Result<(), InvalidWindowIdError> {
+	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &Image) -> Result<(), InvalidWindowIdError> {
 		self.context.set_window_image(window_id, name, image)
 	}
 }
@@ -157,13 +158,12 @@ impl<CustomEvent> Context<CustomEvent> {
 		Ok(())
 	}
 
-	fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &image::DynamicImage) -> Result<(), InvalidWindowIdError> {
+	fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &Image) -> Result<(), InvalidWindowIdError> {
 		let window = self.windows.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
-		let (texture, load_commands) = Texture::from_image(&self.device, &self.image_bind_group_layout, name, image);
-		window.load_texture = Some(load_commands);
+		let texture = Texture::from_data(&self.device, &self.image_bind_group_layout, name, image);
 		window.image = Some(texture);
 		window.uniforms.mark_dirty(true);
 		Ok(())
@@ -320,17 +320,16 @@ fn create_image_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 			wgpu::BindGroupLayoutEntry {
 				binding: 0,
 				visibility: wgpu::ShaderStage::FRAGMENT,
-				ty: wgpu::BindingType::SampledTexture {
-					multisampled: false,
-					dimension: wgpu::TextureViewDimension::D2,
-					component_type: wgpu::TextureComponentType::Uint,
+				ty: wgpu::BindingType::UniformBuffer {
+					dynamic: false,
 				},
 			},
 			wgpu::BindGroupLayoutEntry {
 				binding: 1,
 				visibility: wgpu::ShaderStage::FRAGMENT,
-				ty: wgpu::BindingType::Sampler {
-					comparison: false,
+				ty: wgpu::BindingType::StorageBuffer {
+					readonly: true,
+					dynamic: false,
 				},
 			},
 		],
