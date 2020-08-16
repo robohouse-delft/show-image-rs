@@ -1,16 +1,12 @@
-mod context;
-mod proxy;
-mod window;
-mod util;
+mod backend;
+pub use backend::context::Context;
+pub use backend::context::ContextHandle;
+pub use backend::proxy::ContextProxy;
+pub use backend::window::Window;
+pub use backend::window::WindowOptions;
 
 pub mod oneshot;
 pub mod error;
-
-pub use context::Context;
-pub use context::ContextHandle;
-pub use proxy::ContextProxy;
-pub use window::Window;
-pub use window::WindowOptions;
 
 pub use wgpu::Color;
 pub use winit::window::WindowId;

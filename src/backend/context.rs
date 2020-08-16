@@ -2,13 +2,13 @@ use crate::ContextProxy;
 use crate::Window;
 use crate::WindowId;
 use crate::WindowOptions;
+use crate::backend::proxy::ContextCommand;
+use crate::backend::util::Texture;
+use crate::backend::util::UniformsBuffer;
+use crate::backend::window::WindowUniforms;
 use crate::error::InvalidWindowIdError;
 use crate::error::NoSuitableAdapterFoundError;
 use crate::error::OsError;
-use crate::proxy::ContextCommand;
-use crate::util::Texture;
-use crate::util::UniformsBuffer;
-use crate::window::WindowUniforms;
 
 macro_rules! include_spirv {
 	($path:literal) => {{
@@ -48,8 +48,8 @@ impl<CustomEvent> Context<CustomEvent> {
 		let window_bind_group_layout = create_window_bind_group_layout(&device);
 		let image_bind_group_layout = create_image_bind_group_layout(&device);
 
-		let vertex_shader = device.create_shader_module(&include_spirv!("../shaders/shader.vert.spv"));
-		let fragment_shader = device.create_shader_module(&include_spirv!("../shaders/shader.frag.spv"));
+		let vertex_shader = device.create_shader_module(&include_spirv!("../../shaders/shader.vert.spv"));
+		let fragment_shader = device.create_shader_module(&include_spirv!("../../shaders/shader.frag.spv"));
 
 		let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			bind_group_layouts: &[&window_bind_group_layout, &image_bind_group_layout],
