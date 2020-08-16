@@ -1,15 +1,8 @@
-mod backend;
-pub use backend::context::Context;
-pub use backend::context::ContextHandle;
-pub use backend::proxy::ContextProxy;
-pub use backend::window::Window;
-pub use backend::window::WindowOptions;
+use show_image::Context;
+use show_image::ContextProxy;
+use show_image::ContextHandle;
+use show_image::WindowOptions;
 
-pub mod oneshot;
-pub mod error;
-
-pub use wgpu::Color;
-pub use winit::window::WindowId;
 
 fn main() {
 	let args : Vec<_> = std::env::args().collect();
@@ -25,11 +18,7 @@ fn main() {
 fn fake_main(image: image::DynamicImage, proxy: ContextProxy<()>) {
 	proxy.execute_function(move |mut context: ContextHandle<()>| {
 		eprintln!("Making new window.");
-		let window_id = context.create_window("Show Image", WindowOptions {
-			preserve_aspect_ratio: true,
-			background_color: Color::BLACK,
-			start_hidden: true,
-		}).unwrap();
+		let window_id = context.create_window("Show Image", WindowOptions::default()).unwrap();
 		eprintln!("Setting image.");
 		context.set_window_image(window_id, "image", &image).unwrap();
 		eprintln!("Making window visible.");

@@ -15,9 +15,28 @@ pub struct Window {
 
 #[derive(Debug, Clone)]
 pub struct WindowOptions {
+	/// Preserve the aspect ratio of the image when scaling.
 	pub preserve_aspect_ratio: bool,
+
+	/// The background color for the window.
+	///
+	/// This is used to color areas without image data if `preserve_aspect_ratio` is true.
 	pub background_color: Color,
+
+	/// Create the window hidden.
+	///
+	/// The window can manually be made visible at a later time.
 	pub start_hidden: bool,
+
+	/// The initial size of the window in pixel.
+	///
+	/// This may be ignored by a window manager.
+	pub size: Option<[u32; 2]>,
+
+	/// If true allow the window to be resized.
+	///
+	/// This may be ignored by a window manager.
+	pub resizable: bool,
 }
 
 impl Default for WindowOptions {
@@ -26,7 +45,54 @@ impl Default for WindowOptions {
 			preserve_aspect_ratio: true,
 			background_color: Color::BLACK,
 			start_hidden: false,
+			size: None,
+			resizable: true,
 		}
+	}
+}
+
+impl WindowOptions {
+	/// Preserve the aspect ratio of displayed images, or not.
+	///
+	/// This function consumes and returns `self` to allow daisy chaining.
+	pub fn set_preserve_aspect_ratio(mut self, preserve_aspect_ratio: bool) -> Self {
+		self.preserve_aspect_ratio = preserve_aspect_ratio;
+		self
+	}
+	/// Set the background color of the window.
+	///
+	/// This function consumes and returns `self` to allow daisy chaining.
+	pub fn set_background_color(mut self, background_color: Color) -> Self {
+		self.background_color = background_color;
+		self
+	}
+
+	/// Start the window hidden.
+	///
+	/// This function consumes and returns `self` to allow daisy chaining.
+	pub fn set_start_hidden(mut self, start_hidden: bool) -> Self {
+		self.start_hidden = start_hidden;
+		self
+	}
+
+	/// Set the initial size of the window.
+	///
+	/// This property may be ignored by a window manager.
+	///
+	/// This function consumes and returns `self` to allow daisy chaining.
+	pub fn set_size(mut self, size: [u32; 2]) -> Self {
+		self.size = Some(size);
+		self
+	}
+
+	/// Make the window resizable or not.
+	///
+	/// This property may be ignored by a window manager.
+	///
+	/// This function consumes and returns `self` to allow daisy chaining.
+	pub fn set_resizable(mut self, resizable: bool) -> Self {
+		self.resizable = resizable;
+		self
 	}
 }
 

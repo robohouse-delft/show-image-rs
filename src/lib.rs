@@ -77,24 +77,21 @@
 //! # Result::<(), String>::Ok(())
 //! ```
 
-pub use keyboard_types::Code as ScanCode;
-pub use keyboard_types::Key as KeyCode;
-pub use keyboard_types::KeyState;
-pub use keyboard_types::KeyboardEvent;
-pub use keyboard_types::Location as KeyLocation;
-pub use keyboard_types::Modifiers as KeyModifiers;
-
 mod backend;
-mod background_thread;
+mod error;
+//mod event;
 mod features;
 mod image_info;
 mod oneshot;
-mod event;
 
+pub use error::*;
 pub use backend::*;
 pub use features::*;
 pub use image_info::*;
-pub use event::*;
+//pub use event::*;
+
+pub use wgpu::Color;
+pub use winit::window::WindowId;
 
 /// Error that can occur while waiting for a key press.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -184,26 +181,6 @@ impl Rectangle {
 	}
 }
 
-/// Options for creating a window.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WindowOptions {
-	/// The name of the window.
-	pub name: String,
-
-	/// The initial size of the window in pixel.
-	///
-	/// This may be ignored by a window manager.
-	pub size: [u32; 2],
-
-	/// If true allow the window to be resized.
-	///
-	/// This may be ignored by a window manager.
-	pub resizable: bool,
-
-	/// Preserve the aspect ratio
-	pub preserve_aspect_ratio: bool,
-}
-
 impl std::error::Error for WaitKeyError {}
 
 impl std::fmt::Display for WaitKeyError {
@@ -211,75 +188,6 @@ impl std::fmt::Display for WaitKeyError {
 		match self {
 			WaitKeyError::WindowClosed => write!(f, "window closed"),
 		}
-	}
-}
-
-impl Default for WindowOptions {
-	fn default() -> Self {
-		Self {
-			name: String::from("image"),
-			size: [800, 600],
-			resizable: true,
-			preserve_aspect_ratio: true,
-		}
-	}
-}
-
-impl WindowOptions {
-	/// Set the name of the window.
-	///
-	/// This function consumes and returns `self` to allow daisy chaining.
-	pub fn set_name(mut self, name: String) -> Self {
-		self.name = name;
-		self
-	}
-
-	/// Set the initial size of the window.
-	///
-	/// This property may be ignored by a window manager.
-	///
-	/// This function consumes and returns `self` to allow daisy chaining.
-	pub fn set_size(mut self, size: [u32; 2]) -> Self {
-		self.size = size;
-		self
-	}
-
-	/// Set the initial width of the window.
-	///
-	/// This property may be ignored by a window manager.
-	///
-	/// This function consumes and returns `self` to allow daisy chaining.
-	pub fn set_width(mut self, width: u32) -> Self {
-		self.size[0] = width;
-		self
-	}
-
-	/// Set the initial height of the window.
-	///
-	/// This property may be ignored by a window manager.
-	///
-	/// This function consumes and returns `self` to allow daisy chaining.
-	pub fn set_height(mut self, height: u32) -> Self {
-		self.size[1] = height;
-		self
-	}
-
-	/// Make the window resizable or not.
-	///
-	/// This property may be ignored by a window manager.
-	///
-	/// This function consumes and returns `self` to allow daisy chaining.
-	pub fn set_resizable(mut self, resizable: bool) -> Self {
-		self.resizable = resizable;
-		self
-	}
-
-	/// Preserve the aspect ratio of displayed images, or not.
-	///
-	/// This function consumes and returns `self` to allow daisy chaining.
-	pub fn set_preserve_aspect_ratio(mut self, preserve_aspect_ratio: bool) -> Self {
-		self.preserve_aspect_ratio = preserve_aspect_ratio;
-		self
 	}
 }
 
