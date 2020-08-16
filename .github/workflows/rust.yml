@@ -1,0 +1,26 @@
+name: CI
+on:
+  push: { branches: "master" }
+  pull_request: { branches: "*" }
+
+jobs:
+  build_and_test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install SDL2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libsdl2-dev
+      - name: Checkout code
+        uses: actions/checkout@master
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --features full --color=always
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release --features full --color=always

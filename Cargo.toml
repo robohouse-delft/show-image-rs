@@ -1,11 +1,45 @@
 [package]
-name = "wgpu-image"
-version = "0.1.0"
-authors = ["Maarten de Vries <maarten@de-vri.es>"]
-edition = "2018"
+name          = "show-image"
+version       = "0.6.4"
+license       = "BSD-2-Clause"
+description   = "quickly show images in a window for debugging"
+edition       = "2018"
+
+repository    = "https://github.com/robohouse-delft/show-image-rs"
+documentation = "https://docs.rs/show-image"
+readme        = "README.md"
+
+authors = [
+	"Maarten de Vries <maarten@de-vri.es>",
+	"Hans Gaiser <hans.gaiser@robovalley.com>",
+	"RoboHouse <robohouse@robovalley.com>",
+]
+
+keywords = ["image", "visualize", "show", "debug"]
+categories = [
+	"development-tools::debugging",
+	"multimedia::images",
+	"visualization",
+	"gui",
+]
+
+[features]
+full     = ["save", "image", "tch", "raqote"]
+save     = ["tinyfiledialogs", "image"]
+doc-only = ["tch/doc-only"]
 
 [dependencies]
 wgpu = "0.5.2"
 winit = "0.22.2"
 futures = "0.3.5"
-image = "0.23.8"
+image           = { version="0.23.0", optional=true }
+raqote          = { version="0.8.0", optional=true }
+tch             = { version=">=0.1.6, <0.3.0",  optional=true }
+tinyfiledialogs = { version="3.3.9",  optional=true }
+
+[dev-dependencies]
+show-image = { path = ".", features=["full"] }
+assert2    = "0.2.1"
+
+[package.metadata.docs.rs]
+features = ["doc-only", "full"]
