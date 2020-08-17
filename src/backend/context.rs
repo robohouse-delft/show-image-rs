@@ -119,10 +119,17 @@ impl<CustomEvent> Context<CustomEvent> {
 		title: impl Into<String>,
 		options: WindowOptions,
 	) -> Result<WindowId, OsError> {
-		let window = winit::window::WindowBuilder::new()
+		let mut window = winit::window::WindowBuilder::new()
 			.with_title(title)
 			.with_visible(!options.start_hidden)
-			.build(event_loop)?;
+			.with_resizable(options.resizable);
+
+		if let Some(size) = options.size {
+			let size = winit::dpi::LogicalSize::new(size[0], size[1]);
+			window = window.with_inner_size(size);
+		}
+
+		let window = window.build(event_loop)?;
 
 		let surface = wgpu::Surface::create(&window);
 		let swap_chain = create_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
