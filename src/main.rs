@@ -18,12 +18,12 @@ fn main() {
 
 fn fake_main(image: show_image::Image<'static>, proxy: ContextProxy<()>) {
 	proxy.execute_function(move |mut context: ContextHandle<()>| {
-		eprintln!("Making new window.");
-		let window_id = context.create_window("Show Image", WindowOptions::default()).unwrap();
-		eprintln!("Setting image.");
-		context.set_window_image(window_id, "image", &image).unwrap();
-		eprintln!("Making window visible.");
-		context.set_window_visible(window_id, true).unwrap();
-		eprintln!("Done, waiting to be killed.");
+		let mut window = context.create_window("Show Image", WindowOptions::default()).unwrap();
+		window.set_image("image", &image).unwrap();
+		window.set_visible(true).unwrap();
+		window.add_event_handler(|window, event| {
+			eprintln!("received event for window {:?}: {:#?}", window.id(), event);
+			Default::default()
+		}).unwrap();
 	}).unwrap();
 }

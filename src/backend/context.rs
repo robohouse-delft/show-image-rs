@@ -2,6 +2,7 @@ use crate::ContextProxy;
 use crate::EventHandlerOutput;
 use crate::Image;
 use crate::Window;
+use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
 use crate::backend::event::downgrade_event;
@@ -16,6 +17,7 @@ use crate::error::InvalidWindowIdError;
 use crate::error::NoSuitableAdapterFoundError;
 use crate::error::OsError;
 use crate::event::Event;
+use crate::event::WindowEvent;
 
 type EventLoop<UserEvent> = winit::event_loop::EventLoop<ContextEvent<UserEvent>>;
 type EventLoopWindowTarget<UserEvent> = winit::event_loop::EventLoopWindowTarget<ContextEvent<UserEvent>>;
@@ -31,7 +33,7 @@ pub struct Context<UserEvent: 'static> {
 	image_bind_group_layout: wgpu::BindGroupLayout,
 	render_pipeline: wgpu::RenderPipeline,
 
-	windows: Vec<Window>,
+	windows: Vec<Window<UserEvent>>,
 	event_handlers: Vec<Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static>>,
 }
 
@@ -83,13 +85,41 @@ impl<UserEvent> Context<UserEvent> {
 
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
-		F: FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static,
+		F: 'static + FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput,
 	{
 		self.add_boxed_event_handler(Box::new(handler))
 	}
 
-	pub fn add_boxed_event_handler(&mut self, handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static>) {
+	pub fn add_boxed_event_handler(
+		&mut self,
+		handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput>
+	) {
 		self.event_handlers.push(handler)
+	}
+
+	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
+	where
+		F: 'static + FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput,
+	{
+		let window = self.windows.iter_mut()
+			.find(|x| x.id() == window_id)
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+
+		window.event_handlers.push(Box::new(handler));
+		Ok(())
+	}
+
+	pub fn add_boxed_window_event_handler(
+		&mut self,
+		window_id: WindowId,
+		handler: Box<dyn FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput>,
+	) -> Result<(), InvalidWindowIdError> {
+		let window = self.windows.iter_mut()
+			.find(|x| x.id() == window_id)
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+
+		window.event_handlers.push(handler);
+		Ok(())
 	}
 
 	pub fn run(mut self) -> ! {
@@ -112,8 +142,12 @@ impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 		self.context.proxy()
 	}
 
-	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowId, OsError> {
-		self.context.create_window(self.event_loop, title, options)
+	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowHandle<UserEvent>, OsError> {
+		let window_id = self.context.create_window(self.event_loop, title, options)?;
+		Ok(WindowHandle::new(ContextHandle {
+			context: self.context,
+			event_loop: self.event_loop,
+		}, window_id))
 	}
 
 	pub fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
@@ -130,13 +164,28 @@ impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
-		F: FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static,
+		F: 'static + FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput,
 	{
 		self.context.add_event_handler(handler);
 	}
 
 	pub fn add_boxed_event_handler(&mut self, handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static>) {
 		self.context.add_boxed_event_handler(handler);
+	}
+
+	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
+	where
+		F: 'static + FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput,
+	{
+		self.context.add_window_event_handler(window_id, handler)
+	}
+
+	pub fn add_boxed_window_event_handler(
+		&mut self,
+		window_id: WindowId,
+		handler: Box<dyn FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput>,
+	) -> Result<(), InvalidWindowIdError> {
+		self.context.add_boxed_window_event_handler(window_id, handler)
 	}
 }
 
@@ -170,6 +219,7 @@ impl<UserEvent> Context<UserEvent> {
 			swap_chain,
 			uniforms,
 			image: None,
+			event_handlers: Vec::new(),
 		};
 
 		let window_id = window.id();
@@ -262,8 +312,6 @@ impl<UserEvent> Context<UserEvent> {
 		event_loop: &EventLoopWindowTarget<UserEvent>,
 		control_flow: &mut winit::event_loop::ControlFlow,
 	) {
-		use winit::event::WindowEvent;
-
 		*control_flow = winit::event_loop::ControlFlow::Poll;
 
 		let mut event = match downgrade_event(event) {
@@ -271,7 +319,14 @@ impl<UserEvent> Context<UserEvent> {
 			Err(command) => return self.handle_command(command, event_loop),
 		};
 
-		self.run_event_handlers(&mut event, event_loop);
+		let run_context_handlers = match &mut event {
+			Event::WindowEvent { window_id, event } => self.run_window_event_handlers(*window_id, event, event_loop),
+			_ => true,
+		};
+
+		if run_context_handlers {
+			self.run_event_handlers(&mut event, event_loop);
+		}
 
 		match event {
 			Event::WindowEvent { window_id, event: WindowEvent::Resized(new_size) } => {
@@ -306,9 +361,38 @@ impl<UserEvent> Context<UserEvent> {
 				!result.remove_handler
 			}
 		});
+
 		let new_event_handlers = std::mem::replace(&mut self.event_handlers, Vec::new());
 		event_handlers.extend(new_event_handlers);
 		self.event_handlers = event_handlers;
+	}
+
+	fn run_window_event_handlers(&mut self, window_id: WindowId, event: &mut WindowEvent, event_loop: &EventLoopWindowTarget<UserEvent>) -> bool {
+		let window_index = match self.windows.iter().position(|x| x.id() == window_id) {
+			Some(x) => x,
+			None => return true,
+		};
+
+		let mut event_handlers = std::mem::replace(&mut self.windows[window_index].event_handlers, Vec::new());
+
+		let mut stop_processing = false;
+		event_handlers.retain_mut(|handler| {
+			if stop_processing {
+				false
+			} else {
+				let context_handle = ContextHandle::new(self, event_loop);
+				let window_handle = WindowHandle::new(context_handle, window_id);
+				let result = (handler)(window_handle, event);
+				stop_processing = result.stop_processing;
+				!result.remove_handler
+			}
+		});
+
+		let new_event_handlers = std::mem::replace(&mut self.windows[window_index].event_handlers, Vec::new());
+		event_handlers.extend(new_event_handlers);
+		self.windows[window_index].event_handlers = event_handlers;
+
+		return !stop_processing;
 	}
 
 	fn handle_command(
