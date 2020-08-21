@@ -79,7 +79,7 @@
 
 mod backend;
 mod error;
-//mod event;
+mod event_handler;
 mod features;
 mod image;
 mod image_info;
@@ -90,9 +90,11 @@ pub use self::backend::*;
 pub use self::features::*;
 pub use self::image::*;
 pub use self::image_info::*;
-//pub use event::*;
+pub use self::event_handler::*;
 
 pub use wgpu::Color;
+pub use winit;
+pub use winit::event;
 pub use winit::window::WindowId;
 
 /// Allows a type to be displayed as an image.

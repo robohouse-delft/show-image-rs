@@ -1,15 +1,20 @@
 use crate::ContextProxy;
+use crate::EventHandlerOutput;
 use crate::Image;
 use crate::Window;
 use crate::WindowId;
 use crate::WindowOptions;
+use crate::backend::event::downgrade_event;
 use crate::backend::proxy::ContextCommand;
+use crate::backend::proxy::ContextEvent;
+use crate::backend::util::RetainMut;
 use crate::backend::util::Texture;
 use crate::backend::util::UniformsBuffer;
 use crate::backend::window::WindowUniforms;
 use crate::error::InvalidWindowIdError;
 use crate::error::NoSuitableAdapterFoundError;
 use crate::error::OsError;
+use crate::event::Event;
 
 macro_rules! include_spirv {
 	($path:literal) => {{
@@ -18,12 +23,12 @@ macro_rules! include_spirv {
 	}};
 }
 
-type EventLoop<CustomEvent> = winit::event_loop::EventLoop<ContextCommand<CustomEvent>>;
-type EventLoopWindowTarget<CustomEvent> = winit::event_loop::EventLoopWindowTarget<ContextCommand<CustomEvent>>;
+type EventLoop<UserEvent> = winit::event_loop::EventLoop<ContextEvent<UserEvent>>;
+type EventLoopWindowTarget<UserEvent> = winit::event_loop::EventLoopWindowTarget<ContextEvent<UserEvent>>;
 
-pub struct Context<CustomEvent: 'static> {
-	event_loop: Option<EventLoop<CustomEvent>>,
-	proxy: ContextProxy<CustomEvent>,
+pub struct Context<UserEvent: 'static> {
+	event_loop: Option<EventLoop<UserEvent>>,
+	proxy: ContextProxy<UserEvent>,
 	device: wgpu::Device,
 	queue: wgpu::Queue,
 	swap_chain_format: wgpu::TextureFormat,
@@ -32,14 +37,15 @@ pub struct Context<CustomEvent: 'static> {
 	render_pipeline: wgpu::RenderPipeline,
 
 	windows: Vec<Window>,
+	event_handlers: Vec<Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static>>,
 }
 
-pub struct ContextHandle<'a, CustomEvent: 'static> {
-	context: &'a mut Context<CustomEvent>,
-	event_loop: &'a EventLoopWindowTarget<CustomEvent>,
+pub struct ContextHandle<'a, UserEvent: 'static> {
+	context: &'a mut Context<UserEvent>,
+	event_loop: &'a EventLoopWindowTarget<UserEvent>,
 }
 
-impl<CustomEvent> Context<CustomEvent> {
+impl<UserEvent> Context<UserEvent> {
 	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, NoSuitableAdapterFoundError> {
 		let event_loop = EventLoop::with_user_event();
 		let proxy = ContextProxy::new(event_loop.create_proxy());
@@ -68,11 +74,23 @@ impl<CustomEvent> Context<CustomEvent> {
 			image_bind_group_layout,
 			render_pipeline,
 			windows: Vec::new(),
+			event_handlers: Vec::new(),
 		})
 	}
 
-	pub fn proxy(&self) -> ContextProxy<CustomEvent> {
+	pub fn proxy(&self) -> ContextProxy<UserEvent> {
 		self.proxy.clone()
+	}
+
+	pub fn add_event_handler<F>(&mut self, handler: F)
+	where
+		F: FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static,
+	{
+		self.add_boxed_event_handler(Box::new(handler))
+	}
+
+	pub fn add_boxed_event_handler(&mut self, handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static>) {
+		self.event_handlers.push(handler)
 	}
 
 	pub fn run(mut self) -> ! {
@@ -83,15 +101,15 @@ impl<CustomEvent> Context<CustomEvent> {
 	}
 }
 
-impl<'a, CustomEvent: 'static> ContextHandle<'a, CustomEvent> {
+impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 	fn new(
-		context: &'a mut Context<CustomEvent>,
-		event_loop: &'a EventLoopWindowTarget<CustomEvent>,
+		context: &'a mut Context<UserEvent>,
+		event_loop: &'a EventLoopWindowTarget<UserEvent>,
 	) -> Self {
 		Self { context, event_loop }
 	}
 
-	pub fn proxy(&self) -> ContextProxy<CustomEvent> {
+	pub fn proxy(&self) -> ContextProxy<UserEvent> {
 		self.context.proxy()
 	}
 
@@ -110,12 +128,23 @@ impl<'a, CustomEvent: 'static> ContextHandle<'a, CustomEvent> {
 	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &Image) -> Result<(), InvalidWindowIdError> {
 		self.context.set_window_image(window_id, name, image)
 	}
+
+	pub fn add_event_handler<F>(&mut self, handler: F)
+	where
+		F: FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static,
+	{
+		self.context.add_event_handler(handler);
+	}
+
+	pub fn add_boxed_event_handler(&mut self, handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static>) {
+		self.context.add_boxed_event_handler(handler);
+	}
 }
 
-impl<CustomEvent> Context<CustomEvent> {
+impl<UserEvent> Context<UserEvent> {
 	fn create_window(
 		&mut self,
-		event_loop: &EventLoopWindowTarget<CustomEvent>,
+		event_loop: &EventLoopWindowTarget<UserEvent>,
 		title: impl Into<String>,
 		options: WindowOptions,
 	) -> Result<WindowId, OsError> {
@@ -237,14 +266,21 @@ impl<CustomEvent> Context<CustomEvent> {
 
 	fn handle_event(
 		&mut self,
-		event: winit::event::Event<ContextCommand<CustomEvent>>,
-		event_loop: &EventLoopWindowTarget<CustomEvent>,
+		event: Event<ContextEvent<UserEvent>>,
+		event_loop: &EventLoopWindowTarget<UserEvent>,
 		control_flow: &mut winit::event_loop::ControlFlow,
 	) {
-		use winit::event::Event;
 		use winit::event::WindowEvent;
 
 		*control_flow = winit::event_loop::ControlFlow::Poll;
+
+		let mut event = match downgrade_event(event) {
+			Ok(event) => event,
+			Err(command) => return self.handle_command(command, event_loop),
+		};
+
+		self.run_event_handlers(&mut event, event_loop);
+
 		match event {
 			Event::WindowEvent { window_id, event: WindowEvent::Resized(new_size) } => {
 				let _  = self.resize_window(window_id, new_size);
@@ -255,29 +291,58 @@ impl<CustomEvent> Context<CustomEvent> {
 			Event::WindowEvent { window_id, event: WindowEvent::CloseRequested } => {
 				let _ = self.destroy_window(window_id);
 			},
-			Event::UserEvent(command) => {
-				match command {
-					ContextCommand::CreateWindow(command) => {
-						let _ = command.result_tx.send(self.create_window(event_loop, command.title, command.options));
-					},
-					ContextCommand::DestroyWindow(command) => {
-						let _ = command.result_tx.send(self.destroy_window(command.window_id));
-					},
-					ContextCommand::SetWindowVisible(command) => {
-						let _ = command.result_tx.send(self.set_window_visible(command.window_id, command.visible));
-					}
-					ContextCommand::SetWindowImage(command) => {
-						let _ = command.result_tx.send(self.set_window_image(command.window_id, &command.name, &command.image));
-					}
-					ContextCommand::ExecuteFunction(command) => {
-						(command.function)(ContextHandle::new(self, event_loop));
-					},
-					ContextCommand::Custom(_command) => {
-						// TODO: dispatch to registered event handlers.
-					},
-				}
-			}
 			_ => {},
+		}
+	}
+
+	fn run_event_handlers(&mut self, event: &mut Event<UserEvent>, event_loop: &EventLoopWindowTarget<UserEvent>) {
+		// Event handlers could potentially modify the list of event handlers.
+		// Also, even if they couldn't we'd still need borrow self mutably multible times to run the event handlers.
+		// That's not allowed, of course, so temporarily swap the event handlers with a new vector.
+		// When we've run all handlers, we add the new handlers to the original vector and place it back.
+		// https://newfastuff.com/wp-content/uploads/2019/05/dVIkgAf.png
+		let mut event_handlers = std::mem::replace(&mut self.event_handlers, Vec::new());
+
+		let mut stop_processing = false;
+		event_handlers.retain_mut(|handler| {
+			if stop_processing {
+				false
+			} else {
+				let context_handle = ContextHandle::new(self, event_loop);
+				let result = (handler)(context_handle, event);
+				stop_processing = result.stop_processing;
+				!result.remove_handler
+			}
+		});
+		let new_event_handlers = std::mem::replace(&mut self.event_handlers, Vec::new());
+		event_handlers.extend(new_event_handlers);
+		self.event_handlers = event_handlers;
+	}
+
+	fn handle_command(
+		&mut self,
+		command: ContextCommand<UserEvent>,
+		event_loop: &EventLoopWindowTarget<UserEvent>,
+	) {
+		match command {
+			ContextCommand::CreateWindow(command) => {
+				let _ = command.result_tx.send(self.create_window(event_loop, command.title, command.options));
+			},
+			ContextCommand::DestroyWindow(command) => {
+				let _ = command.result_tx.send(self.destroy_window(command.window_id));
+			},
+			ContextCommand::SetWindowVisible(command) => {
+				let _ = command.result_tx.send(self.set_window_visible(command.window_id, command.visible));
+			}
+			ContextCommand::SetWindowImage(command) => {
+				let _ = command.result_tx.send(self.set_window_image(command.window_id, &command.name, &command.image));
+			}
+			ContextCommand::AddContextEventHandler(command) => {
+				self.event_handlers.push(command.handler);
+			}
+			ContextCommand::ExecuteFunction(command) => {
+				(command.function)(ContextHandle::new(self, event_loop));
+			},
 		}
 	}
 }

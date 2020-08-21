@@ -1,4 +1,6 @@
 use crate::ContextHandle;
+use crate::EventHandlerOutput;
+use crate::event::Event;
 use crate::Image;
 use crate::WindowId;
 use crate::WindowOptions;
@@ -9,35 +11,40 @@ use crate::error::TimeoutError;
 use crate::oneshot;
 use std::time::Duration;
 
-type EventLoopProxy<CustomEvent> = winit::event_loop::EventLoopProxy<ContextCommand<CustomEvent>>;
+type EventLoopProxy<UserEvent> = winit::event_loop::EventLoopProxy<ContextEvent<UserEvent>>;
 
-pub struct ContextProxy<CustomEvent: 'static> {
-	event_loop: EventLoopProxy<CustomEvent>,
+pub struct ContextProxy<UserEvent: 'static> {
+	event_loop: EventLoopProxy<UserEvent>,
 }
 
 #[derive(Clone)]
-pub struct WindowProxy<CustomEvent: 'static> {
+pub struct WindowProxy<UserEvent: 'static> {
 	window_id: WindowId,
-	context_proxy: ContextProxy<CustomEvent>,
+	context_proxy: ContextProxy<UserEvent>,
 }
 
-impl<CustomEvent: 'static> Clone for ContextProxy<CustomEvent> {
+impl<UserEvent: 'static> Clone for ContextProxy<UserEvent> {
 	fn clone(&self) -> Self {
 		Self { event_loop: self.event_loop.clone() }
 	}
 }
 
-pub enum ContextCommand<CustomEvent: 'static> {
+pub enum ContextEvent<UserEvent: 'static> {
+	ContextCommand(ContextCommand<UserEvent>),
+	UserEvent(UserEvent),
+}
+
+pub enum ContextCommand<UserEvent: 'static> {
 	CreateWindow(CreateWindow),
 	DestroyWindow(DestroyWindow),
 	SetWindowVisible(SetWindowVisible),
 	SetWindowImage(SetWindowImage),
-	ExecuteFunction(ExecuteFunction<CustomEvent>),
-	Custom(CustomEvent),
+	AddContextEventHandler(AddContextEventHandler<UserEvent>),
+	ExecuteFunction(ExecuteFunction<UserEvent>),
 }
 
-impl<CustomEvent> ContextProxy<CustomEvent> {
-	pub(crate) fn new(event_loop: EventLoopProxy<CustomEvent>) -> Self {
+impl<UserEvent> ContextProxy<UserEvent> {
+	pub(crate) fn new(event_loop: EventLoopProxy<UserEvent>) -> Self {
 		Self { event_loop }
 	}
 
@@ -45,7 +52,7 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 		&self,
 		title: impl Into<String>,
 		options: WindowOptions,
-	) -> Result<WindowProxy<CustomEvent>, ProxyError<winit::error::OsError>> {
+	) -> Result<WindowProxy<UserEvent>, ProxyError<winit::error::OsError>> {
 		let title = title.into();
 
 		let (result_tx, mut result_rx) = oneshot::channel();
@@ -100,18 +107,33 @@ impl<CustomEvent> ContextProxy<CustomEvent> {
 
 	pub fn execute_function<F>(&self, function: F) -> Result<(), EventLoopClosedError>
 	where
-		F: 'static + FnOnce(ContextHandle<CustomEvent>) + Send,
+		F: 'static + FnOnce(ContextHandle<UserEvent>) + Send,
 	{
 		self.execute_boxed_function(Box::new(function))
 	}
 
-	pub fn execute_boxed_function(&self, function: Box<dyn FnOnce(ContextHandle<CustomEvent>) + Send + 'static>) -> Result<(), EventLoopClosedError> {
+	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), EventLoopClosedError>
+	where
+		F: FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + Send + 'static,
+	{
+		self.add_boxed_event_handler(Box::new(handler))
+	}
+
+	pub fn add_boxed_event_handler(
+		&mut self,
+		handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + Send + 'static>
+	) -> Result<(), EventLoopClosedError> {
+		let command = AddContextEventHandler { handler };
+		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)
+	}
+
+	pub fn execute_boxed_function(&self, function: Box<dyn FnOnce(ContextHandle<UserEvent>) + Send + 'static>) -> Result<(), EventLoopClosedError> {
 		let command = ExecuteFunction { function };
 		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)
 	}
 
-	pub fn send_custom_event(&self, event: CustomEvent) -> Result<(), EventLoopClosedError> {
-		self.event_loop.send_event(ContextCommand::Custom(event)).map_err(|_| EventLoopClosedError)
+	pub fn send_custom_event(&self, event: UserEvent) -> Result<(), EventLoopClosedError> {
+		self.event_loop.send_event(ContextEvent::UserEvent(event)).map_err(|_| EventLoopClosedError)
 	}
 }
 
@@ -123,8 +145,8 @@ fn map_channel_error<T, E>(result: Result<Result<T, E>, oneshot::TryReceiveError
 	})?.map_err(ProxyError::Inner)
 }
 
-impl<CustomEvent: 'static> WindowProxy<CustomEvent> {
-	pub fn new(window_id: WindowId, context_proxy: ContextProxy<CustomEvent>) -> Self {
+impl<UserEvent: 'static> WindowProxy<UserEvent> {
+	pub fn new(window_id: WindowId, context_proxy: ContextProxy<UserEvent>) -> Self {
 		Self { window_id, context_proxy }
 	}
 
@@ -132,7 +154,7 @@ impl<CustomEvent: 'static> WindowProxy<CustomEvent> {
 		self.window_id
 	}
 
-	pub fn context_proxy(&self) -> &ContextProxy<CustomEvent> {
+	pub fn context_proxy(&self) -> &ContextProxy<UserEvent> {
 		&self.context_proxy
 	}
 
@@ -174,36 +196,52 @@ pub struct SetWindowImage {
 	pub result_tx: oneshot::Sender<Result<(), InvalidWindowIdError>>
 }
 
-pub struct ExecuteFunction<CustomEvent: 'static> {
-	pub function: Box<dyn FnOnce(ContextHandle<CustomEvent>) + Send>,
+pub struct AddContextEventHandler<UserEvent: 'static> {
+	pub handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + Send + 'static>,
 }
 
-impl<CustomEvent> From<CreateWindow> for ContextCommand<CustomEvent> {
+pub struct ExecuteFunction<UserEvent: 'static> {
+	pub function: Box<dyn FnOnce(ContextHandle<UserEvent>) + Send>,
+}
+
+impl<UserEvent> From<ContextCommand<UserEvent>> for ContextEvent<UserEvent> {
+	fn from(other: ContextCommand<UserEvent>) -> Self {
+		Self::ContextCommand(other)
+	}
+}
+
+impl<UserEvent> From<CreateWindow> for ContextEvent<UserEvent> {
 	fn from(other: CreateWindow) -> Self {
-		Self::CreateWindow(other)
+		ContextCommand::CreateWindow(other).into()
 	}
 }
 
-impl<CustomEvent> From<DestroyWindow> for ContextCommand<CustomEvent> {
+impl<UserEvent> From<DestroyWindow> for ContextEvent<UserEvent> {
 	fn from(other: DestroyWindow) -> Self {
-		Self::DestroyWindow(other)
+		ContextCommand::DestroyWindow(other).into()
 	}
 }
 
-impl<CustomEvent> From<SetWindowVisible> for ContextCommand<CustomEvent> {
+impl<UserEvent> From<SetWindowVisible> for ContextEvent<UserEvent> {
 	fn from(other: SetWindowVisible) -> Self {
-		Self::SetWindowVisible(other)
+		ContextCommand::SetWindowVisible(other).into()
 	}
 }
 
-impl<CustomEvent> From<SetWindowImage> for ContextCommand<CustomEvent> {
+impl<UserEvent> From<SetWindowImage> for ContextEvent<UserEvent> {
 	fn from(other: SetWindowImage) -> Self {
-		Self::SetWindowImage(other)
+		ContextCommand::SetWindowImage(other).into()
 	}
 }
 
-impl<CustomEvent> From<ExecuteFunction<CustomEvent>> for ContextCommand<CustomEvent> {
-	fn from(other: ExecuteFunction<CustomEvent>) -> Self {
-		Self::ExecuteFunction(other)
+impl<UserEvent> From<AddContextEventHandler<UserEvent>> for ContextEvent<UserEvent> {
+	fn from(other: AddContextEventHandler<UserEvent>) -> Self {
+		ContextCommand::AddContextEventHandler(other).into()
+	}
+}
+
+impl<UserEvent> From<ExecuteFunction<UserEvent>> for ContextEvent<UserEvent> {
+	fn from(other: ExecuteFunction<UserEvent>) -> Self {
+		ContextCommand::ExecuteFunction(other).into()
 	}
 }
