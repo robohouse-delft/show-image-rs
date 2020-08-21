@@ -17,17 +17,14 @@ impl<T> UniformsBuffer<T> {
 	///
 	/// The bind group layout must have exactly 1 binding for a buffer at index 0.
 	pub fn from_value(device: &wgpu::Device, value: &T, layout: &wgpu::BindGroupLayout) -> Self {
-		let buffer = create_buffer_with_value(device, value, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST);
+		let buffer = create_buffer_with_value(device, None, value, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST);
 		let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 			label: Some("uniforms_bind_group"),
 			layout,
-			bindings: &[
-				wgpu::Binding {
+			entries: &[
+				wgpu::BindGroupEntry {
 					binding: 0,
-					resource: wgpu::BindingResource::Buffer {
-						buffer: &buffer,
-						range: 0..std::mem::size_of::<T>() as wgpu::BufferAddress,
-					}
+					resource: wgpu::BindingResource::Buffer(buffer.slice(..)),
 				},
 			],
 		});
@@ -57,7 +54,8 @@ impl<T> UniformsBuffer<T> {
 
 	/// Update the buffer contents using the provided command encoder and clear the dirty flag.
 	pub fn update_from(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, value: &T) {
-		let buffer = create_buffer_with_value(device, value, wgpu::BufferUsage::COPY_SRC);
+
+		let buffer = create_buffer_with_value(device, None, value, wgpu::BufferUsage::COPY_SRC);
 		encoder.copy_buffer_to_buffer(&buffer, 0, &self.buffer, 0, std::mem::size_of::<T>() as wgpu::BufferAddress);
 		self.mark_dirty(false);
 	}

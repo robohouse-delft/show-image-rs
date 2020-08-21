@@ -41,27 +41,27 @@ impl Texture {
 			stride_x: image.info().stride_x,
 			stride_y: image.info().stride_y,
 		};
-		let uniforms = create_buffer_with_value(device, &uniforms, wgpu::BufferUsage::UNIFORM);
 
-		let data = device.create_buffer_with_data(image.buffer(), wgpu::BufferUsage::STORAGE_READ);
+		let uniforms = create_buffer_with_value(device, Some(&format!("{}_uniforms_buffer", name)), &uniforms, wgpu::BufferUsage::UNIFORM);
+
+		use wgpu::util::DeviceExt;
+		let data = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+			label: Some(&format!("{}_image_buffer", name)),
+			contents: image.buffer(),
+			usage: wgpu::BufferUsage::STORAGE,
+		});
 
 		let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 			label: Some(&format!("{}_bind_group", name)),
 			layout: &bind_group_layout,
-			bindings: &[
-				wgpu::Binding {
+			entries: &[
+				wgpu::BindGroupEntry {
 					binding: 0,
-					resource: wgpu::BindingResource::Buffer {
-						buffer: &uniforms,
-						range: 0..std::mem::size_of::<TextureUniforms>() as u64,
-					},
+					resource: wgpu::BindingResource::Buffer(uniforms.slice(..)),
 				},
-				wgpu::Binding {
+				wgpu::BindGroupEntry {
 					binding: 1,
-					resource: wgpu::BindingResource::Buffer {
-						buffer: &data,
-						range: 0..image.info().byte_size(),
-					},
+					resource: wgpu::BindingResource::Buffer(data.slice(..)),
 				},
 			],
 		});

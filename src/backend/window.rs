@@ -10,7 +10,6 @@ pub struct Window {
 	pub(crate) swap_chain: wgpu::SwapChain,
 	pub(crate) uniforms: UniformsBuffer<WindowUniforms>,
 	pub(crate) image: Option<Texture>,
-	pub(crate) load_texture: Option<wgpu::CommandBuffer>,
 }
 
 #[derive(Debug, Clone)]

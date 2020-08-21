@@ -11,22 +11,17 @@ use crate::backend::util::RetainMut;
 use crate::backend::util::Texture;
 use crate::backend::util::UniformsBuffer;
 use crate::backend::window::WindowUniforms;
+use crate::error::GetDeviceError;
 use crate::error::InvalidWindowIdError;
 use crate::error::NoSuitableAdapterFoundError;
 use crate::error::OsError;
 use crate::event::Event;
 
-macro_rules! include_spirv {
-	($path:literal) => {{
-		let bytes = include_bytes!($path);
-		wgpu::read_spirv(std::io::Cursor::new(&bytes[..])).unwrap()
-	}};
-}
-
 type EventLoop<UserEvent> = winit::event_loop::EventLoop<ContextEvent<UserEvent>>;
 type EventLoopWindowTarget<UserEvent> = winit::event_loop::EventLoopWindowTarget<ContextEvent<UserEvent>>;
 
 pub struct Context<UserEvent: 'static> {
+	instance: wgpu::Instance,
 	event_loop: Option<EventLoop<UserEvent>>,
 	proxy: ContextProxy<UserEvent>,
 	device: wgpu::Device,
@@ -46,25 +41,29 @@ pub struct ContextHandle<'a, UserEvent: 'static> {
 }
 
 impl<UserEvent> Context<UserEvent> {
-	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, NoSuitableAdapterFoundError> {
+	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
+		let instance = wgpu::Instance::new(wgpu::BackendBit::all());
 		let event_loop = EventLoop::with_user_event();
 		let proxy = ContextProxy::new(event_loop.create_proxy());
 
-		let (device, queue) = futures::executor::block_on(get_device())?;
+		let (device, queue) = futures::executor::block_on(get_device(&instance))?;
 
 		let window_bind_group_layout = create_window_bind_group_layout(&device);
 		let image_bind_group_layout = create_image_bind_group_layout(&device);
 
-		let vertex_shader = device.create_shader_module(&include_spirv!("../../shaders/shader.vert.spv"));
-		let fragment_shader = device.create_shader_module(&include_spirv!("../../shaders/shader.frag.spv"));
+		let vertex_shader = device.create_shader_module(wgpu::include_spirv!("../../shaders/shader.vert.spv"));
+		let fragment_shader = device.create_shader_module(wgpu::include_spirv!("../../shaders/shader.frag.spv"));
 
 		let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+			label: Some("show-image-pipeline-layout"),
 			bind_group_layouts: &[&window_bind_group_layout, &image_bind_group_layout],
+			push_constant_ranges: &[],
 		});
 
 		let render_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader, swap_chain_format);
 
 		Ok(Self {
+			instance,
 			event_loop: Some(event_loop),
 			proxy,
 			device,
@@ -160,7 +159,7 @@ impl<UserEvent> Context<UserEvent> {
 
 		let window = window.build(event_loop)?;
 
-		let surface = wgpu::Surface::create(&window);
+		let surface = unsafe { self.instance.create_surface(&window) };
 		let swap_chain = create_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
 		let uniforms = UniformsBuffer::from_value(&self.device, &WindowUniforms::default(), &self.window_bind_group_layout);
 
@@ -171,7 +170,6 @@ impl<UserEvent> Context<UserEvent> {
 			swap_chain,
 			uniforms,
 			image: None,
-			load_texture: None,
 		};
 
 		let window_id = window.id();
@@ -227,7 +225,7 @@ impl<UserEvent> Context<UserEvent> {
 		};
 
 		let frame = window.swap_chain
-			.get_next_texture()
+			.get_current_frame()
 			.expect("Failed to acquire next swap chain texture");
 
 		let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -238,10 +236,11 @@ impl<UserEvent> Context<UserEvent> {
 
 		let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 			color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-				load_op: wgpu::LoadOp::Clear,
-				store_op: wgpu::StoreOp::Store,
-				clear_color: window.options.background_color,
-				attachment: &frame.view,
+				ops: wgpu::Operations {
+					load: wgpu::LoadOp::Clear(window.options.background_color),
+					store: true,
+				},
+				attachment: &frame.output.view,
 				resolve_target: None,
 			}],
 			depth_stencil_attachment: None,
@@ -253,14 +252,7 @@ impl<UserEvent> Context<UserEvent> {
 		render_pass.draw(0..6, 0..1);
 		drop(render_pass);
 
-		let render_window = encoder.finish();
-
-		if let Some(load_texture) = window.load_texture.take() {
-			self.queue.submit(&[load_texture, render_window]);
-		} else {
-			self.queue.submit(&[render_window]);
-		}
-
+		self.queue.submit(std::iter::once(encoder.finish()));
 		Ok(())
 	}
 
@@ -347,15 +339,12 @@ impl<UserEvent> Context<UserEvent> {
 	}
 }
 
-async fn get_device() -> Result<(wgpu::Device, wgpu::Queue), NoSuitableAdapterFoundError> {
+async fn get_device(instance: &wgpu::Instance) -> Result<(wgpu::Device, wgpu::Queue), GetDeviceError> {
 	// Find a suitable display adapter.
-	let adapter = wgpu::Adapter::request(
-		&wgpu::RequestAdapterOptions {
-			power_preference: wgpu::PowerPreference::Default,
-			compatible_surface: None, // TODO: can we use a hidden window or something?
-		},
-		wgpu::BackendBit::PRIMARY
-	).await;
+	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
+		power_preference: wgpu::PowerPreference::Default,
+		compatible_surface: None, // TODO: can we use a hidden window or something?
+	}).await;
 
 	let adapter = adapter.ok_or(NoSuitableAdapterFoundError)?;
 
@@ -363,9 +352,11 @@ async fn get_device() -> Result<(wgpu::Device, wgpu::Queue), NoSuitableAdapterFo
 	let (device, queue) = adapter.request_device(
 		&wgpu::DeviceDescriptor {
 			limits: wgpu::Limits::default(),
-			extensions: wgpu::Extensions::default(),
+			features: wgpu::Features::default(),
+			shader_validation: true,
 		},
-	).await;
+		None,
+	).await?;
 
 	Ok((device, queue))
 }
@@ -373,12 +364,14 @@ async fn get_device() -> Result<(wgpu::Device, wgpu::Queue), NoSuitableAdapterFo
 fn create_window_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 	device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("window_bind_group_layout"),
-		bindings: &[
+		entries: &[
 			wgpu::BindGroupLayoutEntry {
 				binding: 0,
 				visibility: wgpu::ShaderStage::VERTEX,
+				count: None,
 				ty: wgpu::BindingType::UniformBuffer {
 					dynamic: false,
+					min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<super::window::WindowUniforms>() as u64).unwrap()),
 				},
 			},
 		],
@@ -388,20 +381,24 @@ fn create_window_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
 fn create_image_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 	device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("image_bind_group_layout"),
-		bindings: &[
+		entries: &[
 			wgpu::BindGroupLayoutEntry {
 				binding: 0,
 				visibility: wgpu::ShaderStage::FRAGMENT,
+				count: None,
 				ty: wgpu::BindingType::UniformBuffer {
 					dynamic: false,
+					min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<super::util::TextureUniforms>() as u64).unwrap()),
 				},
 			},
 			wgpu::BindGroupLayoutEntry {
 				binding: 1,
 				visibility: wgpu::ShaderStage::FRAGMENT,
+				count: None,
 				ty: wgpu::BindingType::StorageBuffer {
 					readonly: true,
 					dynamic: false,
+					min_binding_size: None,
 				},
 			},
 		],
@@ -416,7 +413,8 @@ fn create_render_pipeline(
 	swap_chain_format: wgpu::TextureFormat,
 ) -> wgpu::RenderPipeline {
 	device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-		layout,
+		label: Some("show-image-pipeline"),
+		layout: Some(&layout),
 		vertex_stage: wgpu::ProgrammableStageDescriptor {
 			module: &vertex_shader,
 			entry_point: "main",

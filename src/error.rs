@@ -10,6 +10,12 @@ pub struct InvalidWindowIdError {
 #[derive(Debug, Clone)]
 pub struct NoSuitableAdapterFoundError;
 
+#[derive(Debug, Clone)]
+pub enum GetDeviceError {
+	NoSuitableAdapterFound(NoSuitableAdapterFoundError),
+	NoSuitableDeviceFound(wgpu::RequestDeviceError),
+}
+
 #[derive(Debug)]
 pub enum ProxyError<T> {
 	EventLoopClosed(EventLoopClosedError),
@@ -32,5 +38,17 @@ impl<T> From<EventLoopClosedError> for ProxyError<T> {
 impl<T> From<TimeoutError> for ProxyError<T> {
 	fn from(other: TimeoutError) -> Self {
 		Self::Timeout(other)
+	}
+}
+
+impl From<NoSuitableAdapterFoundError> for GetDeviceError {
+	fn from(other: NoSuitableAdapterFoundError) -> Self {
+		Self::NoSuitableAdapterFound(other)
+	}
+}
+
+impl From<wgpu::RequestDeviceError> for GetDeviceError {
+	fn from(other: wgpu::RequestDeviceError) -> Self {
+		Self::NoSuitableDeviceFound(other)
 	}
 }
