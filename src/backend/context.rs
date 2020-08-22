@@ -9,7 +9,7 @@ use crate::backend::event::downgrade_event;
 use crate::backend::proxy::ContextCommand;
 use crate::backend::proxy::ContextEvent;
 use crate::backend::util::RetainMut;
-use crate::backend::util::Texture;
+use crate::backend::util::GpuImage;
 use crate::backend::util::UniformsBuffer;
 use crate::backend::window::WindowUniforms;
 use crate::error::GetDeviceError;
@@ -247,7 +247,7 @@ impl<UserEvent> Context<UserEvent> {
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
-		let texture = Texture::from_data(&self.device, &self.image_bind_group_layout, name, image);
+		let texture = GpuImage::from_data(&self.device, &self.image_bind_group_layout, name, image);
 		window.image = Some(texture);
 		window.uniforms.mark_dirty(true);
 		Ok(())
@@ -472,7 +472,7 @@ fn create_image_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 				count: None,
 				ty: wgpu::BindingType::UniformBuffer {
 					dynamic: false,
-					min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<super::util::TextureUniforms>() as u64).unwrap()),
+					min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<super::util::GpuImageUniforms>() as u64).unwrap()),
 				},
 			},
 			wgpu::BindGroupLayoutEntry {

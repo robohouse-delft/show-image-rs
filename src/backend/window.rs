@@ -3,7 +3,7 @@ use crate::ContextHandle;
 use crate::EventHandlerOutput;
 use crate::Image;
 use crate::WindowId;
-use crate::backend::util::Texture;
+use crate::backend::util::GpuImage;
 use crate::backend::util::UniformsBuffer;
 use crate::error::InvalidWindowIdError;
 use crate::event::WindowEvent;
@@ -14,7 +14,7 @@ pub struct Window<UserEvent: 'static> {
 	pub(crate) surface: wgpu::Surface,
 	pub(crate) swap_chain: wgpu::SwapChain,
 	pub(crate) uniforms: UniformsBuffer<WindowUniforms>,
-	pub(crate) image: Option<Texture>,
+	pub(crate) image: Option<GpuImage>,
 	pub(crate) event_handlers: Vec<Box<dyn FnMut(WindowHandle<UserEvent>, &mut crate::event::WindowEvent) -> EventHandlerOutput>>,
 }
 

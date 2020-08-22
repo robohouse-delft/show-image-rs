@@ -2,15 +2,17 @@ use crate::Image;
 use crate::PixelFormat;
 use super::buffer::create_buffer_with_value;
 
-pub struct Texture {
+/// A GPU image buffer ready to be used with the rendering pipeline.
+pub struct GpuImage {
 	size: [u32; 2],
 	bind_group: wgpu::BindGroup,
 	_uniforms: wgpu::Buffer,
 	_data: wgpu::Buffer,
 }
 
+/// The uniforms associated with a [`GpuImage`].
 #[derive(Debug, Copy, Clone)]
-pub struct TextureUniforms {
+pub struct GpuImageUniforms {
 	format: u32,
 	width: u32,
 	height: u32,
@@ -18,7 +20,8 @@ pub struct TextureUniforms {
 	stride_y: u32,
 }
 
-impl Texture {
+impl GpuImage {
+	/// Create a [`GpuImage`] from an image buffer.
 	pub fn from_data(
 		device: &wgpu::Device,
 		bind_group_layout: &wgpu::BindGroupLayout,
@@ -34,7 +37,7 @@ impl Texture {
 			PixelFormat::Rgba8 => 4,
 		};
 
-		let uniforms = TextureUniforms {
+		let uniforms = GpuImageUniforms {
 			format,
 			width: image.info().width,
 			height: image.info().height,
@@ -74,18 +77,22 @@ impl Texture {
 		}
 	}
 
+	/// Get the dimensions of the image.
 	pub fn size(&self) -> [u32; 2] {
 		self.size
 	}
 
+	/// Get the width of the image.
 	pub fn width(&self) -> u32 {
 		self.size[0]
 	}
 
+	/// Get the height of the image.
 	pub fn height(&self) -> u32 {
 		self.size[1]
 	}
 
+	/// Get the bind group that should be used to render the image with the rendering pipeline.
 	pub fn bind_group(&self) -> &wgpu::BindGroup {
 		&self.bind_group
 	}
