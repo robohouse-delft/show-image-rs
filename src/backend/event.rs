@@ -1,15 +1,15 @@
 use crate::event::Event;
-use super::proxy::ContextCommand;
 use super::proxy::ContextEvent;
+use super::proxy::ExecuteFunction;
 
 /// Downgrade an `Event<ContextEvent<T>>` to an `Event<T>`.
 ///
 /// If the event was actually a [`ContextCmmand`], it is returned as [`Err`].
-pub fn downgrade_event<UserEvent>(event: Event<ContextEvent<UserEvent>>) -> Result<Event<UserEvent>, ContextCommand<UserEvent>> {
+pub fn downgrade_event<UserEvent>(event: Event<ContextEvent<UserEvent>>) -> Result<Event<UserEvent>, ExecuteFunction<UserEvent>> {
 	match map_nonuser_event(event) {
 		Ok(x) => Ok(x),
 		Err(ContextEvent::UserEvent(x)) => Ok(Event::UserEvent(x)),
-		Err(ContextEvent::ContextCommand(x)) => Err(x),
+		Err(ContextEvent::ExecuteFunction(x)) => Err(x),
 	}
 }
 

@@ -6,7 +6,6 @@ use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
 use crate::backend::event::downgrade_event;
-use crate::backend::proxy::ContextCommand;
 use crate::backend::proxy::ContextEvent;
 use crate::backend::util::RetainMut;
 use crate::backend::util::GpuImage;
@@ -390,9 +389,13 @@ impl<UserEvent> Context<UserEvent> {
 	) {
 		*control_flow = winit::event_loop::ControlFlow::Poll;
 
+		// Split between Event<UserEvent> and ExecuteFunction commands.
 		let mut event = match downgrade_event(event) {
 			Ok(event) => event,
-			Err(command) => return self.handle_command(command, event_loop),
+			Err(command) => {
+				(command.function)(&mut ContextHandle::new(self, event_loop));
+				return;
+			},
 		};
 
 		let run_context_handlers = match &mut event {
@@ -471,34 +474,6 @@ impl<UserEvent> Context<UserEvent> {
 		self.windows[window_index].event_handlers = event_handlers;
 
 		return !stop_processing;
-	}
-
-	/// Handle a proxy command.
-	fn handle_command(
-		&mut self,
-		command: ContextCommand<UserEvent>,
-		event_loop: &EventLoopWindowTarget<UserEvent>,
-	) {
-		match command {
-			ContextCommand::CreateWindow(command) => {
-				let _ = command.result_tx.send(self.create_window(event_loop, command.title, command.options));
-			},
-			ContextCommand::DestroyWindow(command) => {
-				let _ = command.result_tx.send(self.destroy_window(command.window_id));
-			},
-			ContextCommand::SetWindowVisible(command) => {
-				let _ = command.result_tx.send(self.set_window_visible(command.window_id, command.visible));
-			}
-			ContextCommand::SetWindowImage(command) => {
-				let _ = command.result_tx.send(self.set_window_image(command.window_id, &command.name, &command.image));
-			}
-			ContextCommand::AddContextEventHandler(command) => {
-				self.event_handlers.push(command.handler);
-			}
-			ContextCommand::ExecuteFunction(command) => {
-				(command.function)(ContextHandle::new(self, event_loop));
-			},
-		}
 	}
 }
 

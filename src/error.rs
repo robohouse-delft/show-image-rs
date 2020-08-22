@@ -16,29 +16,22 @@ pub enum GetDeviceError {
 	NoSuitableDeviceFound(wgpu::RequestDeviceError),
 }
 
-#[derive(Debug)]
-pub enum ProxyError<T> {
-	EventLoopClosed(EventLoopClosedError),
-	Timeout(TimeoutError),
-	Inner(T),
-}
-
+/// The context event loop was closed.
 #[derive(Debug, Clone)]
 pub struct EventLoopClosedError;
 
-#[derive(Debug, Clone)]
-pub struct TimeoutError;
-
-impl<T> From<EventLoopClosedError> for ProxyError<T> {
-	fn from(other: EventLoopClosedError) -> Self {
-		Self::EventLoopClosed(other)
-	}
+/// An error that can occur while creating a window through a proxy object.
+#[derive(Debug)]
+pub enum ProxyCreateWindowError {
+	EventLoopClosed(EventLoopClosedError),
+	Os(OsError),
 }
 
-impl<T> From<TimeoutError> for ProxyError<T> {
-	fn from(other: TimeoutError) -> Self {
-		Self::Timeout(other)
-	}
+/// An error that can occur while creating a window through a proxy object.
+#[derive(Debug)]
+pub enum ProxyWindowOperationError {
+	EventLoopClosed(EventLoopClosedError),
+	InvalidWindowId(InvalidWindowIdError),
 }
 
 impl From<NoSuitableAdapterFoundError> for GetDeviceError {
@@ -50,5 +43,29 @@ impl From<NoSuitableAdapterFoundError> for GetDeviceError {
 impl From<wgpu::RequestDeviceError> for GetDeviceError {
 	fn from(other: wgpu::RequestDeviceError) -> Self {
 		Self::NoSuitableDeviceFound(other)
+	}
+}
+
+impl From<EventLoopClosedError> for ProxyCreateWindowError {
+	fn from(other: EventLoopClosedError) -> Self {
+		Self::EventLoopClosed(other)
+	}
+}
+
+impl From<OsError> for ProxyCreateWindowError {
+	fn from(other: OsError) -> Self {
+		Self::Os(other)
+	}
+}
+
+impl From<EventLoopClosedError> for ProxyWindowOperationError {
+	fn from(other: EventLoopClosedError) -> Self {
+		Self::EventLoopClosed(other)
+	}
+}
+
+impl From<InvalidWindowIdError> for ProxyWindowOperationError {
+	fn from(other: InvalidWindowIdError) -> Self {
+		Self::InvalidWindowId(other)
 	}
 }

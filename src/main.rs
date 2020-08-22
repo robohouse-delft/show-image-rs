@@ -1,6 +1,5 @@
 use show_image::Context;
 use show_image::ContextProxy;
-use show_image::ContextHandle;
 use show_image::WindowOptions;
 use show_image::ImageData;
 
@@ -17,7 +16,8 @@ fn main() {
 }
 
 fn fake_main(image: show_image::Image<'static>, proxy: ContextProxy<()>) {
-	proxy.execute_function(move |mut context: ContextHandle<()>| {
+	proxy.run_function_wait(move |context| {
+		eprintln!("queued function running!");
 		let mut window = context.create_window("Show Image", WindowOptions::default()).unwrap();
 		window.set_image("image", &image).unwrap();
 		window.set_visible(true).unwrap();

@@ -1,15 +1,15 @@
 use crate::ContextHandle;
+use crate::WindowHandle;
 use crate::EventHandlerOutput;
-use crate::event::Event;
 use crate::Image;
 use crate::WindowId;
 use crate::WindowOptions;
 use crate::error::EventLoopClosedError;
-use crate::error::InvalidWindowIdError;
-use crate::error::ProxyError;
-use crate::error::TimeoutError;
+use crate::error::ProxyCreateWindowError;
+use crate::error::ProxyWindowOperationError;
+use crate::event::Event;
+use crate::event::WindowEvent;
 use crate::oneshot;
-use std::time::Duration;
 
 /// Shorthand type alias for the correct `winit::event::EventLoopProxy`.
 type EventLoopProxy<UserEvent> = winit::event_loop::EventLoopProxy<ContextEvent<UserEvent>>;
@@ -36,18 +36,18 @@ impl<UserEvent: 'static> Clone for ContextProxy<UserEvent> {
 ///
 /// It can be either a [`ContextCommand`] or a user event.
 pub enum ContextEvent<UserEvent: 'static> {
-	ContextCommand(ContextCommand<UserEvent>),
+	ExecuteFunction(ExecuteFunction<UserEvent>),
 	UserEvent(UserEvent),
 }
 
-/// A command that can be sent to the global context.
-pub enum ContextCommand<UserEvent: 'static> {
-	CreateWindow(CreateWindow),
-	DestroyWindow(DestroyWindow),
-	SetWindowVisible(SetWindowVisible),
-	SetWindowImage(SetWindowImage),
-	AddContextEventHandler(AddContextEventHandler<UserEvent>),
-	ExecuteFunction(ExecuteFunction<UserEvent>),
+pub struct ExecuteFunction<UserEvent: 'static> {
+	pub function: Box<dyn FnOnce(&mut ContextHandle<UserEvent>) + Send>,
+}
+
+impl<UserEvent> From<ExecuteFunction<UserEvent>> for ContextEvent<UserEvent> {
+	fn from(other: ExecuteFunction<UserEvent>) -> Self {
+		ContextEvent::ExecuteFunction(other)
+	}
 }
 
 impl<UserEvent> ContextProxy<UserEvent> {
@@ -64,19 +64,14 @@ impl<UserEvent> ContextProxy<UserEvent> {
 		&self,
 		title: impl Into<String>,
 		options: WindowOptions,
-	) -> Result<WindowProxy<UserEvent>, ProxyError<winit::error::OsError>> {
+	) -> Result<WindowProxy<UserEvent>, ProxyCreateWindowError> {
 		let title = title.into();
+		let window_id = self.run_function_wait(move |context| {
+			context.create_window(title, options)
+				.map(|window| window.id())
+		})??;
 
-		let (result_tx, mut result_rx) = oneshot::channel();
-		let command = CreateWindow { title, options, result_tx };
-		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)?;
-
-		let window_id = map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))?;
-
-		Ok(WindowProxy {
-			window_id,
-			context_proxy: self.clone(),
-		})
+		Ok(WindowProxy::new(window_id, self.clone()))
 	}
 
 	/// Destroy a window.
@@ -86,12 +81,11 @@ impl<UserEvent> ContextProxy<UserEvent> {
 	pub fn destroy_window(
 		&self,
 		window_id: WindowId,
-	) -> Result<(), ProxyError<InvalidWindowIdError>> {
-		let (result_tx, mut result_rx) = oneshot::channel();
-		let command = DestroyWindow { window_id, result_tx };
-		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)?;
-
-		map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))
+	) -> Result<(), ProxyWindowOperationError> {
+		self.run_function_wait(move |context| {
+			context.destroy_window(window_id)
+		})??;
+		Ok(())
 	}
 
 	/// Make a window visiable or invsible.
@@ -102,12 +96,11 @@ impl<UserEvent> ContextProxy<UserEvent> {
 		&self,
 		window_id: WindowId,
 		visible: bool,
-	) -> Result<(), ProxyError<InvalidWindowIdError>> {
-		let (result_tx, mut result_rx) = oneshot::channel();
-		let command = SetWindowVisible { window_id, visible, result_tx };
-		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)?;
-
-		map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))
+	) -> Result<(), ProxyWindowOperationError> {
+		self.run_function_wait(move |context| {
+			context.set_window_visible(window_id, visible)
+		})??;
+		Ok(())
 	}
 
 	/// Set the shown image for a window.
@@ -119,77 +112,87 @@ impl<UserEvent> ContextProxy<UserEvent> {
 		window_id: WindowId,
 		name: impl Into<String>,
 		image: impl Into<Image<'static>>,
-	) -> Result<(), ProxyError<InvalidWindowIdError>> {
+	) -> Result<(), ProxyWindowOperationError> {
 		let name = name.into();
 		let image = image.into();
-
-		let (result_tx, mut result_rx) = oneshot::channel();
-		let command = SetWindowImage { window_id, name, image, result_tx };
-		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)?;
-
-		map_channel_error(result_rx.recv_timeout(Duration::from_secs(2)))
-	}
-
-	/// Queue a function for execution in the context thread.
-	///
-	/// This function does not wait for the queued function to be executed.
-	pub fn execute_function<F>(&self, function: F) -> Result<(), EventLoopClosedError>
-	where
-		F: 'static + FnOnce(ContextHandle<UserEvent>) + Send,
-	{
-		self.execute_boxed_function(Box::new(function))
-	}
-
-
-	/// Queue a boxed function for execution in the context thread.
-	///
-	/// This function does not wait for the queued function to be executed.
-	///
-	/// This does the same as [`Self::execute_function`],
-	/// but doesn't add another layer of boxing if you already have a boxed function.
-	pub fn execute_boxed_function(&self, function: Box<dyn FnOnce(ContextHandle<UserEvent>) + Send + 'static>) -> Result<(), EventLoopClosedError> {
-		let command = ExecuteFunction { function };
-		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)
+		self.run_function_wait(move |context| {
+			context.set_window_image(window_id, &name, &image)
+		})??;
+		Ok(())
 	}
 
 	/// Add a global event handler to the context.
 	///
-	/// Some events may still occur before the event handler is truly installed.
+	/// Events that are already queued with the event loop will not be passed to the handler.
+	///
+	/// This function uses [`Self::run_function_wait`] internally, so it blocks until the event handler is added.
+	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
 	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), EventLoopClosedError>
 	where
 		F: FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + Send + 'static,
 	{
-		self.add_boxed_event_handler(Box::new(handler))
+		self.run_function_wait(move |context| {
+			context.add_event_handler(handler)
+		})
 	}
 
+	/// Add an event handler for a specific window.
+	///
+	/// Events that are already queued with the event loop will not be passed to the handler.
+	///
+	/// This function uses [`Self::run_function_wait`] internally, so it blocks until the event handler is added.
+	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
+	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), ProxyWindowOperationError>
+	where
+		F: FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput + Send + 'static,
+	{
+		self.run_function_wait(move |context| {
+			context.add_window_event_handler(window_id, handler)
+		})??;
+		Ok(())
+	}
 
-	/// Add a global event handler to the context.
+	/// Post a function for execution in the context thread without waiting for it to execute.
 	///
-	/// Some events may still occur before the event handler is truly installed.
+	/// This function returns immediately, without waiting for the posted function to start or complete.
+	/// If you want to get a return value back from the function, use [`Self::run_function_wait`] instead.
 	///
-	/// This does the same as [`Self::add_event_handler`],
-	/// but doesn't add another layer of boxing if you already have a boxed function.
-	pub fn add_boxed_event_handler(
-		&mut self,
-		handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + Send + 'static>
-	) -> Result<(), EventLoopClosedError> {
-		let command = AddContextEventHandler { handler };
-		self.event_loop.send_event(command.into()).map_err(|_| EventLoopClosedError)
+	/// *Note:*
+	/// You should not post functions to the context thread that block for a long time.
+	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
+	pub fn run_function<F>(&self, function: F) -> Result<(), EventLoopClosedError>
+	where
+		F: 'static + FnOnce(&mut ContextHandle<UserEvent>) + Send,
+	{
+		let function = Box::new(function);
+		let event = ExecuteFunction { function }.into();
+		self.event_loop.send_event(event).map_err(|_| EventLoopClosedError)
+	}
+
+	/// Post a function for execution in the context thread and wait for the return value.
+	///
+	/// If you do not need a return value from the posted function,
+	/// you can use [`Self::run_function`] to avoid blocking it completes.
+	///
+	/// *Note:*
+	/// You should not post functions to the context thread that block for a long time.
+	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
+	pub fn run_function_wait<F, T>(&self, function: F) -> Result<T, EventLoopClosedError>
+	where
+		F: FnOnce(&mut ContextHandle<UserEvent>) -> T + Send + 'static,
+		T: Send + 'static,
+	{
+		let (result_tx, result_rx) = oneshot::channel();
+		self.run_function(move |context| {
+			result_tx.send((function)(context))
+		})?;
+		result_rx.recv().map_err(|_| EventLoopClosedError)
 	}
 
 	/// Send a user event to the context.
 	pub fn send_user_event(&self, event: UserEvent) -> Result<(), EventLoopClosedError> {
 		self.event_loop.send_event(ContextEvent::UserEvent(event)).map_err(|_| EventLoopClosedError)
 	}
-}
-
-/// Convert a `Result<Result<T, E>, oneshot::TryReceiveError>` to a `Result<T, ProxyError<E>>`.
-fn map_channel_error<T, E>(result: Result<Result<T, E>, oneshot::TryReceiveError>) -> Result<T, ProxyError<E>> {
-	result.map_err(|error| match error {
-		oneshot::TryReceiveError::NotReady => ProxyError::Timeout(TimeoutError),
-		oneshot::TryReceiveError::Disconnected => ProxyError::EventLoopClosed(EventLoopClosedError),
-		oneshot::TryReceiveError::AlreadyRetrieved => unreachable!("oneshot result is already retrieved"),
-	})?.map_err(ProxyError::Inner)
 }
 
 impl<UserEvent: 'static> WindowProxy<UserEvent> {
@@ -209,8 +212,16 @@ impl<UserEvent: 'static> WindowProxy<UserEvent> {
 	}
 
 	/// Destroy the window.
-	pub fn destroy(&self) -> Result<(), ProxyError<InvalidWindowIdError>> {
+	pub fn destroy(&self) -> Result<(), ProxyWindowOperationError> {
 		self.context_proxy.destroy_window(self.window_id)
+	}
+
+	/// Set the image of the window.
+	pub fn set_visible(
+		&self,
+		visible: bool,
+	) -> Result<(), ProxyWindowOperationError> {
+		self.context_proxy.set_window_visible(self.window_id, visible)
 	}
 
 	/// Set the image of the window.
@@ -218,81 +229,20 @@ impl<UserEvent: 'static> WindowProxy<UserEvent> {
 		&self,
 		name: impl Into<String>,
 		image: Image<'static>,
-	) -> Result<(), ProxyError<InvalidWindowIdError>> {
+	) -> Result<(), ProxyWindowOperationError> {
 		self.context_proxy.set_window_image(self.window_id, name, image)
 	}
-}
 
-pub struct CreateWindow {
-	pub title: String,
-	pub options: crate::WindowOptions,
-	pub result_tx: oneshot::Sender<Result<WindowId, winit::error::OsError>>
-}
-
-pub struct DestroyWindow {
-	pub window_id: WindowId,
-	pub result_tx: oneshot::Sender<Result<(), InvalidWindowIdError>>
-}
-
-pub struct SetWindowVisible {
-	pub window_id: WindowId,
-	pub visible: bool,
-	pub result_tx: oneshot::Sender<Result<(), InvalidWindowIdError>>
-}
-
-pub struct SetWindowImage {
-	pub window_id: WindowId,
-	pub name: String,
-	pub image: Image<'static>,
-	pub result_tx: oneshot::Sender<Result<(), InvalidWindowIdError>>
-}
-
-pub struct AddContextEventHandler<UserEvent: 'static> {
-	pub handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + Send + 'static>,
-}
-
-pub struct ExecuteFunction<UserEvent: 'static> {
-	pub function: Box<dyn FnOnce(ContextHandle<UserEvent>) + Send>,
-}
-
-impl<UserEvent> From<ContextCommand<UserEvent>> for ContextEvent<UserEvent> {
-	fn from(other: ContextCommand<UserEvent>) -> Self {
-		Self::ContextCommand(other)
-	}
-}
-
-impl<UserEvent> From<CreateWindow> for ContextEvent<UserEvent> {
-	fn from(other: CreateWindow) -> Self {
-		ContextCommand::CreateWindow(other).into()
-	}
-}
-
-impl<UserEvent> From<DestroyWindow> for ContextEvent<UserEvent> {
-	fn from(other: DestroyWindow) -> Self {
-		ContextCommand::DestroyWindow(other).into()
-	}
-}
-
-impl<UserEvent> From<SetWindowVisible> for ContextEvent<UserEvent> {
-	fn from(other: SetWindowVisible) -> Self {
-		ContextCommand::SetWindowVisible(other).into()
-	}
-}
-
-impl<UserEvent> From<SetWindowImage> for ContextEvent<UserEvent> {
-	fn from(other: SetWindowImage) -> Self {
-		ContextCommand::SetWindowImage(other).into()
-	}
-}
-
-impl<UserEvent> From<AddContextEventHandler<UserEvent>> for ContextEvent<UserEvent> {
-	fn from(other: AddContextEventHandler<UserEvent>) -> Self {
-		ContextCommand::AddContextEventHandler(other).into()
-	}
-}
-
-impl<UserEvent> From<ExecuteFunction<UserEvent>> for ContextEvent<UserEvent> {
-	fn from(other: ExecuteFunction<UserEvent>) -> Self {
-		ContextCommand::ExecuteFunction(other).into()
+	/// Add an event handler for a specific window.
+	///
+	/// Events that are already queued with the event loop will not be passed to the handler.
+	///
+	/// This function uses [`ContextHandle::run_function_wait`] internally, so it blocks until the event handler is added.
+	/// To avoid blocking, you can use [`ContextHandle::run_function`] to post a lambda that adds an error handler instead.
+	pub fn add_window_event_handler<F>(&mut self, handler: F) -> Result<(), ProxyWindowOperationError>
+	where
+		F: FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput + Send + 'static,
+	{
+		self.context_proxy.add_window_event_handler(self.window_id, handler)
 	}
 }
