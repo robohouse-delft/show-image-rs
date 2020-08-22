@@ -1,4 +1,5 @@
 pub trait RetainMut<T> {
+	/// Same as [`Vec::retain`], except the lamba receives mutable references.
 	fn retain_mut<F>(&mut self, f: F)
 	where
 		F: FnMut(&mut T) -> bool;

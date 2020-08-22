@@ -19,30 +19,66 @@ use crate::error::OsError;
 use crate::event::Event;
 use crate::event::WindowEvent;
 
+/// Shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
 type EventLoop<UserEvent> = winit::event_loop::EventLoop<ContextEvent<UserEvent>>;
+
+/// Shorthand type-alias for the correct [`winit::event_loop::EventLoopWindowTarget`].
 type EventLoopWindowTarget<UserEvent> = winit::event_loop::EventLoopWindowTarget<ContextEvent<UserEvent>>;
 
+/// The global context managing all windows and the main event loop.
 pub struct Context<UserEvent: 'static> {
+	/// The wgpu instance to create surfaces with.
 	instance: wgpu::Instance,
+
+	/// The event loop to use.
+	///
+	/// Running the event loop consumes it,
+	/// so from that point on this field is `None`.
 	event_loop: Option<EventLoop<UserEvent>>,
+
+	/// A proxy object to clone for new requests.
 	proxy: ContextProxy<UserEvent>,
+
+	/// The wgpu device to use.
 	device: wgpu::Device,
+
+	/// The wgpu command queue to use.
 	queue: wgpu::Queue,
+
+	/// The swap chain format to use.
 	swap_chain_format: wgpu::TextureFormat,
+
+	/// The bind group layout for the window specific bindings.
 	window_bind_group_layout: wgpu::BindGroupLayout,
+
+	/// The bind group layout for the image specific bindings.
 	image_bind_group_layout: wgpu::BindGroupLayout,
+
+	/// The render pipeline to use.
 	render_pipeline: wgpu::RenderPipeline,
 
+	/// The windows.
 	windows: Vec<Window<UserEvent>>,
+
+	/// The global event handlers.
 	event_handlers: Vec<Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static>>,
 }
 
+/// A handle to the global context.
+///
+/// You can interact with the global context through a [`ContextHandle`] only from the context thread.
+/// To interact with the context from a different thread, use a [`ContextProxy`].
 pub struct ContextHandle<'a, UserEvent: 'static> {
 	context: &'a mut Context<UserEvent>,
 	event_loop: &'a EventLoopWindowTarget<UserEvent>,
 }
 
 impl<UserEvent> Context<UserEvent> {
+	/// Create a new global context.
+	///
+	/// You can theoreticlly create as many as you want,
+	/// but they must be run from the main thread and the [`run`](Self::run) function never returns.
+	/// So you can only *run* a single context.
 	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
 		let instance = wgpu::Instance::new(wgpu::BackendBit::all());
 		let event_loop = EventLoop::with_user_event();
@@ -79,10 +115,12 @@ impl<UserEvent> Context<UserEvent> {
 		})
 	}
 
+	/// Get a proxy for the context to interact with it from a different thread.
 	pub fn proxy(&self) -> ContextProxy<UserEvent> {
 		self.proxy.clone()
 	}
 
+	/// Add a global event handler.
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
 		F: 'static + FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput,
@@ -90,6 +128,10 @@ impl<UserEvent> Context<UserEvent> {
 		self.add_boxed_event_handler(Box::new(handler))
 	}
 
+	/// Add a boxed global event handler.
+	///
+	/// This does the same as [`Self::add_event_handler`],
+	/// but doesn't add another layer of boxing if you already have a boxed function.
 	pub fn add_boxed_event_handler(
 		&mut self,
 		handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput>
@@ -97,6 +139,7 @@ impl<UserEvent> Context<UserEvent> {
 		self.event_handlers.push(handler)
 	}
 
+	/// Add a window-specific event handler.
 	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
 	where
 		F: 'static + FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput,
@@ -109,6 +152,10 @@ impl<UserEvent> Context<UserEvent> {
 		Ok(())
 	}
 
+	/// Add a boxed window-specific event handler.
+	///
+	/// This does the same as [`Self::add_window_event_handler`],
+	/// but doesn't add another layer of boxing if you already have a boxed function.
 	pub fn add_boxed_window_event_handler(
 		&mut self,
 		window_id: WindowId,
@@ -122,6 +169,12 @@ impl<UserEvent> Context<UserEvent> {
 		Ok(())
 	}
 
+	/// Run the event loop of the context.
+	///
+	/// This function must be run from the main thread and never returns.
+	///
+	/// Not all platforms have this restriction,
+	/// but for portability reasons it is enforced on all platforms.
 	pub fn run(mut self) -> ! {
 		let event_loop = self.event_loop.take().unwrap();
 		event_loop.run(move |event, event_loop, control_flow| {
@@ -131,6 +184,7 @@ impl<UserEvent> Context<UserEvent> {
 }
 
 impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
+	/// Create a new context handle.
 	fn new(
 		context: &'a mut Context<UserEvent>,
 		event_loop: &'a EventLoopWindowTarget<UserEvent>,
@@ -138,10 +192,12 @@ impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 		Self { context, event_loop }
 	}
 
+	/// Get a proxy for the context to interact with it from a different thread.
 	pub fn proxy(&self) -> ContextProxy<UserEvent> {
 		self.context.proxy()
 	}
 
+	/// Create a new window.
 	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowHandle<UserEvent>, OsError> {
 		let window_id = self.context.create_window(self.event_loop, title, options)?;
 		Ok(WindowHandle::new(ContextHandle {
@@ -150,18 +206,22 @@ impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 		}, window_id))
 	}
 
+	/// Destroy a window.
 	pub fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
 		self.context.destroy_window(window_id)
 	}
 
+	/// Make a window visible or invisible.
 	pub fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowIdError> {
 		self.context.set_window_visible(window_id, visible)
 	}
 
+	/// Set the image to be displayed on a window.
 	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &Image) -> Result<(), InvalidWindowIdError> {
 		self.context.set_window_image(window_id, name, image)
 	}
 
+	/// Add a global event handler.
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
 		F: 'static + FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput,
@@ -169,10 +229,15 @@ impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 		self.context.add_event_handler(handler);
 	}
 
+	/// Add a boxed global event handler.
+	///
+	/// This does the same as [`Self::add_event_handler`],
+	/// but doesn't add another layer of boxing if you already have a boxed function.
 	pub fn add_boxed_event_handler(&mut self, handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static>) {
 		self.context.add_boxed_event_handler(handler);
 	}
 
+	/// Add a window-specific event handler.
 	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
 	where
 		F: 'static + FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput,
@@ -180,6 +245,10 @@ impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 		self.context.add_window_event_handler(window_id, handler)
 	}
 
+	/// Add a boxed window-specific event handler.
+	///
+	/// This does the same as [`Self::add_window_event_handler`],
+	/// but doesn't add another layer of boxing if you already have a boxed function.
 	pub fn add_boxed_window_event_handler(
 		&mut self,
 		window_id: WindowId,
@@ -190,6 +259,7 @@ impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 }
 
 impl<UserEvent> Context<UserEvent> {
+	/// Create a window.
 	fn create_window(
 		&mut self,
 		event_loop: &EventLoopWindowTarget<UserEvent>,
@@ -227,6 +297,7 @@ impl<UserEvent> Context<UserEvent> {
 		Ok(window_id)
 	}
 
+	/// Destroy a window.
 	fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
 		let index = self.windows.iter().position(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
@@ -234,6 +305,7 @@ impl<UserEvent> Context<UserEvent> {
 		Ok(())
 	}
 
+	/// Make a window visible or invisible.
 	fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowIdError> {
 		let window = self.windows.iter_mut()
 			.find(|w| w.id() == window_id)
@@ -242,6 +314,7 @@ impl<UserEvent> Context<UserEvent> {
 		Ok(())
 	}
 
+	/// Set the image to be displayed on a window.
 	fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &Image) -> Result<(), InvalidWindowIdError> {
 		let window = self.windows.iter_mut()
 			.find(|w| w.id() == window_id)
@@ -253,6 +326,7 @@ impl<UserEvent> Context<UserEvent> {
 		Ok(())
 	}
 
+	/// Resize a window.
 	fn resize_window(&mut self, window_id: WindowId, new_size: winit::dpi::PhysicalSize<u32>) -> Result<(), InvalidWindowIdError> {
 		let window = self.windows
 			.iter_mut()
@@ -264,6 +338,7 @@ impl<UserEvent> Context<UserEvent> {
 		Ok(())
 	}
 
+	/// Render the contents of a window.
 	fn render_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
 		let window = self.windows.iter_mut()
 			.find(|w| w.id() == window_id)
@@ -306,6 +381,7 @@ impl<UserEvent> Context<UserEvent> {
 		Ok(())
 	}
 
+	/// Handle an event from the event loop.
 	fn handle_event(
 		&mut self,
 		event: Event<ContextEvent<UserEvent>>,
@@ -342,6 +418,7 @@ impl<UserEvent> Context<UserEvent> {
 		}
 	}
 
+	/// Run global event handlers.
 	fn run_event_handlers(&mut self, event: &mut Event<UserEvent>, event_loop: &EventLoopWindowTarget<UserEvent>) {
 		// Event handlers could potentially modify the list of event handlers.
 		// Also, even if they couldn't we'd still need borrow self mutably multible times to run the event handlers.
@@ -357,7 +434,7 @@ impl<UserEvent> Context<UserEvent> {
 			} else {
 				let context_handle = ContextHandle::new(self, event_loop);
 				let result = (handler)(context_handle, event);
-				stop_processing = result.stop_processing;
+				stop_processing = result.stop_propagation;
 				!result.remove_handler
 			}
 		});
@@ -367,6 +444,7 @@ impl<UserEvent> Context<UserEvent> {
 		self.event_handlers = event_handlers;
 	}
 
+	/// Run window-specific event handlers.
 	fn run_window_event_handlers(&mut self, window_id: WindowId, event: &mut WindowEvent, event_loop: &EventLoopWindowTarget<UserEvent>) -> bool {
 		let window_index = match self.windows.iter().position(|x| x.id() == window_id) {
 			Some(x) => x,
@@ -383,7 +461,7 @@ impl<UserEvent> Context<UserEvent> {
 				let context_handle = ContextHandle::new(self, event_loop);
 				let window_handle = WindowHandle::new(context_handle, window_id);
 				let result = (handler)(window_handle, event);
-				stop_processing = result.stop_processing;
+				stop_processing = result.stop_propagation;
 				!result.remove_handler
 			}
 		});
@@ -395,6 +473,7 @@ impl<UserEvent> Context<UserEvent> {
 		return !stop_processing;
 	}
 
+	/// Handle a proxy command.
 	fn handle_command(
 		&mut self,
 		command: ContextCommand<UserEvent>,
@@ -423,6 +502,7 @@ impl<UserEvent> Context<UserEvent> {
 	}
 }
 
+/// Get a wgpu device to use.
 async fn get_device(instance: &wgpu::Instance) -> Result<(wgpu::Device, wgpu::Queue), GetDeviceError> {
 	// Find a suitable display adapter.
 	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -445,6 +525,7 @@ async fn get_device(instance: &wgpu::Instance) -> Result<(wgpu::Device, wgpu::Qu
 	Ok((device, queue))
 }
 
+/// Create the bind group layout for the window specific bindings.
 fn create_window_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 	device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("window_bind_group_layout"),
@@ -462,6 +543,7 @@ fn create_window_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
 	})
 }
 
+/// Create the bind group layout for the image specific bindings.
 fn create_image_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 	device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("image_bind_group_layout"),
@@ -489,6 +571,7 @@ fn create_image_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 	})
 }
 
+/// Create a render pipeline with the specified device, layout, shaders and swap chain format.
 fn create_render_pipeline(
 	device: &wgpu::Device,
 	layout: &wgpu::PipelineLayout,
@@ -527,6 +610,7 @@ fn create_render_pipeline(
 	})
 }
 
+/// Create a swap chain for a surface.
 fn create_swap_chain(size: winit::dpi::PhysicalSize<u32>, surface: &wgpu::Surface, format: wgpu::TextureFormat, device: &wgpu::Device) -> wgpu::SwapChain {
 	let swap_chain_desc = wgpu::SwapChainDescriptor {
 		usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
