@@ -18,10 +18,14 @@ use crate::error::OsError;
 use crate::event::Event;
 use crate::event::WindowEvent;
 
-/// Shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
+/// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
+///
+/// Not for use in public APIs.
 type EventLoop = winit::event_loop::EventLoop<ContextFunction>;
 
-/// Shorthand type-alias for the correct [`winit::event_loop::EventLoopWindowTarget`].
+/// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoopWindowTarget`].
+///
+/// Not for use in public APIs.
 type EventLoopWindowTarget = winit::event_loop::EventLoopWindowTarget<ContextFunction>;
 
 /// The global context managing all windows and the main event loop.
@@ -75,9 +79,9 @@ pub struct ContextHandle<'a> {
 impl Context {
 	/// Create a new global context.
 	///
-	/// You can theoreticlly create as many as you want,
+	/// You can theoreticlly create as many contexts as you want,
 	/// but they must be run from the main thread and the [`run`](Self::run) function never returns.
-	/// So you can only *run* a single context.
+	/// So it is not possible to *run* more than one context.
 	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
 		let instance = wgpu::Instance::new(wgpu::BackendBit::all());
 		let event_loop = EventLoop::with_user_event();
