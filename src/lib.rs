@@ -104,7 +104,7 @@ pub use winit::window::WindowId;
 ///
 /// When the `never` type is stabalized, this type alias will change to [`winit::event::Event<!>`].
 /// Do not worry, the library will receive a semver bump when that happens.
-pub type Event<'a> = winit::event::Event<'a, ()>;
+pub type Event<'a> = winit::event::Event<'a, AllWindowsClosed>;
 
 /// Allows a type to be displayed as an image.
 ///

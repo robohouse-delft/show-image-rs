@@ -157,7 +157,14 @@ impl Context {
 	pub fn run(mut self) -> ! {
 		let event_loop = self.event_loop.take().unwrap();
 		event_loop.run(move |event, event_loop, control_flow| {
-			self.handle_event(event, event_loop, control_flow)
+			let initial_window_count = self.windows.len();
+			self.handle_event(event, event_loop, control_flow);
+
+			// Check if the event handlers caused the last window(s) to close.
+			// If so, generate an AllWIndowsClosed event for the event handlers.
+			if self.windows.is_empty() && initial_window_count > 0 {
+				self.run_event_handlers(&mut crate::Event::UserEvent(crate::AllWindowsClosed), event_loop);
+			}
 		});
 	}
 }

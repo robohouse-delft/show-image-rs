@@ -1,3 +1,6 @@
+/// Event indicating that all open windows have been closed.
+pub struct AllWindowsClosed;
+
 /// Control flow properties for event handlers.
 ///
 /// Instances of this struct are passed to event handlers

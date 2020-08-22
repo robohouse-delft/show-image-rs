@@ -8,6 +8,14 @@ fn main() {
 
 	show_image::run_context_with_local_task(move |context| {
 		eprintln!("queued function running!");
+
+		context.add_event_handler(|context, event, _control| {
+			if let show_image::Event::UserEvent(show_image::AllWindowsClosed) = event {
+				eprintln!("last window closed");
+				context.stop();
+			}
+		});
+
 		let mut window = context.create_window("Show Image", WindowOptions::default()).unwrap();
 		window.set_image("image", &image).unwrap();
 		window.set_visible(true).unwrap();
