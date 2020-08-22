@@ -15,7 +15,7 @@ fn main() {
 	context.run();
 }
 
-fn fake_main(image: show_image::Image<'static>, proxy: ContextProxy<()>) {
+fn fake_main(image: show_image::Image<'static>, proxy: ContextProxy) {
 	proxy.run_function_wait(move |context| {
 		eprintln!("queued function running!");
 		let mut window = context.create_window("Show Image", WindowOptions::default()).unwrap();

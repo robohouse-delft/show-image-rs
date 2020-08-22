@@ -97,6 +97,15 @@ pub use winit;
 pub use winit::event;
 pub use winit::window::WindowId;
 
+/// The event type that can be handled by event handlers.
+///
+/// Note that the user event from [`winit::event::Event`] is used internally.
+/// User event handlers will never see a `Event::UserEvent`.
+///
+/// When the `never` type is stabalized, this type alias will change to [`winit::event::Event<!>`].
+/// Do not worry, the library will receive a semver bump when that happens.
+pub type Event<'a> = winit::event::Event<'a, ()>;
+
 /// Allows a type to be displayed as an image.
 ///
 /// Implementations for types from third-party libraries can be enabled using feature flags.

@@ -9,7 +9,7 @@ use crate::error::InvalidWindowIdError;
 use crate::event::WindowEvent;
 
 /// A window.
-pub struct Window<UserEvent: 'static> {
+pub struct Window {
 	/// The winit window.
 	pub(crate) window: winit::window::Window,
 
@@ -29,21 +29,21 @@ pub struct Window<UserEvent: 'static> {
 	pub(crate) image: Option<GpuImage>,
 
 	/// The event handlers for this specific window.
-	pub(crate) event_handlers: Vec<Box<dyn FnMut(WindowHandle<UserEvent>, &mut crate::event::WindowEvent) -> EventHandlerOutput>>,
+	pub(crate) event_handlers: Vec<Box<dyn FnMut(WindowHandle, &mut crate::event::WindowEvent) -> EventHandlerOutput>>,
 }
 
 /// A handle to a window.
-pub struct WindowHandle<'a, UserEvent: 'static> {
+pub struct WindowHandle<'a> {
 	/// The context handle to use.
-	context_handle: ContextHandle<'a, UserEvent>,
+	context_handle: ContextHandle<'a>,
 
 	/// The window ID of the managed window.
 	window_id: WindowId,
 }
 
-impl<'a, UserEvent> WindowHandle<'a, UserEvent> {
+impl<'a> WindowHandle<'a> {
 	/// Create a new window handle from a context handle and a window ID.
-	pub fn new(context_handle: ContextHandle<'a, UserEvent>, window_id: WindowId) -> Self {
+	pub fn new(context_handle: ContextHandle<'a>, window_id: WindowId) -> Self {
 		Self { context_handle, window_id }
 	}
 
@@ -53,12 +53,12 @@ impl<'a, UserEvent> WindowHandle<'a, UserEvent> {
 	}
 
 	/// Get the context handle as mutable reference.
-	pub fn context_handle(&mut self) -> &mut ContextHandle<'a, UserEvent> {
+	pub fn context_handle(&mut self) -> &mut ContextHandle<'a> {
 		&mut self.context_handle
 	}
 
 	/// Destroy the window.
-	pub fn destroy(mut self) -> Result<ContextHandle<'a, UserEvent>, InvalidWindowIdError> {
+	pub fn destroy(mut self) -> Result<ContextHandle<'a>, InvalidWindowIdError> {
 		self.context_handle.destroy_window(self.window_id)?;
 		Ok(self.context_handle)
 	}
@@ -76,7 +76,7 @@ impl<'a, UserEvent> WindowHandle<'a, UserEvent> {
 	/// Add an event handler to the window.
 	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), InvalidWindowIdError>
 	where
-		F: 'static + FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput,
+		F: 'static + FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput,
 	{
 		self.context_handle.add_window_event_handler(self.window_id, handler)
 	}
@@ -87,7 +87,7 @@ impl<'a, UserEvent> WindowHandle<'a, UserEvent> {
 	/// but doesn't add another layer of boxing if you already have a boxed function.
 	pub fn add_boxed_event_handler(
 		&mut self,
-		handler: Box<dyn FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput>,
+		handler: Box<dyn FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput>,
 	) -> Result<(), InvalidWindowIdError> {
 		self.context_handle.add_boxed_window_event_handler(self.window_id, handler)
 	}
@@ -176,7 +176,7 @@ impl WindowOptions {
 	}
 }
 
-impl<UserEvent> Window<UserEvent> {
+impl Window {
 	/// Get the window ID.
 	pub fn id(&self) -> WindowId {
 		self.window.id()

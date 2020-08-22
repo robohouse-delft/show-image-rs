@@ -5,8 +5,8 @@ use crate::Window;
 use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
-use crate::backend::event::downgrade_event;
-use crate::backend::proxy::ContextEvent;
+use crate::backend::event::map_nonuser_event;
+use crate::backend::proxy::ContextFunction;
 use crate::backend::util::RetainMut;
 use crate::backend::util::GpuImage;
 use crate::backend::util::UniformsBuffer;
@@ -19,13 +19,13 @@ use crate::event::Event;
 use crate::event::WindowEvent;
 
 /// Shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
-type EventLoop<UserEvent> = winit::event_loop::EventLoop<ContextEvent<UserEvent>>;
+type EventLoop = winit::event_loop::EventLoop<ContextFunction>;
 
 /// Shorthand type-alias for the correct [`winit::event_loop::EventLoopWindowTarget`].
-type EventLoopWindowTarget<UserEvent> = winit::event_loop::EventLoopWindowTarget<ContextEvent<UserEvent>>;
+type EventLoopWindowTarget = winit::event_loop::EventLoopWindowTarget<ContextFunction>;
 
 /// The global context managing all windows and the main event loop.
-pub struct Context<UserEvent: 'static> {
+pub struct Context {
 	/// The wgpu instance to create surfaces with.
 	instance: wgpu::Instance,
 
@@ -33,10 +33,10 @@ pub struct Context<UserEvent: 'static> {
 	///
 	/// Running the event loop consumes it,
 	/// so from that point on this field is `None`.
-	event_loop: Option<EventLoop<UserEvent>>,
+	event_loop: Option<EventLoop>,
 
 	/// A proxy object to clone for new requests.
-	proxy: ContextProxy<UserEvent>,
+	proxy: ContextProxy,
 
 	/// The wgpu device to use.
 	device: wgpu::Device,
@@ -57,22 +57,22 @@ pub struct Context<UserEvent: 'static> {
 	render_pipeline: wgpu::RenderPipeline,
 
 	/// The windows.
-	windows: Vec<Window<UserEvent>>,
+	windows: Vec<Window>,
 
 	/// The global event handlers.
-	event_handlers: Vec<Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static>>,
+	event_handlers: Vec<Box<dyn FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput + 'static>>,
 }
 
 /// A handle to the global context.
 ///
 /// You can interact with the global context through a [`ContextHandle`] only from the context thread.
 /// To interact with the context from a different thread, use a [`ContextProxy`].
-pub struct ContextHandle<'a, UserEvent: 'static> {
-	context: &'a mut Context<UserEvent>,
-	event_loop: &'a EventLoopWindowTarget<UserEvent>,
+pub struct ContextHandle<'a> {
+	context: &'a mut Context,
+	event_loop: &'a EventLoopWindowTarget,
 }
 
-impl<UserEvent> Context<UserEvent> {
+impl Context {
 	/// Create a new global context.
 	///
 	/// You can theoreticlly create as many as you want,
@@ -115,14 +115,14 @@ impl<UserEvent> Context<UserEvent> {
 	}
 
 	/// Get a proxy for the context to interact with it from a different thread.
-	pub fn proxy(&self) -> ContextProxy<UserEvent> {
+	pub fn proxy(&self) -> ContextProxy {
 		self.proxy.clone()
 	}
 
 	/// Add a global event handler.
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
-		F: 'static + FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput,
+		F: 'static + FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput,
 	{
 		self.add_boxed_event_handler(Box::new(handler))
 	}
@@ -133,7 +133,7 @@ impl<UserEvent> Context<UserEvent> {
 	/// but doesn't add another layer of boxing if you already have a boxed function.
 	pub fn add_boxed_event_handler(
 		&mut self,
-		handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput>
+		handler: Box<dyn FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput>
 	) {
 		self.event_handlers.push(handler)
 	}
@@ -141,7 +141,7 @@ impl<UserEvent> Context<UserEvent> {
 	/// Add a window-specific event handler.
 	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
 	where
-		F: 'static + FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput,
+		F: 'static + FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput,
 	{
 		let window = self.windows.iter_mut()
 			.find(|x| x.id() == window_id)
@@ -158,7 +158,7 @@ impl<UserEvent> Context<UserEvent> {
 	pub fn add_boxed_window_event_handler(
 		&mut self,
 		window_id: WindowId,
-		handler: Box<dyn FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput>,
+		handler: Box<dyn FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput>,
 	) -> Result<(), InvalidWindowIdError> {
 		let window = self.windows.iter_mut()
 			.find(|x| x.id() == window_id)
@@ -182,22 +182,22 @@ impl<UserEvent> Context<UserEvent> {
 	}
 }
 
-impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
+impl<'a> ContextHandle<'a> {
 	/// Create a new context handle.
 	fn new(
-		context: &'a mut Context<UserEvent>,
-		event_loop: &'a EventLoopWindowTarget<UserEvent>,
+		context: &'a mut Context,
+		event_loop: &'a EventLoopWindowTarget,
 	) -> Self {
 		Self { context, event_loop }
 	}
 
 	/// Get a proxy for the context to interact with it from a different thread.
-	pub fn proxy(&self) -> ContextProxy<UserEvent> {
+	pub fn proxy(&self) -> ContextProxy {
 		self.context.proxy()
 	}
 
 	/// Create a new window.
-	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowHandle<UserEvent>, OsError> {
+	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowHandle, OsError> {
 		let window_id = self.context.create_window(self.event_loop, title, options)?;
 		Ok(WindowHandle::new(ContextHandle {
 			context: self.context,
@@ -223,7 +223,7 @@ impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 	/// Add a global event handler.
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
-		F: 'static + FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput,
+		F: 'static + FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput,
 	{
 		self.context.add_event_handler(handler);
 	}
@@ -232,14 +232,14 @@ impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 	///
 	/// This does the same as [`Self::add_event_handler`],
 	/// but doesn't add another layer of boxing if you already have a boxed function.
-	pub fn add_boxed_event_handler(&mut self, handler: Box<dyn FnMut(ContextHandle<UserEvent>, &mut Event<UserEvent>) -> EventHandlerOutput + 'static>) {
+	pub fn add_boxed_event_handler(&mut self, handler: Box<dyn FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput + 'static>) {
 		self.context.add_boxed_event_handler(handler);
 	}
 
 	/// Add a window-specific event handler.
 	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
 	where
-		F: 'static + FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput,
+		F: 'static + FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput,
 	{
 		self.context.add_window_event_handler(window_id, handler)
 	}
@@ -251,17 +251,17 @@ impl<'a, UserEvent: 'static> ContextHandle<'a, UserEvent> {
 	pub fn add_boxed_window_event_handler(
 		&mut self,
 		window_id: WindowId,
-		handler: Box<dyn FnMut(WindowHandle<UserEvent>, &mut WindowEvent) -> EventHandlerOutput>,
+		handler: Box<dyn FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput>,
 	) -> Result<(), InvalidWindowIdError> {
 		self.context.add_boxed_window_event_handler(window_id, handler)
 	}
 }
 
-impl<UserEvent> Context<UserEvent> {
+impl Context {
 	/// Create a window.
 	fn create_window(
 		&mut self,
-		event_loop: &EventLoopWindowTarget<UserEvent>,
+		event_loop: &EventLoopWindowTarget,
 		title: impl Into<String>,
 		options: WindowOptions,
 	) -> Result<WindowId, OsError> {
@@ -383,17 +383,17 @@ impl<UserEvent> Context<UserEvent> {
 	/// Handle an event from the event loop.
 	fn handle_event(
 		&mut self,
-		event: Event<ContextEvent<UserEvent>>,
-		event_loop: &EventLoopWindowTarget<UserEvent>,
+		event: Event<ContextFunction>,
+		event_loop: &EventLoopWindowTarget,
 		control_flow: &mut winit::event_loop::ControlFlow,
 	) {
 		*control_flow = winit::event_loop::ControlFlow::Poll;
 
-		// Split between Event<UserEvent> and ExecuteFunction commands.
-		let mut event = match downgrade_event(event) {
+		// Split between Event<ContextFunction> and ContextFunction commands.
+		let mut event = match map_nonuser_event(event) {
 			Ok(event) => event,
-			Err(command) => {
-				(command.function)(&mut ContextHandle::new(self, event_loop));
+			Err(function) => {
+				(function)(&mut ContextHandle::new(self, event_loop));
 				return;
 			},
 		};
@@ -422,7 +422,7 @@ impl<UserEvent> Context<UserEvent> {
 	}
 
 	/// Run global event handlers.
-	fn run_event_handlers(&mut self, event: &mut Event<UserEvent>, event_loop: &EventLoopWindowTarget<UserEvent>) {
+	fn run_event_handlers(&mut self, event: &mut crate::Event, event_loop: &EventLoopWindowTarget) {
 		// Event handlers could potentially modify the list of event handlers.
 		// Also, even if they couldn't we'd still need borrow self mutably multible times to run the event handlers.
 		// That's not allowed, of course, so temporarily swap the event handlers with a new vector.
@@ -448,7 +448,7 @@ impl<UserEvent> Context<UserEvent> {
 	}
 
 	/// Run window-specific event handlers.
-	fn run_window_event_handlers(&mut self, window_id: WindowId, event: &mut WindowEvent, event_loop: &EventLoopWindowTarget<UserEvent>) -> bool {
+	fn run_window_event_handlers(&mut self, window_id: WindowId, event: &mut WindowEvent, event_loop: &EventLoopWindowTarget) -> bool {
 		let window_index = match self.windows.iter().position(|x| x.id() == window_id) {
 			Some(x) => x,
 			None => return true,
