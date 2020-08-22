@@ -28,6 +28,8 @@ pub struct WindowProxy {
 pub type ContextFunction = Box<dyn FnOnce(&mut ContextHandle) + Send>;
 
 /// Internal shorthand for the correct `winit::event::EventLoopProxy`.
+///
+/// Not for use in public APIs.
 type EventLoopProxy = winit::event_loop::EventLoopProxy<ContextFunction>;
 
 impl ContextProxy {

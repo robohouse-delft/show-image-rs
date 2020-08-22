@@ -80,17 +80,6 @@ impl<'a> WindowHandle<'a> {
 	{
 		self.context_handle.add_window_event_handler(self.window_id, handler)
 	}
-
-	/// Add an event handler to the window.
-	///
-	/// This does the same as [`Self::add_event_handler`],
-	/// but doesn't add another layer of boxing if you already have a boxed function.
-	pub fn add_boxed_event_handler(
-		&mut self,
-		handler: Box<dyn FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput>,
-	) -> Result<(), InvalidWindowIdError> {
-		self.context_handle.add_boxed_window_event_handler(self.window_id, handler)
-	}
 }
 
 #[derive(Debug, Clone)]

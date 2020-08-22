@@ -124,18 +124,7 @@ impl Context {
 	where
 		F: 'static + FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput,
 	{
-		self.add_boxed_event_handler(Box::new(handler))
-	}
-
-	/// Add a boxed global event handler.
-	///
-	/// This does the same as [`Self::add_event_handler`],
-	/// but doesn't add another layer of boxing if you already have a boxed function.
-	pub fn add_boxed_event_handler(
-		&mut self,
-		handler: Box<dyn FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput>
-	) {
-		self.event_handlers.push(handler)
+		self.event_handlers.push(Box::new(handler))
 	}
 
 	/// Add a window-specific event handler.
@@ -148,23 +137,6 @@ impl Context {
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
 		window.event_handlers.push(Box::new(handler));
-		Ok(())
-	}
-
-	/// Add a boxed window-specific event handler.
-	///
-	/// This does the same as [`Self::add_window_event_handler`],
-	/// but doesn't add another layer of boxing if you already have a boxed function.
-	pub fn add_boxed_window_event_handler(
-		&mut self,
-		window_id: WindowId,
-		handler: Box<dyn FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput>,
-	) -> Result<(), InvalidWindowIdError> {
-		let window = self.windows.iter_mut()
-			.find(|x| x.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
-
-		window.event_handlers.push(handler);
 		Ok(())
 	}
 
@@ -228,32 +200,12 @@ impl<'a> ContextHandle<'a> {
 		self.context.add_event_handler(handler);
 	}
 
-	/// Add a boxed global event handler.
-	///
-	/// This does the same as [`Self::add_event_handler`],
-	/// but doesn't add another layer of boxing if you already have a boxed function.
-	pub fn add_boxed_event_handler(&mut self, handler: Box<dyn FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput + 'static>) {
-		self.context.add_boxed_event_handler(handler);
-	}
-
 	/// Add a window-specific event handler.
 	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
 	where
 		F: 'static + FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput,
 	{
 		self.context.add_window_event_handler(window_id, handler)
-	}
-
-	/// Add a boxed window-specific event handler.
-	///
-	/// This does the same as [`Self::add_window_event_handler`],
-	/// but doesn't add another layer of boxing if you already have a boxed function.
-	pub fn add_boxed_window_event_handler(
-		&mut self,
-		window_id: WindowId,
-		handler: Box<dyn FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput>,
-	) -> Result<(), InvalidWindowIdError> {
-		self.context.add_boxed_window_event_handler(window_id, handler)
 	}
 }
 
