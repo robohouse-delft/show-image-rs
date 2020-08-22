@@ -65,6 +65,9 @@ pub struct Context {
 
 	/// The global event handlers.
 	event_handlers: Vec<Box<dyn FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput + 'static>>,
+
+	/// Flag indicating the context should stop after processing all queued events.
+	stop: bool,
 }
 
 /// A handle to the global context.
@@ -115,6 +118,7 @@ impl Context {
 			render_pipeline,
 			windows: Vec::new(),
 			event_handlers: Vec::new(),
+			stop: false,
 		})
 	}
 
@@ -170,6 +174,11 @@ impl<'a> ContextHandle<'a> {
 	/// Get a proxy for the context to interact with it from a different thread.
 	pub fn proxy(&self) -> ContextProxy {
 		self.context.proxy()
+	}
+
+	/// Stop the context thread as soon as possible.
+	pub fn stop(&mut self) {
+		self.context.stop = true;
 	}
 
 	/// Create a new window.
@@ -343,7 +352,12 @@ impl Context {
 		event_loop: &EventLoopWindowTarget,
 		control_flow: &mut winit::event_loop::ControlFlow,
 	) {
-		*control_flow = winit::event_loop::ControlFlow::Poll;
+		if self.stop {
+			*control_flow = winit::event_loop::ControlFlow::Exit;
+			return;
+		}
+
+		*control_flow = winit::event_loop::ControlFlow::Wait;
 
 		// Split between Event<ContextFunction> and ContextFunction commands.
 		let mut event = match map_nonuser_event(event) {
