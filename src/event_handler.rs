@@ -1,6 +1,9 @@
-/// Return value for event handlers.
-#[derive(Debug, Clone, Default)]
-pub struct EventHandlerOutput {
+/// Control flow properties for event handlers.
+///
+/// Instances of this struct are passed to event handlers
+/// to allow them to remove themselves and to stop event propagation.
+#[derive(Debug, Default, Clone)]
+pub struct EventHandlerControlFlow {
 	/// Remove the event handler after it returned.
 	pub remove_handler: bool,
 

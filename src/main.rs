@@ -11,9 +11,8 @@ fn main() {
 		let mut window = context.create_window("Show Image", WindowOptions::default()).unwrap();
 		window.set_image("image", &image).unwrap();
 		window.set_visible(true).unwrap();
-		window.add_event_handler(|window, event| {
+		window.add_event_handler(|window, event, _control| {
 			eprintln!("received event for window {:?}: {:#?}", window.id(), event);
-			Default::default()
 		}).unwrap();
 	}).unwrap();
 }

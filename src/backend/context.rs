@@ -1,5 +1,5 @@
 use crate::ContextProxy;
-use crate::EventHandlerOutput;
+use crate::EventHandlerControlFlow;
 use crate::Image;
 use crate::Window;
 use crate::WindowHandle;
@@ -7,8 +7,8 @@ use crate::WindowId;
 use crate::WindowOptions;
 use crate::backend::event::map_nonuser_event;
 use crate::backend::proxy::ContextFunction;
-use crate::backend::util::RetainMut;
 use crate::backend::util::GpuImage;
+use crate::backend::util::RetainMut;
 use crate::backend::util::UniformsBuffer;
 use crate::backend::window::WindowUniforms;
 use crate::error::GetDeviceError;
@@ -64,7 +64,7 @@ pub struct Context {
 	windows: Vec<Window>,
 
 	/// The global event handlers.
-	event_handlers: Vec<Box<dyn FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput + 'static>>,
+	event_handlers: Vec<Box<dyn FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + 'static>>,
 
 	/// Flag indicating the context should stop after processing all queued events.
 	stop: bool,
@@ -130,7 +130,7 @@ impl Context {
 	/// Add a global event handler.
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
-		F: 'static + FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput,
+		F: 'static + FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow),
 	{
 		self.event_handlers.push(Box::new(handler))
 	}
@@ -138,7 +138,7 @@ impl Context {
 	/// Add a window-specific event handler.
 	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
 	where
-		F: 'static + FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput,
+		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{
 		let window = self.windows.iter_mut()
 			.find(|x| x.id() == window_id)
@@ -208,7 +208,7 @@ impl<'a> ContextHandle<'a> {
 	/// Add a global event handler.
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
-		F: 'static + FnMut(ContextHandle, &mut crate::Event) -> EventHandlerOutput,
+		F: 'static + FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow),
 	{
 		self.context.add_event_handler(handler);
 	}
@@ -216,7 +216,7 @@ impl<'a> ContextHandle<'a> {
 	/// Add a window-specific event handler.
 	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
 	where
-		F: 'static + FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput,
+		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{
 		self.context.add_window_event_handler(window_id, handler)
 	}
@@ -400,15 +400,16 @@ impl Context {
 		// https://newfastuff.com/wp-content/uploads/2019/05/dVIkgAf.png
 		let mut event_handlers = std::mem::replace(&mut self.event_handlers, Vec::new());
 
-		let mut stop_processing = false;
+		let mut stop_propagation = false;
 		event_handlers.retain_mut(|handler| {
-			if stop_processing {
+			if stop_propagation {
 				false
 			} else {
-				let context_handle = ContextHandle::new(self, event_loop);
-				let result = (handler)(context_handle, event);
-				stop_processing = result.stop_propagation;
-				!result.remove_handler
+				let mut context_handle = ContextHandle::new(self, event_loop);
+				let mut control = EventHandlerControlFlow::default();
+				(handler)(&mut context_handle, event, &mut control);
+				stop_propagation = control.stop_propagation;
+				!control.remove_handler
 			}
 		});
 
@@ -426,16 +427,17 @@ impl Context {
 
 		let mut event_handlers = std::mem::replace(&mut self.windows[window_index].event_handlers, Vec::new());
 
-		let mut stop_processing = false;
+		let mut stop_propagation = false;
 		event_handlers.retain_mut(|handler| {
-			if stop_processing {
+			if stop_propagation {
 				false
 			} else {
 				let context_handle = ContextHandle::new(self, event_loop);
-				let window_handle = WindowHandle::new(context_handle, window_id);
-				let result = (handler)(window_handle, event);
-				stop_processing = result.stop_propagation;
-				!result.remove_handler
+				let mut window_handle = WindowHandle::new(context_handle, window_id);
+				let mut control = EventHandlerControlFlow::default();
+				(handler)(&mut window_handle, event, &mut control);
+				stop_propagation = control.stop_propagation;
+				!control.remove_handler
 			}
 		});
 
@@ -443,7 +445,7 @@ impl Context {
 		event_handlers.extend(new_event_handlers);
 		self.windows[window_index].event_handlers = event_handlers;
 
-		return !stop_processing;
+		return !stop_propagation;
 	}
 }
 

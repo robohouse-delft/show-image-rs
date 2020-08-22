@@ -1,6 +1,6 @@
 use crate::Color;
 use crate::ContextHandle;
-use crate::EventHandlerOutput;
+use crate::EventHandlerControlFlow;
 use crate::Image;
 use crate::WindowId;
 use crate::backend::util::GpuImage;
@@ -29,7 +29,7 @@ pub struct Window {
 	pub(crate) image: Option<GpuImage>,
 
 	/// The event handlers for this specific window.
-	pub(crate) event_handlers: Vec<Box<dyn FnMut(WindowHandle, &mut crate::event::WindowEvent) -> EventHandlerOutput>>,
+	pub(crate) event_handlers: Vec<Box<dyn FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow)>>,
 }
 
 /// A handle to a window.
@@ -76,7 +76,7 @@ impl<'a> WindowHandle<'a> {
 	/// Add an event handler to the window.
 	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), InvalidWindowIdError>
 	where
-		F: 'static + FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput,
+		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{
 		self.context_handle.add_window_event_handler(self.window_id, handler)
 	}

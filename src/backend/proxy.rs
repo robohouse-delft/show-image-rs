@@ -1,6 +1,5 @@
 use crate::ContextHandle;
-use crate::Event;
-use crate::EventHandlerOutput;
+use crate::EventHandlerControlFlow;
 use crate::Image;
 use crate::WindowHandle;
 use crate::WindowId;
@@ -111,7 +110,7 @@ impl ContextProxy {
 	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
 	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), EventLoopClosedError>
 	where
-		F: FnMut(ContextHandle, &mut Event) -> EventHandlerOutput + Send + 'static,
+		F: FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + Send + 'static,
 	{
 		self.run_function_wait(move |context| {
 			context.add_event_handler(handler)
@@ -126,7 +125,7 @@ impl ContextProxy {
 	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
 	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), ProxyWindowOperationError>
 	where
-		F: FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput + Send + 'static,
+		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
 		self.run_function_wait(move |context| {
 			context.add_window_event_handler(window_id, handler)
@@ -217,7 +216,7 @@ impl WindowProxy {
 	/// To avoid blocking, you can use [`ContextHandle::run_function`] to post a lambda that adds an error handler instead.
 	pub fn add_window_event_handler<F>(&mut self, handler: F) -> Result<(), ProxyWindowOperationError>
 	where
-		F: FnMut(WindowHandle, &mut WindowEvent) -> EventHandlerOutput + Send + 'static,
+		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
 		self.context_proxy.add_window_event_handler(self.window_id, handler)
 	}
