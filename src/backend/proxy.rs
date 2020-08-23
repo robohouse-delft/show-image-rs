@@ -120,7 +120,7 @@ impl ContextProxy {
 	///
 	/// This function uses [`Self::run_function_wait`] internally, so it blocks until the event handler is added.
 	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
-	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), EventLoopClosedError>
+	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), EventLoopClosedError>
 	where
 		F: FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + Send + 'static,
 	{
@@ -135,7 +135,7 @@ impl ContextProxy {
 	///
 	/// This function uses [`Self::run_function_wait`] internally, so it blocks until the event handler is added.
 	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
-	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), ProxyWindowOperationError>
+	pub fn add_window_event_handler<F>(&self, window_id: WindowId, handler: F) -> Result<(), ProxyWindowOperationError>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
@@ -226,7 +226,7 @@ impl WindowProxy {
 	///
 	/// This function uses [`ContextHandle::run_function_wait`] internally, so it blocks until the event handler is added.
 	/// To avoid blocking, you can use [`ContextHandle::run_function`] to post a lambda that adds an error handler instead.
-	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), ProxyWindowOperationError>
+	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), ProxyWindowOperationError>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
