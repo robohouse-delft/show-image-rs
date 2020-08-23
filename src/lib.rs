@@ -97,6 +97,9 @@ pub use winit;
 pub use winit::event;
 pub use winit::window::WindowId;
 
+#[cfg(feature = "macros")]
+pub use show_image_macros::main;
+
 /// The event type that can be handled by event handlers.
 ///
 /// Note that the user event from [`winit::event::Event`] is used internally.

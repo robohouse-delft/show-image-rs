@@ -1,0 +1,18 @@
+[package]
+name = "show-image-macros"
+version = "0.7.0"
+license = "BSD-2-Clause"
+description  = "macros for the show-image crate"
+edition = "2018"
+
+repository = "https://github.com/robohouse-delft/show-image-rs"
+
+authors = ["Maarten de Vries <maarten@de-vri.es>"]
+
+[lib]
+proc_macro = true
+
+[dependencies]
+quote = "1.0.7"
+proc-macro2 = "1.0.19"
+syn = { version = "1.0.39", features = ["full"] }
