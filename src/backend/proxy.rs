@@ -220,13 +220,13 @@ impl WindowProxy {
 		self.context_proxy.set_window_image(self.window_id, name, image)
 	}
 
-	/// Add an event handler for a specific window.
+	/// Add an event handler for the window.
 	///
 	/// Events that are already queued with the event loop will not be passed to the handler.
 	///
 	/// This function uses [`ContextHandle::run_function_wait`] internally, so it blocks until the event handler is added.
 	/// To avoid blocking, you can use [`ContextHandle::run_function`] to post a lambda that adds an error handler instead.
-	pub fn add_window_event_handler<F>(&mut self, handler: F) -> Result<(), ProxyWindowOperationError>
+	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), ProxyWindowOperationError>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
