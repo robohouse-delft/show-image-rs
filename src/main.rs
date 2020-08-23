@@ -1,10 +1,8 @@
 use show_image::WindowOptions;
-use show_image::ImageData;
 
 fn main() {
 	let args : Vec<_> = std::env::args().collect();
 	let image = image::open(args.get(1).unwrap()).unwrap();
-	let image = image.into_image().unwrap();
 
 	show_image::run_context_with_local_task(move |context| {
 		eprintln!("queued function running!");

@@ -1,8 +1,10 @@
 use crate::BoxImage;
 use crate::Image;
-use crate::ImageData;
 use crate::ImageInfo;
 use crate::PixelFormat;
+use crate::error::ImageDataError;
+
+// TODO: support premultiplied alpha in shader, and implement ImageData too.
 
 fn divide_by_alpha(data: &mut [u8]) {
 	for i in 0..(data.len() / 4) {
@@ -15,23 +17,14 @@ fn divide_by_alpha(data: &mut [u8]) {
 	}
 }
 
-impl ImageData for raqote::DrawTarget {
-	type Error = String;
+impl std::convert::TryFrom<raqote::DrawTarget> for Image {
+	type Error = ImageDataError;
 
-	fn image(&self) -> Result<Image, String> {
-		let info = draw_target_info(self)?;
+	fn try_from(other: raqote::DrawTarget) -> Result<Self, Self::Error> {
+		let info = draw_target_info(&other)?;
 
-		let mut buffer = Box::from(self.get_data_u8());
-		divide_by_alpha(&mut buffer);
-
-		Ok(BoxImage::new(info, buffer).into())
-	}
-
-	fn into_image(self) -> Result<Image<'static>, String> {
-		let info = draw_target_info(&self)?;
-
-		let length = self.get_data_u8().len();
-		let buffer = Box::into_raw(self.into_vec().into_boxed_slice()) as *mut u8;
+		let length = other.get_data_u8().len();
+		let buffer = Box::into_raw(other.into_vec().into_boxed_slice()) as *mut u8;
 		let mut buffer = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(buffer, length)) };
 		divide_by_alpha(&mut buffer);
 
@@ -39,45 +32,30 @@ impl ImageData for raqote::DrawTarget {
 	}
 }
 
-impl ImageData for &'_ raqote::DrawTarget {
-	type Error = String;
+impl std::convert::TryFrom<&raqote::DrawTarget> for Image {
+	type Error = ImageDataError;
 
-	fn image(&self) -> Result<Image, String> {
-		(*self).image()
-	}
+	fn try_from(other: &raqote::DrawTarget) -> Result<Self, Self::Error> {
+		let info = draw_target_info(&other)?;
 
-	fn into_image(self) -> Result<Image<'static>, String> {
-		Ok(self.image()?.into_owned())
-	}
-}
-
-impl<'a> ImageData for raqote::Image<'a> {
-	type Error = String;
-
-	fn image(&self) -> Result<Image, String> {
-		let info = image_info(self)?;
-
-		let buffer = self.data.as_ptr() as *const u8;
-		let mut buffer = unsafe { Box::from(std::slice::from_raw_parts(buffer, self.data.len() * 4)) };
+		let mut buffer = Box::from(other.get_data_u8());
 		divide_by_alpha(&mut buffer);
 
 		Ok(BoxImage::new(info, buffer).into())
 	}
-
-	fn into_image(self) -> Result<Image<'static>, String> {
-		Ok(self.image()?.into_owned())
-	}
 }
 
-impl<'a> ImageData for &'_ raqote::Image<'a> {
-	type Error = String;
+impl std::convert::TryFrom<raqote::Image<'_>> for Image {
+	type Error = ImageDataError;
 
-	fn image(&self) -> Result<Image, String> {
-		(*self).image()
-	}
+	fn try_from(other: raqote::Image) -> Result<Self, Self::Error> {
+		let info = image_info(&other)?;
 
-	fn into_image(self) -> Result<Image<'static>, String> {
-		Ok(self.image()?.into_owned())
+		let buffer = other.data.as_ptr() as *const u8;
+		let mut buffer = unsafe { Box::from(std::slice::from_raw_parts(buffer, other.data.len() * 4)) };
+		divide_by_alpha(&mut buffer);
+
+		Ok(BoxImage::new(info, buffer).into())
 	}
 }
 

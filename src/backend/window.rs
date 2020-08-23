@@ -1,11 +1,12 @@
 use crate::Color;
 use crate::ContextHandle;
 use crate::EventHandlerControlFlow;
-use crate::Image;
+use crate::AsImageView;
 use crate::WindowId;
 use crate::backend::util::GpuImage;
 use crate::backend::util::UniformsBuffer;
 use crate::error::InvalidWindowIdError;
+use crate::error::SetImageError;
 use crate::event::WindowEvent;
 
 /// A window.
@@ -69,7 +70,7 @@ impl<'a> WindowHandle<'a> {
 	}
 
 	/// Set the image to display on the window.
-	pub fn set_image(&mut self, name: impl AsRef<str>, image: &Image) -> Result<(), InvalidWindowIdError> {
+	pub fn set_image(&mut self, name: impl AsRef<str>, image: &impl AsImageView) -> Result<(), SetImageError> {
 		self.context_handle.set_window_image(self.window_id, name.as_ref(), image)
 	}
 

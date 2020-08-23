@@ -31,9 +31,9 @@
 
 use crate::BoxImage;
 use crate::Image;
-use crate::ImageData;
 use crate::ImageInfo;
 use crate::PixelFormat;
+use crate::error::ImageDataError;
 
 /// Wrapper for [`tch::Tensor`] that implements [`ImageData`].
 pub struct TensorImage<'a> {
@@ -76,15 +76,15 @@ pub trait TensorAsImage {
 	/// or a preferred color format to have the library guess based on the tensor shape.
 	///
 	/// See the other functions in the trait for easier shorthands.
-	fn as_image<'a>(&'a self, pixel_format: TensorPixelFormat) -> Result<TensorImage<'a>, String>;
+	fn as_image<'a>(&'a self, pixel_format: TensorPixelFormat) -> Result<TensorImage<'a>, ImageDataError>;
 
 	/// Wrap the tensor with a known pixel format in a [`TensorImage`], assuming it holds interlaced pixel data.
-	fn as_interlaced<'a>(&'a self, pixel_format: PixelFormat) -> Result<TensorImage<'a>, String> {
+	fn as_interlaced<'a>(&'a self, pixel_format: PixelFormat) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_image(TensorPixelFormat::Interlaced(pixel_format))
 	}
 
 	/// Wrap the tensor with a known pixel format in a [`TensorImage`], assuming it holds planaer pixel data.
-	fn as_planar<'a>(&'a self, pixel_format: PixelFormat) -> Result<TensorImage<'a>, String> {
+	fn as_planar<'a>(&'a self, pixel_format: PixelFormat) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_image(TensorPixelFormat::Planar(pixel_format))
 	}
 
@@ -92,7 +92,7 @@ pub trait TensorAsImage {
 	///
 	/// The pixel format of the tensor will be guessed based on the shape.
 	/// The `color_format` argument determines if tensors with 3 or 4 channels are interpreted as RGB or BGR.
-	fn as_image_guess<'a>(&'a self, color_format: ColorFormat) -> Result<TensorImage<'a>, String> {
+	fn as_image_guess<'a>(&'a self, color_format: ColorFormat) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_image(TensorPixelFormat::Guess(color_format))
 	}
 
@@ -100,7 +100,7 @@ pub trait TensorAsImage {
 	///
 	/// The pixel format of the tensor will be guessed based on the shape.
 	/// Tensors with 3 or 4 channels will be interpreted as RGB.
-	fn as_image_guess_rgb<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_image_guess_rgb<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_image_guess(ColorFormat::Rgb)
 	}
 
@@ -108,58 +108,58 @@ pub trait TensorAsImage {
 	///
 	/// The pixel format of the tensor will be guessed based on the shape.
 	/// Tensors with 3 or 4 channels will be interpreted as BGR.
-	fn as_image_guess_bgr<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_image_guess_bgr<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_image_guess(ColorFormat::Bgr)
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds monochrome data.
-	fn as_mono8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_mono8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_interlaced(PixelFormat::Mono8)
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced RGB data.
-	fn as_interlaced_rgb8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_interlaced_rgb8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_interlaced(PixelFormat::Rgb8)
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced RGBA data.
-	fn as_interlaced_rgba8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_interlaced_rgba8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_interlaced(PixelFormat::Rgba8)
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced BGR data.
-	fn as_interlaced_bgr8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_interlaced_bgr8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_interlaced(PixelFormat::Bgr8)
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced BGRA data.
-	fn as_interlaced_bgra8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_interlaced_bgra8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_interlaced(PixelFormat::Bgra8)
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar RGB data.
-	fn as_planar_rgb8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_planar_rgb8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_planar(PixelFormat::Rgb8)
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar RGBA data.
-	fn as_planar_rgba8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_planar_rgba8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_planar(PixelFormat::Rgba8)
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar BGR data.
-	fn as_planar_bgr8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_planar_bgr8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_planar(PixelFormat::Bgr8)
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar BGRA data.
-	fn as_planar_bgra8<'a>(&'a self) -> Result<TensorImage<'a>, String> {
+	fn as_planar_bgra8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_planar(PixelFormat::Bgra8)
 	}
 }
 
 impl TensorAsImage for tch::Tensor {
-	fn as_image(&self, pixel_format: TensorPixelFormat) -> Result<TensorImage, String> {
+	fn as_image(&self, pixel_format: TensorPixelFormat) -> Result<TensorImage, ImageDataError> {
 		let (planar, info) = match pixel_format {
 			TensorPixelFormat::Planar(pixel_format)     => tensor_info(self, pixel_format, true)?,
 			TensorPixelFormat::Interlaced(pixel_format) => tensor_info(self, pixel_format, false)?,
@@ -169,21 +169,23 @@ impl TensorAsImage for tch::Tensor {
 	}
 }
 
-impl ImageData for TensorImage<'_> {
-	type Error = ();
-
-	fn image(&self) -> Result<Image<'static>, Self::Error> {
-		let buffer = if self.planar {
-			Vec::<u8>::from(self.tensor.permute(&[1, 2, 0])).into_boxed_slice()
-		} else {
-			Vec::<u8>::from(self.tensor).into_boxed_slice()
+impl<'a> From<TensorImage<'a>> for Image {
+	fn from(other: TensorImage<'a>) -> Self {
+		let data: Vec<u8> = match other.planar {
+			true => other.tensor.permute(&[1, 2, 0]).into(),
+			false => other.tensor.into(),
 		};
 
-		Ok(BoxImage::new(self.info, buffer).into())
+		BoxImage::new(other.info, data.into_boxed_slice()).into()
 	}
+}
 
-	fn into_image(self) -> Result<Image<'static>, Self::Error> {
-		Ok(self.image()?.into_owned())
+impl<'a> From<Result<TensorImage<'a>, ImageDataError>> for Image {
+	fn from(other: Result<TensorImage<'a>, ImageDataError>) -> Self {
+		match other {
+			Ok(x) => x.into(),
+			Err(e) => Image::Invalid(e),
+		}
 	}
 }
 

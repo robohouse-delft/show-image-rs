@@ -106,31 +106,6 @@ pub use winit::window::WindowId;
 /// Do not worry, the library will receive a semver bump when that happens.
 pub type Event<'a> = winit::event::Event<'a, AllWindowsClosed>;
 
-/// Allows a type to be displayed as an image.
-///
-/// Implementations for types from third-party libraries can be enabled using feature flags.
-pub trait ImageData {
-	type Error;
-
-	/// Get a potentially borrowed [`Image`].
-	fn image<'a>(&'a self) -> Result<Image<'a>, Self::Error>;
-
-	/// Consumse self and return an [`Image`] object.
-	///
-	/// This function is used to avoid copying the image data when `self` can be consumed.
-	fn into_image(self) -> Result<Image<'static>, Self::Error>;
-
-	/// Get an owning [`Image`] object.
-	///
-	/// This function is not allowed to return a value that borrows self.
-	///
-	/// The default implemention delegates to `self.image()` and copies the data.
-	/// Types that own an `Arc<[u8]>` should override this to avoid copying the data.
-	fn owned_image(&self) -> Result<Image<'static>, Self::Error> {
-		Ok(self.image()?.into_owned())
-	}
-}
-
 /// Save an image to the given path.
 #[cfg(feature = "save")]
 pub fn save_image(path: &std::path::Path, data: &[u8], info: ImageInfo) -> Result<(), String> {
@@ -190,64 +165,4 @@ pub fn prompt_save_image(name_hint: &str, data: &[u8], info: ImageInfo) -> Resul
 	};
 
 	save_image(path.as_ref(), &data, info)
-}
-
-impl ImageData for Image<'_> {
-	type Error = ();
-
-	fn image(&self) -> Result<Image, Self::Error> {
-		Ok(self.as_ref().into())
-	}
-
-	fn into_image(self) -> Result<Image<'static>, Self::Error> {
-		Ok(self.into_owned())
-	}
-
-	fn owned_image(&self) -> Result<Image<'static>, Self::Error> {
-		Ok(self.clone().into_owned())
-	}
-}
-
-impl ImageData for RefImage<'_> {
-	type Error = ();
-
-	fn image(&self) -> Result<Image, Self::Error> {
-		Ok(Image::Ref(*self))
-	}
-
-	fn into_image(self) -> Result<Image<'static>, Self::Error> {
-		Ok(Image::from(self.image()?).into_owned())
-	}
-}
-
-impl ImageData for BoxImage {
-	type Error = ();
-
-	fn image(&self) -> Result<Image, Self::Error> {
-		Ok(Image::Ref(RefImage::from(self)))
-	}
-
-	fn into_image(self) -> Result<Image<'static>, Self::Error> {
-		Ok(self.into())
-	}
-
-	fn owned_image(&self) -> Result<Image<'static>, Self::Error> {
-		Ok(self.clone().into())
-	}
-}
-
-impl ImageData for ArcImage {
-	type Error = ();
-
-	fn image(&self) -> Result<Image, Self::Error> {
-		Ok(Image::Ref(RefImage::from(self)))
-	}
-
-	fn into_image(self) -> Result<Image<'static>, Self::Error> {
-		Ok(self.into())
-	}
-
-	fn owned_image(&self) -> Result<Image<'static>, Self::Error> {
-		Ok(self.clone().into())
-	}
 }

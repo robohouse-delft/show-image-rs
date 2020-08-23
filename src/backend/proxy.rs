@@ -6,6 +6,7 @@ use crate::WindowId;
 use crate::WindowOptions;
 use crate::error::EventLoopClosedError;
 use crate::error::ProxyCreateWindowError;
+use crate::error::ProxySetImageError;
 use crate::error::ProxyWindowOperationError;
 use crate::event::WindowEvent;
 use crate::oneshot;
@@ -92,8 +93,8 @@ impl ContextProxy {
 		&self,
 		window_id: WindowId,
 		name: impl Into<String>,
-		image: impl Into<Image<'static>>,
-	) -> Result<(), ProxyWindowOperationError> {
+		image: impl Into<Image>,
+	) -> Result<(), ProxySetImageError> {
 		let name = name.into();
 		let image = image.into();
 		self.run_function_wait(move |context| {
@@ -203,8 +204,8 @@ impl WindowProxy {
 	pub fn set_image(
 		&self,
 		name: impl Into<String>,
-		image: Image<'static>,
-	) -> Result<(), ProxyWindowOperationError> {
+		image: impl Into<Image>,
+	) -> Result<(), ProxySetImageError> {
 		self.context_proxy.set_window_image(self.window_id, name, image)
 	}
 

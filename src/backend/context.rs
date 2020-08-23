@@ -1,6 +1,6 @@
 use crate::ContextProxy;
 use crate::EventHandlerControlFlow;
-use crate::Image;
+use crate::AsImageView;
 use crate::Window;
 use crate::WindowHandle;
 use crate::WindowId;
@@ -15,6 +15,7 @@ use crate::error::GetDeviceError;
 use crate::error::InvalidWindowIdError;
 use crate::error::NoSuitableAdapterFoundError;
 use crate::error::OsError;
+use crate::error::SetImageError;
 use crate::event::Event;
 use crate::event::WindowEvent;
 
@@ -208,7 +209,7 @@ impl<'a> ContextHandle<'a> {
 	}
 
 	/// Set the image to be displayed on a window.
-	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &Image) -> Result<(), InvalidWindowIdError> {
+	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &impl AsImageView) -> Result<(), SetImageError> {
 		self.context.set_window_image(window_id, name, image)
 	}
 
@@ -286,11 +287,12 @@ impl Context {
 	}
 
 	/// Set the image to be displayed on a window.
-	fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &Image) -> Result<(), InvalidWindowIdError> {
+	fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &impl AsImageView) -> Result<(), SetImageError> {
 		let window = self.windows.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
+		let image = image.as_image_view()?;
 		let texture = GpuImage::from_data(&self.device, &self.image_bind_group_layout, name, image);
 		window.image = Some(texture);
 		window.uniforms.mark_dirty(true);

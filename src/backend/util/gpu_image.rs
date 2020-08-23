@@ -1,4 +1,4 @@
-use crate::Image;
+use crate::ImageView;
 use crate::PixelFormat;
 use super::buffer::create_buffer_with_value;
 
@@ -26,9 +26,8 @@ impl GpuImage {
 		device: &wgpu::Device,
 		bind_group_layout: &wgpu::BindGroupLayout,
 		name: &str,
-		image: &Image,
+		image: ImageView,
 	) -> Self {
-
 		let format = match image.info().pixel_format {
 			PixelFormat::Mono8 => 0,
 			PixelFormat::Bgr8 => 1,
@@ -50,7 +49,7 @@ impl GpuImage {
 		use wgpu::util::DeviceExt;
 		let data = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 			label: Some(&format!("{}_image_buffer", name)),
-			contents: image.buffer(),
+			contents: image.data(),
 			usage: wgpu::BufferUsage::STORAGE,
 		});
 

@@ -1,175 +1,160 @@
 use std::sync::Arc;
 
 use crate::ImageInfo;
+use crate::error::ImageDataError;
 
-#[derive(Debug, Clone)]
-pub enum Image<'a> {
-	Ref(RefImage<'a>),
-	Box(BoxImage),
-	Arc(ArcImage),
+/// Trait for borriwing image data from a struct.
+pub trait AsImageView {
+	/// Get an image view for the object.
+	fn as_image_view(&self) -> Result<ImageView, ImageDataError>;
 }
 
+/// A borrowed view of image data,
 #[derive(Debug, Copy, Clone)]
-pub struct RefImage<'a> {
+pub struct ImageView<'a> {
 	info: ImageInfo,
-	buffer: &'a [u8],
+	data: &'a [u8],
 }
 
+impl<'a> ImageView<'a> {
+	/// Create a new image view from image information and a data slice.
+	pub fn new(info: ImageInfo, data: &'a [u8]) -> Self {
+		Self { info, data }
+	}
+
+	/// Get the image information.
+	pub fn info(&self) -> ImageInfo {
+		self.info
+	}
+
+	/// Borrow the image data as byte slice.
+	pub fn data(&self) -> &[u8] {
+		self.data
+	}
+}
+
+impl<'a> AsImageView for ImageView<'a> {
+	fn as_image_view(&self) -> Result<ImageView, ImageDataError> {
+		Ok(*self)
+	}
+}
+
+/// An owning image that can be send to another thread.
+///
+/// The image is backed by either a [`Box`] or [`Arc`].
+/// It can either directly own the data or through a [`dyn AsImageView`].
+pub enum Image {
+	/// An image backed by a `Box<[u8]>`.
+	Box(BoxImage),
+
+	/// An image backed by an `Arc<[u8]>`.
+	Arc(ArcImage),
+
+	/// An image backed by a `Box<dyn AsImageView>`.
+	BoxDyn(Box<dyn AsImageView + Send>),
+
+	/// An image backed by an `Arc<dyn AsImageView>`.
+	ArcDyn(Arc<dyn AsImageView + Sync + Send>),
+
+	/// An invalid image that will always fail the conversion to [`ImageView`].
+	Invalid(ImageDataError),
+}
+
+impl Clone for Image {
+	fn clone(&self) -> Self {
+		match self {
+			Self::Box(x) => Self::Box(x.clone()),
+			Self::Arc(x) => Self::Arc(x.clone()),
+			// We can not clone Box<dyn AsImageView> directly, but we can clone the data or the error.
+			Self::BoxDyn(x) => match x.as_image_view() {
+				Ok(view) => Self::Box(BoxImage::new(view.info, view.data.into())),
+				Err(error) => Self::Invalid(error),
+			},
+			Self::ArcDyn(x) => Self::ArcDyn(x.clone()),
+			Self::Invalid(x) => Self::Invalid(x.clone()),
+		}
+	}
+}
+
+impl<T: AsImageView> AsImageView for Box<T> {
+	fn as_image_view(&self) -> Result<ImageView, ImageDataError> {
+		self.as_ref().as_image_view()
+	}
+}
+
+impl<T: AsImageView> AsImageView for Arc<T> {
+	fn as_image_view(&self) -> Result<ImageView, ImageDataError> {
+		self.as_ref().as_image_view()
+	}
+}
+
+/// An image backed by a `Box<[u8]>`.
 #[derive(Debug, Clone)]
 pub struct BoxImage {
 	info: ImageInfo,
-	buffer: Box<[u8]>,
+	data: Box<[u8]>,
 }
 
+/// An image backed by an `Arc<[u8]>`.
 #[derive(Debug, Clone)]
 pub struct ArcImage {
 	info: ImageInfo,
-	buffer: Arc<[u8]>,
+	data: Arc<[u8]>,
 }
 
-impl Image<'_> {
-	pub fn into_owned(self) -> Image<'static> {
+impl Image {
+	/// Get a non-owning view of the image data.
+	pub fn as_image_view(&self) -> Result<ImageView, ImageDataError>  {
 		match self {
-			Image::Ref(x) => Image::Box(x.to_box()),
-			Image::Box(x) => Image::Box(x),
-			Image::Arc(x) => Image::Arc(x),
-		}
-	}
-
-	pub fn into_arc(self) -> ArcImage {
-		match self {
-			Self::Ref(x) => x.to_arc(),
-			Self::Box(x) => ArcImage::from(x),
-			Self::Arc(x) => x,
-		}
-	}
-
-	pub fn as_ref<'a>(&'a self) -> RefImage<'a> {
-		match self {
-			Self::Ref(x) => *x,
-			Self::Box(x) => x.into(),
-			Self::Arc(x) => x.into(),
-		}
-	}
-
-	pub fn info(&self) -> &ImageInfo {
-		match self {
-			Self::Ref(x) => &x.info,
-			Self::Box(x) => &x.info,
-			Self::Arc(x) => &x.info,
-		}
-	}
-
-	pub fn buffer(&self) -> &[u8] {
-		match self {
-			Self::Ref(x) => x.buffer,
-			Self::Box(x) => &x.buffer,
-			Self::Arc(x) => &x.buffer,
+			Self::Box(x) => Ok(x.as_view()),
+			Self::Arc(x) => Ok(x.as_view()),
+			Self::BoxDyn(x) => x.as_image_view(),
+			Self::ArcDyn(x) => x.as_image_view(),
+			Self::Invalid(e) => Err(e.clone()),
 		}
 	}
 }
 
-impl<'a> RefImage<'a> {
-	pub fn new(info: ImageInfo, buffer: &'a [u8]) -> Self {
-		Self { info, buffer }
-	}
-
-	pub fn to_box(self) -> BoxImage {
-		BoxImage {
-			info: self.info,
-			buffer: self.buffer.into(),
-		}
-	}
-
-	pub fn to_arc(self) -> ArcImage {
-		ArcImage {
-			info: self.info,
-			buffer: self.buffer.into(),
-		}
-	}
-
-	pub fn info(&self) -> &ImageInfo {
-		&self.info
-	}
-
-	pub fn buffer(&self) -> &[u8] {
-		self.buffer
+impl AsImageView for Image {
+	fn as_image_view(&self) -> Result<ImageView, ImageDataError>  {
+		self.as_image_view()
 	}
 }
 
 impl BoxImage {
-	pub fn new(info: ImageInfo, buffer: Box<[u8]>) -> Self {
-		Self { info, buffer }
+	/// Create a new image from image information and a boxed slice.
+	pub fn new(info: ImageInfo, data: Box<[u8]>) -> Self {
+		Self { info, data }
 	}
 
-	pub fn info(&self) -> &ImageInfo {
-		&self.info
+	/// Get a non-owning view of the image data.
+	pub fn as_view(&self) -> ImageView  {
+		ImageView::new(self.info, &self.data)
 	}
+}
 
-	pub fn buffer(&self) -> &[u8] {
-		&self.buffer
+impl AsImageView for BoxImage {
+	fn as_image_view(&self) -> Result<ImageView, ImageDataError>  {
+		Ok(self.as_view())
 	}
 }
 
 impl ArcImage {
-	pub fn new(info: ImageInfo, buffer: Arc<[u8]>) -> Self {
-		Self { info, buffer }
+	/// Create a new image from image information and a Arc-wrapped slice.
+	pub fn new(info: ImageInfo, data: Arc<[u8]>) -> Self {
+		Self { info, data }
 	}
 
-	pub fn info(&self) -> &ImageInfo {
-		&self.info
+	/// Get a non-owning view of the image data.
+	pub fn as_view(&self) -> ImageView  {
+		ImageView::new(self.info, &self.data)
 	}
 
-	pub fn buffer(&self) -> &[u8] {
-		&self.buffer
-	}
 }
 
-impl<'a> From<RefImage<'a>> for Image<'a> {
-	fn from(other: RefImage<'a>) -> Self {
-		Self::Ref(other)
-	}
-}
-
-impl<'a> From<&'a RefImage<'a>> for Image<'a> {
-	fn from(other: &'a RefImage<'a>) -> Self {
-		Self::Ref(*other)
-	}
-}
-
-impl From<BoxImage> for Image<'_> {
-	fn from(other: BoxImage) -> Self {
-		Self::Box(other)
-	}
-}
-
-impl From<ArcImage> for Image<'_> {
-	fn from(other: ArcImage) -> Self {
-		Self::Arc(other)
-	}
-}
-
-impl<'a> From<&'a Image<'_>> for RefImage<'a> {
-	fn from(other: &'a Image) -> Self {
-		other.as_ref()
-	}
-}
-
-impl<'a> From<&'a BoxImage> for RefImage<'a> {
-	fn from(other: &'a BoxImage) -> Self {
-		Self {
-			info: other.info,
-			buffer: other.buffer.as_ref(),
-		}
-	}
-}
-
-impl<'a> From<&'a ArcImage> for RefImage<'a> {
-	fn from(other: &'a ArcImage) -> Self {
-		Self {
-			info: other.info,
-			buffer: other.buffer.as_ref(),
-		}
+impl AsImageView for ArcImage {
+	fn as_image_view(&self) -> Result<ImageView, ImageDataError>  {
+		Ok(self.as_view())
 	}
 }
 
@@ -177,7 +162,49 @@ impl From<BoxImage> for ArcImage {
 	fn from(other: BoxImage) -> Self {
 		Self {
 			info: other.info,
-			buffer: other.buffer.into()
+			data: other.data.into()
 		}
+	}
+}
+
+impl From<BoxImage> for Image {
+	fn from(other: BoxImage) -> Self {
+		Self::Box(other)
+	}
+}
+
+impl From<ArcImage> for Image {
+	fn from(other: ArcImage) -> Self {
+		Self::Arc(other)
+	}
+}
+
+impl From<Box<dyn AsImageView + Send>> for Image {
+	fn from(other: Box<dyn AsImageView + Send>) -> Self {
+		Self::BoxDyn(other)
+	}
+}
+
+impl From<Arc<dyn AsImageView + Sync + Send>> for Image {
+	fn from(other: Arc<dyn AsImageView + Sync + Send>) -> Self {
+		Self::ArcDyn(other)
+	}
+}
+
+impl<T> From<Box<T>> for Image
+where
+	T: AsImageView + Send + 'static,
+{
+	fn from(other: Box<T>) -> Self {
+		Self::BoxDyn(other)
+	}
+}
+
+impl<T> From<Arc<T>> for Image
+where
+	T: AsImageView + Send + Sync + 'static,
+{
+	fn from(other: Arc<T>) -> Self {
+		Self::ArcDyn(other)
 	}
 }
