@@ -38,6 +38,17 @@ impl ContextProxy {
 		Self { event_loop }
 	}
 
+	/// Exit the application with the given status code as soon as possible.
+	///
+	/// The actual exit will be performed after queued events have been processed.
+	/// This allows all queued actions to be performed before the exit happends.
+	///
+	/// If a non-zero exit status has already been set,
+	/// the new exit status is ignored and the program will exit with the previously set status code.
+	pub fn exit(&self, status: i32) -> Result<(), EventLoopClosedError> {
+		self.run_function(move |context| context.exit(status))
+	}
+
 	/// Create a new window.
 	///
 	/// The real work is done in the context thread.

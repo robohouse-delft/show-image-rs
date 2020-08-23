@@ -67,8 +67,8 @@ pub struct Context {
 	/// The global event handlers.
 	event_handlers: Vec<Box<dyn FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + 'static>>,
 
-	/// Flag indicating the context should stop after processing all queued events.
-	stop: bool,
+	/// Flag indicating the main thread should exit with the given status when all events are processed.
+	exit: Option<i32>,
 }
 
 /// A handle to the global context.
@@ -119,7 +119,7 @@ impl Context {
 			render_pipeline,
 			windows: Vec::new(),
 			event_handlers: Vec::new(),
-			stop: false,
+			exit: None,
 		})
 	}
 
@@ -184,9 +184,18 @@ impl<'a> ContextHandle<'a> {
 		self.context.proxy()
 	}
 
-	/// Stop the context thread as soon as possible.
-	pub fn stop(&mut self) {
-		self.context.stop = true;
+	/// Exit the application with the given status code as soon as possible.
+	///
+	/// The actual exit will be performed after queued events have been processed.
+	/// This allows all queued actions to be performed before the exit happends.
+	///
+	/// If a non-zero exit status has already been set,
+	/// the new exit status is ignored and the program will exit with the previously set status code.
+	pub fn exit(&mut self, status: i32) {
+		match self.context.exit {
+			Some(0) | None => self.context.exit = Some(status),
+			Some(_) => (),
+		}
 	}
 
 	/// Create a new window.
@@ -361,9 +370,12 @@ impl Context {
 		event_loop: &EventLoopWindowTarget,
 		control_flow: &mut winit::event_loop::ControlFlow,
 	) {
-		if self.stop {
-			*control_flow = winit::event_loop::ControlFlow::Exit;
-			return;
+		// Wait for state change events to be cleared, then exit the program.
+		// This should allow for all queued functions to be executed first (I hope).
+		if let Event::MainEventsCleared = &event {
+			if let Some(status) = self.exit {
+				std::process::exit(status);
+			}
 		}
 
 		*control_flow = winit::event_loop::ControlFlow::Wait;
