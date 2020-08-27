@@ -97,6 +97,8 @@ pub use winit;
 pub use winit::event;
 pub use winit::window::WindowId;
 
+pub mod termination;
+
 #[cfg(feature = "macros")]
 pub use show_image_macros::main;
 

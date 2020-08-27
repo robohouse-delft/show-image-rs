@@ -39,9 +39,10 @@ fn initialize_context() -> Result<Context, error::GetDeviceError> {
 /// # Panics
 /// This function panics if initialization of the global context fails.
 /// See [`try_run_context`] for a variant that allows the user task to handle initialization errors.
-pub fn run_context<F>(user_task: F) -> !
+pub fn run_context<F, R>(user_task: F) -> !
 where
 	F: FnOnce(ContextProxy) -> R + Send + 'static,
+	R: crate::termination::Termination,
 {
 	let context = initialize_context()
 		.expect("failed to initialize global context");
@@ -49,8 +50,8 @@ where
 	// Spawn the user task.
 	let proxy = context.proxy();
 	std::thread::spawn(move || {
-		(user_task)(proxy);
-		std::process::exit(0);
+		let termination = (user_task)(proxy);
+		std::process::exit(termination.report());
 	});
 
 	context.run();
@@ -68,23 +69,24 @@ where
 ///
 /// # Panics
 /// If the context fails to initialize, this function panics.
-pub fn try_run_context<F>(user_task: F) -> !
+pub fn try_run_context<F, R>(user_task: F) -> !
 where
-	F: FnOnce(Result<ContextProxy, error::GetDeviceError>) + Send + 'static,
+	F: FnOnce(Result<ContextProxy, error::GetDeviceError>) -> R + Send + 'static,
+	R: crate::termination::Termination,
 {
 	let context = match initialize_context() {
 		Ok(x) => x,
 		Err(e) => {
-			(user_task)(Err(e));
-			std::process::exit(0);
+			let termination = (user_task)(Err(e));
+			std::process::exit(termination.report());
 		}
 	};
 
 	// Spawn the user task.
 	let proxy = context.proxy();
 	std::thread::spawn(move || {
-		(user_task)(Ok(proxy));
-		std::process::exit(0);
+		let termination = (user_task)(Ok(proxy));
+		std::process::exit(termination.report());
 	});
 
 	context.run();

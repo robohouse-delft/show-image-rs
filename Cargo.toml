@@ -24,10 +24,11 @@ categories = [
 ]
 
 [features]
-full     = ["save", "image", "tch", "raqote", "macros"]
-save     = ["tinyfiledialogs", "image"]
 doc-only = ["tch/doc-only"]
+full     = ["save", "image", "tch", "raqote", "macros"]
 macros   = ["show-image-macros"]
+nightly  = []
+save     = ["tinyfiledialogs", "image"]
 
 [dependencies]
 wgpu              = "0.6.0"
@@ -42,6 +43,9 @@ show-image-macros = { version="0.7.0", optional=true, path="show-image-macros" }
 [dev-dependencies]
 show-image = { path = ".", features=["full"] }
 assert2    = "0.3.1"
+
+[build-dependencies]
+rustc_version = "0.2.3"
 
 [package.metadata.docs.rs]
 features = ["doc-only", "full"]
