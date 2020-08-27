@@ -1,8 +1,8 @@
-pub mod context;
-pub mod event;
-pub mod proxy;
-pub mod util;
-pub mod window;
+mod context;
+mod event;
+mod proxy;
+mod util;
+mod window;
 
 pub use context::ContextHandle;
 pub use proxy::ContextProxy;

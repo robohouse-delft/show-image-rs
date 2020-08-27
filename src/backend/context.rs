@@ -5,6 +5,7 @@ use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
 use crate::backend::proxy::ContextFunction;
+use crate::backend::window::Window;
 use crate::error::CreateWindowError;
 use crate::error::GetDeviceError;
 use crate::error::InvalidWindowIdError;
@@ -12,7 +13,6 @@ use crate::error::NoSuitableAdapterFoundError;
 use crate::error::SetImageError;
 use crate::event::Event;
 use crate::event::WindowEvent;
-use crate::window::Window;
 
 /// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
 ///
