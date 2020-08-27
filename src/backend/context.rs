@@ -59,11 +59,11 @@ pub struct Context {
 	/// The windows.
 	windows: Vec<Window>,
 
+	/// If true, exit the program when the last window closes.
+	exit_with_last_window: bool,
+
 	/// The global event handlers.
 	event_handlers: Vec<Box<dyn FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + 'static>>,
-
-	/// Flag indicating the main thread should exit with the given status when all events are processed.
-	exit: Option<i32>,
 }
 
 /// A handle to the global context.
@@ -113,8 +113,8 @@ impl Context {
 			image_bind_group_layout,
 			render_pipeline,
 			windows: Vec::new(),
+			exit_with_last_window: false,
 			event_handlers: Vec::new(),
-			exit: None,
 		})
 	}
 
@@ -159,6 +159,9 @@ impl Context {
 			// Check if the event handlers caused the last window(s) to close.
 			// If so, generate an AllWIndowsClosed event for the event handlers.
 			if self.windows.is_empty() && initial_window_count > 0 {
+				if self.exit_with_last_window {
+					std::process::exit(0);
+				}
 				self.run_event_handlers(&mut crate::Event::UserEvent(crate::AllWindowsClosed), event_loop);
 			}
 		});
@@ -179,18 +182,9 @@ impl<'a> ContextHandle<'a> {
 		self.context.proxy()
 	}
 
-	/// Exit the application with the given status code as soon as possible.
-	///
-	/// The actual exit will be performed after queued events have been processed.
-	/// This allows all queued actions to be performed before the exit happends.
-	///
-	/// If a non-zero exit status has already been set,
-	/// the new exit status is ignored and the program will exit with the previously set status code.
-	pub fn exit(&mut self, status: i32) {
-		match self.context.exit {
-			Some(0) | None => self.context.exit = Some(status),
-			Some(_) => (),
-		}
+	/// Exit the program when the last window closes.
+	pub fn set_exit_with_last_window(&mut self, exit_with_last_window: bool) {
+		self.context.exit_with_last_window = exit_with_last_window;
 	}
 
 	/// Create a new window.
@@ -365,14 +359,6 @@ impl Context {
 		event_loop: &EventLoopWindowTarget,
 		control_flow: &mut winit::event_loop::ControlFlow,
 	) {
-		// Wait for state change events to be cleared, then exit the program.
-		// This should allow for all queued functions to be executed first (I hope).
-		if let Event::MainEventsCleared = &event {
-			if let Some(status) = self.exit {
-				std::process::exit(status);
-			}
-		}
-
 		*control_flow = winit::event_loop::ControlFlow::Wait;
 
 		// Split between Event<ContextFunction> and ContextFunction commands.

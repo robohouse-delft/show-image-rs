@@ -30,41 +30,90 @@ fn initialize_context() -> Result<Context, error::GetDeviceError> {
 
 /// Initialize and run the global context and spawn a user task in a new thread.
 ///
-/// This function only returns if it fails.
-/// If the context is stopped, the calling thread is terminated.
-pub fn run_context<F>(user_task: F) -> Result<(), error::GetDeviceError>
+/// This fuction never returns.
+/// Once the user task finishes, the program exits with status code 0.
+/// It is the responsibility of the user code to join any important threads at the end of the task.
+///
+/// If the `macros` feature is enabled, you can also wrap your main function with the [`main`] macro.
+///
+/// # Panics
+/// This function panics if initialization of the global context fails.
+/// See [`try_run_context`] for a variant that allows the user task to handle initialization errors.
+pub fn run_context<F>(user_task: F) -> !
 where
-	F: FnOnce(ContextProxy) + Send + 'static,
+	F: FnOnce(ContextProxy) -> R + Send + 'static,
 {
-	let context = initialize_context()?;
+	let context = initialize_context()
+		.expect("failed to initialize global context");
 
 	// Spawn the user task.
 	let proxy = context.proxy();
 	std::thread::spawn(move || {
 		(user_task)(proxy);
+		std::process::exit(0);
 	});
 
 	context.run();
 }
 
-/// Initialize and run the global context, and run a user task in the same thread.
+/// Initialize and run the global context and spawn a user task in a new thread.
 ///
-/// This function only returns if it fails.
-/// If the context is stopped, the calling thread is terminated.
+/// This fuction never returns.
+/// Once the user task finishes, the program exits with status code 0.
+/// It is the responsibility of the user code to join any important threads at the end of the task.
+///
+/// Unlike [`try_run_context`], this function allows the user task to handle initialization errors.
+/// If initialization fails, the user task will be executed in the calling thread.
+/// If initialization succeeds, the user task is started in a newly spawned thread.
+///
+/// # Panics
+/// If the context fails to initialize, this function panics.
+pub fn try_run_context<F>(user_task: F) -> !
+where
+	F: FnOnce(Result<ContextProxy, error::GetDeviceError>) + Send + 'static,
+{
+	let context = match initialize_context() {
+		Ok(x) => x,
+		Err(e) => {
+			(user_task)(Err(e));
+			std::process::exit(0);
+		}
+	};
+
+	// Spawn the user task.
+	let proxy = context.proxy();
+	std::thread::spawn(move || {
+		(user_task)(Ok(proxy));
+		std::process::exit(0);
+	});
+
+	context.run();
+}
+
+/// Initialize and run the global context and run a user task, both in the main thread.
+///
+/// The global context will execute the user function in the main thread after the context is fully initialized.
+///
+/// This fuction never returns.
+/// The global context will keep running after the local task finishes.
+/// It is up to the user code to call [`std::process::exit`] when the process should exit.
+/// Alternatively, you could call [`ContextHandle::set_exit_with_last_window`].
 ///
 /// *Note*:
-/// You should not run a function that blocks for any significant time in the context thread.
+/// You should not run a function that blocks for any significant time in the main thread.
 /// Doing so will prevent the event loop from processing events and will result in unresponsive windows.
 ///
-/// If you're looking for a place to run your own application code,
-/// you probably want to use [`run_context`].
-/// But if you can drive your entire application from event handlers,
-/// then this function is probably what you're looking for.
-pub fn run_context_with_local_task<F>(user_task: F) -> Result<(), error::GetDeviceError>
+/// If you're looking for a place to run your own application code, you probably want to use [`run_context`] or the [`main`] macro.
+/// However, if you can drive your entire application from event handlers, then this function is probably what you're looking for.
+///
+/// # Panics
+/// This function panics if initialization of the global context fails.
+/// See [`try_run_context_with_local_task`] for a variant that allows the user task to handle initialization errors.
+pub fn run_context_with_local_task<F>(user_task: F) -> !
 where
 	F: FnOnce(&mut ContextHandle) + Send + 'static,
 {
-	let context = initialize_context()?;
+	let context = initialize_context().unwrap();
 
 	// Queue the user task.
 	// Unwrap should be safe, the event loop hasn't even started yet, so it can't be closed yet either.
@@ -73,10 +122,51 @@ where
 	context.run();
 }
 
-/// Get the global context.
+/// Initialize and run the global context and run a user task, both in the main thread.
+///
+/// The global context will execute the user function in the main thread after the context is fully initialized.
+///
+/// This fuction never returns.
+/// The global context will keep running after the local task finishes.
+/// It is up to the user code to call [`std::process::exit`] when the process should exit.
+/// Alternatively, you could call [`ContextHandle::set_exit_with_last_window`].
+///
+/// *Note*:
+/// You should not run a function that blocks for any significant time in the main thread.
+/// Doing so will prevent the event loop from processing events and will result in unresponsive windows.
+///
+/// If you're looking for a place to run your own application code, you probably want to use [`run_context`] or the [`main`] macro.
+/// However, if you can drive your entire application from event handlers, then this function is probably what you're looking for.
+///
+/// This function requires the user task to handle context initialization failure.
+/// See [`run_context_with_local_task`] for a variant the panics on failure instead.
+pub fn try_run_context_with_local_task<F>(user_task: F) -> !
+where
+	F: FnOnce(Result<&mut ContextHandle, error::GetDeviceError>) + Send + 'static,
+{
+	let context = match initialize_context() {
+		Ok(x) => x,
+		Err(e) => {
+			(user_task)(Err(e));
+			std::process::exit(0);
+		}
+	};
+
+	// Queue the user task.
+	// It won't be executed until context.run() is called.
+	// Unwrap should be safe, the event loop hasn't even started yet, so it can't be closed yet either.
+	context.proxy()
+		.run_function(|context| user_task(Ok(context)))
+		.unwrap();
+
+	context.run();
+}
+
+/// Get the global context to interact with existing windows or create new windows.
 ///
 /// If you manually spawn threads that try to access the context before calling `run_context`, you introduce a race condition.
-/// Instead, you should pass a function to [`run_context`] that will be started in a new thread after the context is initialized.
+/// Instead, you should pass a function to [`run_context`] or one of the variants.
+/// Those functions take care to initialize the global context before running the user code.
 ///
 /// # Panics
 /// This panics if the global context is not yet fully initialized.
@@ -89,7 +179,7 @@ pub fn context() -> ContextProxy {
 	}
 }
 
-/// Create a window with the global context.
+/// Create a new window with the global context.
 ///
 /// If you manually spawn threads that try to access the context before calling `run_context`, you introduce a race condition.
 /// Instead, you should pass a function to [`run_context`] that will be started in a new thread after the context is initialized.
@@ -98,37 +188,4 @@ pub fn context() -> ContextProxy {
 /// This panics if the global context is not yet fully initialized.
 pub fn create_window(title: impl Into<String>, options: WindowOptions) -> Result<WindowProxy, error::ProxyCreateWindowError> {
 	context().create_window(title, options)
-}
-
-/// Exit the program with the given status code.
-///
-/// The actual exit will be performed after queued events have been processed.
-/// This allows all queued actions to be performed before the exit happends.
-///
-/// You may also just call [`std::process::exit`] instead.
-/// That will not wait for queued events and functions to be handled.
-/// Whether or not that is a problem depends on your application.
-///
-/// You are encouraged to perform important operations in your own thread and just call [`std::process::exit`].
-/// That will avoid problems where queued functions might take too long to finish and prevent the process from exitting.
-///
-/// # Panics
-/// This panics if the global context is not yet fully initialized.
-pub fn exit(status: i32) -> ! {
-
-	// Using a global mutex and condition variable is too much hassle, so we just poll.
-	let sleep_increment = std::time::Duration::from_millis(5);
-	let sleep_max = std::time::Duration::from_millis(100);
-	let mut sleep_duration = sleep_increment;
-
-	loop {
-		if let Err(crate::error::EventLoopClosedError) = context().exit(status) {
-			std::process::exit(status);
-		}
-
-		std::thread::sleep(sleep_duration);
-		if sleep_duration < sleep_max {
-			sleep_duration += sleep_increment;
-		}
-	}
 }
