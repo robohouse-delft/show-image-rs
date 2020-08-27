@@ -1,16 +1,11 @@
 use crate::ContextProxy;
 use crate::EventHandlerControlFlow;
 use crate::AsImageView;
-use crate::Window;
+use crate::window::Window;
 use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
-use crate::backend::event::map_nonuser_event;
 use crate::backend::proxy::ContextFunction;
-use crate::backend::util::GpuImage;
-use crate::backend::util::RetainMut;
-use crate::backend::util::UniformsBuffer;
-use crate::backend::window::WindowUniforms;
 use crate::error::GetDeviceError;
 use crate::error::InvalidWindowIdError;
 use crate::error::NoSuitableAdapterFoundError;
@@ -261,7 +256,7 @@ impl Context {
 
 		let surface = unsafe { self.instance.create_surface(&window) };
 		let swap_chain = create_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
-		let uniforms = UniformsBuffer::from_value(&self.device, &WindowUniforms::default(), &self.window_bind_group_layout);
+		let uniforms = super::util::UniformsBuffer::from_value(&self.device, &Default::default(), &self.window_bind_group_layout);
 
 		let window = Window {
 			window,
@@ -302,7 +297,7 @@ impl Context {
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
 		let image = image.as_image_view()?;
-		let texture = GpuImage::from_data(&self.device, &self.image_bind_group_layout, name, image);
+		let texture = super::util::GpuImage::from_data(&self.device, &self.image_bind_group_layout, name, image);
 		window.image = Some(texture);
 		window.uniforms.mark_dirty(true);
 		Ok(())
@@ -381,7 +376,7 @@ impl Context {
 		*control_flow = winit::event_loop::ControlFlow::Wait;
 
 		// Split between Event<ContextFunction> and ContextFunction commands.
-		let mut event = match map_nonuser_event(event) {
+		let mut event = match super::event::map_nonuser_event(event) {
 			Ok(event) => event,
 			Err(function) => {
 				(function)(&mut ContextHandle::new(self, event_loop));
@@ -414,6 +409,8 @@ impl Context {
 
 	/// Run global event handlers.
 	fn run_event_handlers(&mut self, event: &mut crate::Event, event_loop: &EventLoopWindowTarget) {
+		use super::util::RetainMut;
+
 		// Event handlers could potentially modify the list of event handlers.
 		// Also, even if they couldn't we'd still need borrow self mutably multible times to run the event handlers.
 		// That's not allowed, of course, so temporarily swap the event handlers with a new vector.
@@ -441,6 +438,8 @@ impl Context {
 
 	/// Run window-specific event handlers.
 	fn run_window_event_handlers(&mut self, window_id: WindowId, event: &mut WindowEvent, event_loop: &EventLoopWindowTarget) -> bool {
+		use super::util::RetainMut;
+
 		let window_index = match self.windows.iter().position(|x| x.id() == window_id) {
 			Some(x) => x,
 			None => return true,
