@@ -5,11 +5,10 @@ use raqote::SolidSource;
 use raqote::Source;
 use raqote::StrokeStyle;
 use show_image::event;
-use show_image::event::WindowEvent;
 use show_image::Image;
 
 #[show_image::main]
-fn main(mut context: show_image::ContextProxy) -> Result<(), String> {
+fn main() -> Result<(), String> {
 	let args: Vec<_> = std::env::args().collect();
 	if args.len() != 1 {
 		return Err(format!("usage: {}", args[0]));
@@ -74,7 +73,7 @@ fn main(mut context: show_image::ContextProxy) -> Result<(), String> {
 	// window.execute(move |window| window.add_overlay(overlay))?;
 
 	window.add_event_handler(|window, event, _control| {
-		if let WindowEvent::KeyboardInput { input, .. } = event {
+		if let event::WindowEvent::KeyboardInput { input, .. } = event {
 			if input.virtual_keycode == Some(event::VirtualKeyCode::Escape) && input.state == event::ElementState::Pressed {
 				let _ = window.destroy();
 			}
@@ -82,7 +81,7 @@ fn main(mut context: show_image::ContextProxy) -> Result<(), String> {
 	}).map_err(|e| e.to_string())?;
 
 	// Wait forever until the window is closed or escape is pressed.
-	context.set_exit_with_last_window(true);
+	show_image::context().set_exit_with_last_window(true);
 	loop {
 		std::thread::park();
 	}
