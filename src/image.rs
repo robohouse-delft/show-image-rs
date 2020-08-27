@@ -9,6 +9,11 @@ pub trait AsImageView {
 	fn as_image_view(&self) -> Result<ImageView, ImageDataError>;
 }
 
+/// Get the image info of an object that implements [`AsImageView`].
+pub fn image_info(image: &impl AsImageView) -> Result<ImageInfo, ImageDataError> {
+	Ok(image.as_image_view()?.info())
+}
+
 /// A borrowed view of image data,
 #[derive(Debug, Copy, Clone)]
 pub struct ImageView<'a> {
