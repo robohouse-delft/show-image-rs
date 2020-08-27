@@ -4,7 +4,7 @@ use crate::ImageInfo;
 use crate::PixelFormat;
 use crate::error::ImageDataError;
 
-// TODO: support premultiplied alpha in shader, and implement ImageData too.
+// TODO: support premultiplied alpha in shader, and implement AsImageView too.
 
 fn divide_by_alpha(data: &mut [u8]) {
 	for i in 0..(data.len() / 4) {

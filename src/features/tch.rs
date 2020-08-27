@@ -3,15 +3,15 @@
 //! This module adds support for displaying [`tch::Tensor`] as images.
 //! The main interface is provided by an extension trait [`TensorAsImage`],
 //! which allows you to wrap a tensor in a [`TensorImage`].
-//! The wrapper struct adds some required metadata for interpreting the tensor data as an image.
+//! The wrapper struct adds some required meta-data for interpreting the tensor data as an image.
 //!
-//! The metadata has to be supplied by the user, or it can be guessed automatically based on the tensor shape.
+//! The meta-data has to be supplied by the user, or it can be guessed automatically based on the tensor shape.
 //! When guessing, you do need to specify if you want to interpret multi-channel tensors as RGB or BGR.
-//! An extension trait [`TensorAsImage`] is provided to construct the wrapper with the proper metadata.
+//! An extension trait [`TensorAsImage`] is provided to construct the wrapper with the proper meta-data.
 //!
-//! It may not be possible to interpret a tensor as the requested image format,
+//! It is not always possible to interpret a tensor as the requested image format,
 //! so all function in the extension trait return a [`Result`].
-//! The [`ImageData`] trait is implemented for [`TensorImage`] and for [`Result`]`<`[`TensorImage`]`, `[`String`]`>`,
+//! The [`Into<Image>`] trait is implemented for [`TensorImage`] and for [`Result`]`<`[`TensorImage`]`, `[`ImageDataError`]`>`,
 //! so you can directly pass the result to [`set_image`](crate::Window::set_image),
 //!
 //! Both planar and interlaced tensors are supported.
@@ -35,7 +35,7 @@ use crate::ImageInfo;
 use crate::PixelFormat;
 use crate::error::ImageDataError;
 
-/// Wrapper for [`tch::Tensor`] that implements [`ImageData`].
+/// Wrapper for [`tch::Tensor`] that implements `Into<Image>`.
 pub struct TensorImage<'a> {
 	tensor: &'a tch::Tensor,
 	info: ImageInfo,
@@ -63,14 +63,14 @@ pub enum ColorFormat {
 /// Extension trait to allow displaying tensors as image.
 ///
 /// The tensor data will always be copied.
-/// Additionaly, the data will be converted to 8 bit integers,
+/// Additionally, the data will be converted to 8 bit integers,
 /// and planar data will be converted to interlaced data.
 ///
 /// The original tensor is unaffected, but the conversion can be expensive.
 /// If you also need to convert the tensor, consider doing so before displaying it.
 #[allow(clippy::needless_lifetimes)]
 pub trait TensorAsImage {
-	/// Wrap the tensor in a [`TensorImage`] that implements [`ImageData`].
+	/// Wrap the tensor in a [`TensorImage`] that implements `Into<Image>`.
 	///
 	/// This function requires you to specify the pixel format of the tensor,
 	/// or a preferred color format to have the library guess based on the tensor shape.
@@ -83,7 +83,7 @@ pub trait TensorAsImage {
 		self.as_image(TensorPixelFormat::Interlaced(pixel_format))
 	}
 
-	/// Wrap the tensor with a known pixel format in a [`TensorImage`], assuming it holds planaer pixel data.
+	/// Wrap the tensor with a known pixel format in a [`TensorImage`], assuming it holds planar pixel data.
 	fn as_planar<'a>(&'a self, pixel_format: PixelFormat) -> Result<TensorImage<'a>, ImageDataError> {
 		self.as_image(TensorPixelFormat::Planar(pixel_format))
 	}
