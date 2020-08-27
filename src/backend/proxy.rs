@@ -4,10 +4,9 @@ use crate::Image;
 use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
-use crate::error::EventLoopClosedError;
-use crate::error::ProxyCreateWindowError;
-use crate::error::ProxySetImageError;
-use crate::error::ProxyWindowOperationError;
+use crate::error::CreateWindowError;
+use crate::error::InvalidWindowIdError;
+use crate::error::SetImageError;
 use crate::event::WindowEvent;
 use crate::oneshot;
 
@@ -39,7 +38,7 @@ impl ContextProxy {
 	}
 
 	/// Exit the program when the last window closes.
-	pub fn set_exit_with_last_window(&mut self, exit_with_last_window: bool) -> Result<(), EventLoopClosedError>{
+	pub fn set_exit_with_last_window(&mut self, exit_with_last_window: bool) {
 		self.run_function(move |context| {
 			context.set_exit_with_last_window(exit_with_last_window);
 		})
@@ -53,12 +52,12 @@ impl ContextProxy {
 		&self,
 		title: impl Into<String>,
 		options: WindowOptions,
-	) -> Result<WindowProxy, ProxyCreateWindowError> {
+	) -> Result<WindowProxy, CreateWindowError> {
 		let title = title.into();
 		let window_id = self.run_function_wait(move |context| {
 			context.create_window(title, options)
 				.map(|window| window.id())
-		})??;
+		})?;
 
 		Ok(WindowProxy::new(window_id, self.clone()))
 	}
@@ -70,11 +69,10 @@ impl ContextProxy {
 	pub fn destroy_window(
 		&self,
 		window_id: WindowId,
-	) -> Result<(), ProxyWindowOperationError> {
+	) -> Result<(), InvalidWindowIdError> {
 		self.run_function_wait(move |context| {
 			context.destroy_window(window_id)
-		})??;
-		Ok(())
+		})
 	}
 
 	/// Make a window visiable or invsible.
@@ -85,11 +83,10 @@ impl ContextProxy {
 		&self,
 		window_id: WindowId,
 		visible: bool,
-	) -> Result<(), ProxyWindowOperationError> {
+	) -> Result<(), InvalidWindowIdError> {
 		self.run_function_wait(move |context| {
 			context.set_window_visible(window_id, visible)
-		})??;
-		Ok(())
+		})
 	}
 
 	/// Set the shown image for a window.
@@ -101,13 +98,12 @@ impl ContextProxy {
 		window_id: WindowId,
 		name: impl Into<String>,
 		image: impl Into<Image>,
-	) -> Result<(), ProxySetImageError> {
+	) -> Result<(), SetImageError> {
 		let name = name.into();
 		let image = image.into();
 		self.run_function_wait(move |context| {
 			context.set_window_image(window_id, &name, &image)
-		})??;
-		Ok(())
+		})
 	}
 
 	/// Add a global event handler to the context.
@@ -116,7 +112,7 @@ impl ContextProxy {
 	///
 	/// This function uses [`Self::run_function_wait`] internally, so it blocks until the event handler is added.
 	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
-	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), EventLoopClosedError>
+	pub fn add_event_handler<F>(&self, handler: F)
 	where
 		F: FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + Send + 'static,
 	{
@@ -131,14 +127,13 @@ impl ContextProxy {
 	///
 	/// This function uses [`Self::run_function_wait`] internally, so it blocks until the event handler is added.
 	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
-	pub fn add_window_event_handler<F>(&self, window_id: WindowId, handler: F) -> Result<(), ProxyWindowOperationError>
+	pub fn add_window_event_handler<F>(&self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
 		self.run_function_wait(move |context| {
 			context.add_window_event_handler(window_id, handler)
-		})??;
-		Ok(())
+		})
 	}
 
 	/// Post a function for execution in the context thread without waiting for it to execute.
@@ -149,12 +144,14 @@ impl ContextProxy {
 	/// *Note:*
 	/// You should not post functions to the context thread that block for a long time.
 	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
-	pub fn run_function<F>(&self, function: F) -> Result<(), EventLoopClosedError>
+	pub fn run_function<F>(&self, function: F)
 	where
 		F: 'static + FnOnce(&mut ContextHandle) + Send,
 	{
 		let function = Box::new(function);
-		self.event_loop.send_event(function).map_err(|_| EventLoopClosedError)
+		if let Err(_) = self.event_loop.send_event(function) {
+			panic!("global context stopped running but somehow the process is still alive");
+		}
 	}
 
 	/// Post a function for execution in the context thread and wait for the return value.
@@ -165,7 +162,7 @@ impl ContextProxy {
 	/// *Note:*
 	/// You should not post functions to the context thread that block for a long time.
 	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
-	pub fn run_function_wait<F, T>(&self, function: F) -> Result<T, EventLoopClosedError>
+	pub fn run_function_wait<F, T>(&self, function: F) -> T
 	where
 		F: FnOnce(&mut ContextHandle) -> T + Send + 'static,
 		T: Send + 'static,
@@ -173,8 +170,9 @@ impl ContextProxy {
 		let (result_tx, result_rx) = oneshot::channel();
 		self.run_function(move |context| {
 			result_tx.send((function)(context))
-		})?;
-		result_rx.recv().map_err(|_| EventLoopClosedError)
+		});
+		result_rx.recv()
+			.expect("global context failed to send function return value back, which can only happen if the event loop stopped, but that should also kill the process")
 	}
 }
 
@@ -195,7 +193,7 @@ impl WindowProxy {
 	}
 
 	/// Destroy the window.
-	pub fn destroy(&self) -> Result<(), ProxyWindowOperationError> {
+	pub fn destroy(&self) -> Result<(), InvalidWindowIdError> {
 		self.context_proxy.destroy_window(self.window_id)
 	}
 
@@ -203,7 +201,7 @@ impl WindowProxy {
 	pub fn set_visible(
 		&self,
 		visible: bool,
-	) -> Result<(), ProxyWindowOperationError> {
+	) -> Result<(), InvalidWindowIdError> {
 		self.context_proxy.set_window_visible(self.window_id, visible)
 	}
 
@@ -212,7 +210,7 @@ impl WindowProxy {
 		&self,
 		name: impl Into<String>,
 		image: impl Into<Image>,
-	) -> Result<(), ProxySetImageError> {
+	) -> Result<(), SetImageError> {
 		self.context_proxy.set_window_image(self.window_id, name, image)
 	}
 
@@ -222,7 +220,7 @@ impl WindowProxy {
 	///
 	/// This function uses [`ContextHandle::run_function_wait`] internally, so it blocks until the event handler is added.
 	/// To avoid blocking, you can use [`ContextHandle::run_function`] to post a lambda that adds an error handler instead.
-	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), ProxyWindowOperationError>
+	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), InvalidWindowIdError>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{

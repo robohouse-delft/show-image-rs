@@ -1,6 +1,11 @@
 use crate::WindowId;
 
-pub use winit::error::OsError;
+/// An error that can occur while creating a new window.
+#[derive(Debug)]
+pub enum CreateWindowError {
+	/// The underlying call to `winit` reported an error.
+	Winit(winit::error::OsError),
+}
 
 /// An error that can occur while interpreting image data.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -31,31 +36,6 @@ pub enum SetImageError {
 	ImageDataError(ImageDataError),
 }
 
-/// The context event loop was closed.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct EventLoopClosedError;
-
-/// An error that can occur while creating a window through a proxy object.
-#[derive(Debug)]
-pub enum ProxyCreateWindowError {
-	EventLoopClosed(EventLoopClosedError),
-	Os(OsError),
-}
-
-/// An error that can occur while creating a window through a proxy object.
-#[derive(Debug, Eq, PartialEq)]
-pub enum ProxyWindowOperationError {
-	EventLoopClosed(EventLoopClosedError),
-	InvalidWindowId(InvalidWindowIdError),
-}
-
-/// An error that can occur while creating a window through a proxy object.
-#[derive(Debug, Eq, PartialEq)]
-pub enum ProxySetImageError {
-	EventLoopClosed(EventLoopClosedError),
-	SetImageError(SetImageError),
-}
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum GetDeviceError {
 	NoSuitableAdapterFound(NoSuitableAdapterFoundError),
@@ -64,6 +44,12 @@ pub enum GetDeviceError {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoSuitableAdapterFoundError;
+
+impl From<winit::error::OsError> for CreateWindowError {
+	fn from(other: winit::error::OsError) -> Self {
+		Self::Winit(other)
+	}
+}
 
 impl From<ImageDataError> for SetImageError {
 	fn from(other: ImageDataError) -> Self {
@@ -107,52 +93,21 @@ impl From<wgpu::RequestDeviceError> for GetDeviceError {
 	}
 }
 
-impl From<EventLoopClosedError> for ProxyCreateWindowError {
-	fn from(other: EventLoopClosedError) -> Self {
-		Self::EventLoopClosed(other)
-	}
-}
-
-impl From<OsError> for ProxyCreateWindowError {
-	fn from(other: OsError) -> Self {
-		Self::Os(other)
-	}
-}
-
-impl From<EventLoopClosedError> for ProxyWindowOperationError {
-	fn from(other: EventLoopClosedError) -> Self {
-		Self::EventLoopClosed(other)
-	}
-}
-
-impl From<InvalidWindowIdError> for ProxyWindowOperationError {
-	fn from(other: InvalidWindowIdError) -> Self {
-		Self::InvalidWindowId(other)
-	}
-}
-
-impl From<EventLoopClosedError> for ProxySetImageError {
-	fn from(other: EventLoopClosedError) -> Self {
-		Self::EventLoopClosed(other)
-	}
-}
-
-impl From<SetImageError> for ProxySetImageError {
-	fn from(other: SetImageError) -> Self {
-		Self::SetImageError(other)
-	}
-}
-
+impl std::error::Error for CreateWindowError {}
 impl std::error::Error for ImageDataError {}
 impl std::error::Error for UnsupportedImageFormatError {}
 impl std::error::Error for InvalidWindowIdError {}
 impl std::error::Error for SetImageError {}
-impl std::error::Error for EventLoopClosedError {}
-impl std::error::Error for ProxyCreateWindowError {}
-impl std::error::Error for ProxyWindowOperationError {}
-impl std::error::Error for ProxySetImageError {}
 impl std::error::Error for GetDeviceError {}
 impl std::error::Error for NoSuitableAdapterFoundError {}
+
+impl std::fmt::Display for CreateWindowError {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			Self::Winit(e) => write!(f, "{}", e),
+		}
+	}
+}
 
 impl std::fmt::Display for ImageDataError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -180,39 +135,6 @@ impl std::fmt::Display for SetImageError {
 		match self {
 			Self::InvalidWindowId(e) => write!(f, "{}", e),
 			Self::ImageDataError(e) => write!(f, "{}", e),
-		}
-	}
-}
-
-impl std::fmt::Display for EventLoopClosedError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		write!(f, "global context has stopped")
-	}
-}
-
-impl std::fmt::Display for ProxyCreateWindowError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Self::EventLoopClosed(e) => write!(f, "{}", e),
-			Self::Os(e) => write!(f, "{}", e),
-		}
-	}
-}
-
-impl std::fmt::Display for ProxyWindowOperationError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Self::EventLoopClosed(e) => write!(f, "{}", e),
-			Self::InvalidWindowId(e) => write!(f, "{}", e),
-		}
-	}
-}
-
-impl std::fmt::Display for ProxySetImageError {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Self::EventLoopClosed(e) => write!(f, "{}", e),
-			Self::SetImageError(e) => write!(f, "{}", e),
 		}
 	}
 }

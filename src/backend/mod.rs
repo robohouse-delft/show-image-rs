@@ -118,9 +118,8 @@ where
 	let context = initialize_context().unwrap();
 
 	// Queue the user task.
-	// Unwrap should be safe, the event loop hasn't even started yet, so it can't be closed yet either.
-	context.proxy().run_function(user_task).unwrap();
-
+	// It won't be executed until context.run() is called.
+	context.proxy().run_function(user_task);
 	context.run();
 }
 
@@ -156,11 +155,7 @@ where
 
 	// Queue the user task.
 	// It won't be executed until context.run() is called.
-	// Unwrap should be safe, the event loop hasn't even started yet, so it can't be closed yet either.
-	context.proxy()
-		.run_function(|context| user_task(Ok(context)))
-		.unwrap();
-
+	context.proxy().run_function(|context| user_task(Ok(context)));
 	context.run();
 }
 
@@ -188,6 +183,6 @@ pub fn context() -> ContextProxy {
 ///
 /// # Panics
 /// This panics if the global context is not yet fully initialized.
-pub fn create_window(title: impl Into<String>, options: WindowOptions) -> Result<WindowProxy, error::ProxyCreateWindowError> {
+pub fn create_window(title: impl Into<String>, options: WindowOptions) -> Result<WindowProxy, error::CreateWindowError> {
 	context().create_window(title, options)
 }

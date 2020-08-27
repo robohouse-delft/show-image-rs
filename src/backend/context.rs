@@ -1,18 +1,18 @@
+use crate::AsImageView;
 use crate::ContextProxy;
 use crate::EventHandlerControlFlow;
-use crate::AsImageView;
-use crate::window::Window;
 use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
 use crate::backend::proxy::ContextFunction;
+use crate::error::CreateWindowError;
 use crate::error::GetDeviceError;
 use crate::error::InvalidWindowIdError;
 use crate::error::NoSuitableAdapterFoundError;
-use crate::error::OsError;
 use crate::error::SetImageError;
 use crate::event::Event;
 use crate::event::WindowEvent;
+use crate::window::Window;
 
 /// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
 ///
@@ -188,7 +188,7 @@ impl<'a> ContextHandle<'a> {
 	}
 
 	/// Create a new window.
-	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowHandle, OsError> {
+	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowHandle, CreateWindowError> {
 		let window_id = self.context.create_window(self.event_loop, title, options)?;
 		Ok(WindowHandle::new(ContextHandle {
 			context: self.context,
@@ -235,7 +235,7 @@ impl Context {
 		event_loop: &EventLoopWindowTarget,
 		title: impl Into<String>,
 		options: WindowOptions,
-	) -> Result<WindowId, OsError> {
+	) -> Result<WindowId, CreateWindowError> {
 		let mut window = winit::window::WindowBuilder::new()
 			.with_title(title)
 			.with_visible(!options.start_hidden)

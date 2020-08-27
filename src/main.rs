@@ -10,7 +10,7 @@ fn main(context: show_image::ContextProxy) {
 			eprintln!("last window closed");
 			std::process::exit(0);
 		}
-	}).unwrap();
+	});
 
 	let window = context.create_window("Show Image", WindowOptions::default()).unwrap();
 	window.set_image("image", image).unwrap();
