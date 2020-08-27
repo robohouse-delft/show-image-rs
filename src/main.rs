@@ -1,7 +1,8 @@
 use show_image::WindowOptions;
 
 #[show_image::main]
-fn main(context: show_image::ContextProxy) {
+fn main() {
+	let context = show_image::context();
 	let args : Vec<_> = std::env::args().collect();
 	let image = image::open(args.get(1).unwrap()).unwrap();
 

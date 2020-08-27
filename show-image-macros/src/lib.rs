@@ -1,7 +1,6 @@
 //! This crate contains helper macros for the `show-image` crate.
 //! You should not depend on this crate directly.
-//! Instead, enable the `macro` feature of the `show-image` crate,
-//! which will report all macros at the crate root.
+//! Instead, enable the `macro` feature of the `show-image` crate and use them from there.
 
 /// Wrap your program entry point for correct initialization of the `show-image` global context.
 ///
@@ -16,9 +15,6 @@
 /// However, some platforms require all GUI code to run in the "main" thread (looking at you, OS X).
 /// To ensure portability, the same restriction is enforced on other platforms.
 ///
-/// Your entry point must take a single [`show_image::ContextProxy`] argument.
-/// It can return anything that a normal entry point can return.
-///
 /// # Examples
 ///
 /// ```no_run
@@ -26,7 +22,8 @@
 /// use image::Image;
 ///
 /// #[show_image::main]
-/// fn main(context: ContextProxy) -> Result<(), String> {
+/// fn main() -> Result<(), String> {
+///   let context = show_image::context();
 ///   let window = context
 ///     .create_window("My Awesome Window", WindowOptions::default())
 ///     .map_err(|e| e.to_string())?;
@@ -37,7 +34,7 @@
 ///   window.set_image("image", image)
 ///     .map_err(|e| e.to_string())?;
 ///
-///   // Tell the context to terminate the processw when the last window closes,
+///   // Tell the context to terminate the process when the last window closes,
 ///   // and then wait forever.
 ///   context.set_exit_with_last_window(true);
 ///   loop {
@@ -58,7 +55,7 @@ mod details {
 
 	/// Convert a syn::Error into a compile error with a dummy main.
 	///
-	/// The dummy main prevents the compiler from complaining about a missing entrypoint, which is confusing noise.
+	/// The dummy main prevents the compiler from complaining about a missing entry point, which is confusing noise.
 	/// We only want the compiler to show the real error.
 	pub fn error_to_tokens(error: syn::Error) -> proc_macro2::TokenStream {
 		let error = error.to_compile_error();

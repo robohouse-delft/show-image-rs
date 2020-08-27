@@ -157,7 +157,7 @@ impl ContextProxy {
 	/// Post a function for execution in the context thread and wait for the return value.
 	///
 	/// If you do not need a return value from the posted function,
-	/// you can use [`Self::run_function`] to avoid blocking it completes.
+	/// you can use [`Self::run_function`] to avoid blocking the calling thread untill it completes.
 	///
 	/// *Note:*
 	/// You should not post functions to the context thread that block for a long time.
@@ -219,7 +219,7 @@ impl WindowProxy {
 	/// Events that are already queued with the event loop will not be passed to the handler.
 	///
 	/// This function uses [`ContextHandle::run_function_wait`] internally, so it blocks until the event handler is added.
-	/// To avoid blocking, you can use [`ContextHandle::run_function`] to post a lambda that adds an error handler instead.
+	/// To avoid blocking, you can use [`ContextHandle::run_function`] to post a lambda that adds an event handler instead.
 	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), InvalidWindowIdError>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
