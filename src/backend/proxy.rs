@@ -77,7 +77,7 @@ impl ContextProxy {
 		})
 	}
 
-	/// Make a window visiable or invsible.
+	/// Make a window visible or invisible.
 	///
 	/// The real work is done in the context thread.
 	/// This function blocks until the context thread has performed the action.
@@ -159,7 +159,7 @@ impl ContextProxy {
 	/// Post a function for execution in the context thread and wait for the return value.
 	///
 	/// If you do not need a return value from the posted function,
-	/// you can use [`Self::run_function`] to avoid blocking the calling thread untill it completes.
+	/// you can use [`Self::run_function`] to avoid blocking the calling thread until it completes.
 	///
 	/// *Note:*
 	/// You should not post functions to the context thread that block for a long time.
