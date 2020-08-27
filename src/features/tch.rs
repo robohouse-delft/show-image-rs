@@ -20,13 +20,13 @@
 //!
 //! # Example
 //! ```no_run
-//! use show_image::make_window;
+//! use show_image::{create_window, WindowOptions};
 //! use show_image::tch::TensorAsImage;
 //!
-//! let tensor = tch::vision::imagenet::load_image("/path/to/image").unwrap();
-//! let window = make_window("image")?;
+//! let tensor = tch::vision::imagenet::load_image("/path/to/image.png").unwrap();
+//! let window = create_window("image", WindowOptions::default())?;
 //! window.set_image("image-001", tensor.as_image_guess_rgb())?;
-//! # Result::<(), String>::Ok(())
+//! # Result::<(), Box<dyn std::error::Error>>::Ok(())
 //! ```
 
 use crate::BoxImage;

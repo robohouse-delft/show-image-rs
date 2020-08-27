@@ -37,44 +37,40 @@
 //! but any type that implements [`ImageData`] will do.
 //! ```no_run
 //! # use image;
-//! # use std::time::Duration;
 //! # let pixel_data = &[0u8][..];
-//! use show_image::{ImageInfo, make_window};
+//! use show_image::{ImageView, ImageInfo, create_window};
 //!
-//! let image = (pixel_data, ImageInfo::rgb8(1920, 1080));
+//! let image = ImageView::new(ImageInfo::rgb8(1920, 1080), pixel_data);
 //!
-//! // Create a window and display the image.
-//! let window = make_window("image")?;
+//! // Create a window with default options and display the image.
+//! let window = create_window("image", Default::default())?;
 //! window.set_image("image-001", image)?;
 //!
-//! # Result::<(), String>::Ok(())
+//! # Result::<(), Box<dyn std::error::Error>>::Ok(())
 //! ```
 //!
 //! # Example 2: Handling keyboard events.
 //! ```no_run
-//! # use std::time::Duration;
-//! # use show_image::ImageInfo;
-//! use show_image::{Event, KeyCode, make_window};
+//! # use show_image::{ImageInfo, ImageView};
+//! use show_image::{event, create_window};
 //!
 //! // Create a window and display the image.
-//! # let image = (&[0u8][..], ImageInfo::rgb8(1920, 1080));
-//! let window = make_window("image")?;
+//! # let image = ImageView::new(ImageInfo::rgb8(1920, 1080), &[0u8][..]);
+//! let window = create_window("image", Default::default())?;
 //! window.set_image("image-001", &image)?;
 //!
 //! // Print keyboard events until Escape is pressed, then exit.
 //! // If the user closes the window, the channel is closed and the loop also exits.
-//! for event in window.events()? {
-//!     if let Event::KeyboardEvent(event) = event {
+//! for event in window.event_channel()? {
+//!   if let event::WindowEvent::KeyboardInput { input, .. } = event {
 //!         println!("{:#?}", event);
-//!         if event.key == KeyCode::Escape {
+//!         if input.virtual_keycode == Some(event::VirtualKeyCode::Escape) {
 //!             break;
 //!         }
 //!     }
 //! }
 //!
-//! // Make sure all background tasks are stopped cleanly.
-//! show_image::stop()?;
-//! # Result::<(), String>::Ok(())
+//! # Result::<(), Box<dyn std::error::Error>>::Ok(())
 //! ```
 
 mod backend;

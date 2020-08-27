@@ -20,26 +20,15 @@
 /// ```no_run
 /// use show_image::{ContextProxy, WindowOptions};
 /// use image::Image;
+/// # use std::error::Error;
 ///
 /// #[show_image::main]
-/// fn main() -> Result<(), String> {
-///   let context = show_image::context();
-///   let window = context
-///     .create_window("My Awesome Window", WindowOptions::default())
-///     .map_err(|e| e.to_string())?;
+/// fn main() -> Result<(), Box<dyn Error>> {
+///   let window = show_image::create_window("My Awesome Window", WindowOptions::default())?;
+///   let image = Image::load("/path/to/image.png")?;
 ///
-///   let image = Image::load("/path/to/image.png")
-///     .map_err(|e| e.to_string())?;
-///
-///   window.set_image("image", image)
-///     .map_err(|e| e.to_string())?;
-///
-///   // Tell the context to terminate the process when the last window closes,
-///   // and then wait forever.
-///   context.set_exit_with_last_window(true);
-///   loop {
-///     std::thread::park();
-///   }
+///   window.set_image("image", image)?;
+///   window.wait_until_destroyed()?;
 /// }
 /// ```
 #[proc_macro_attribute]
