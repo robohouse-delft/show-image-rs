@@ -1,8 +1,6 @@
 use raqote::DrawOptions;
 use raqote::DrawTarget;
 use raqote::PathBuilder;
-use raqote::SolidSource;
-use raqote::Source;
 use raqote::StrokeStyle;
 use show_image::event;
 use show_image::Image;
@@ -19,11 +17,11 @@ fn main() -> Result<(), String> {
 	image.set_transform(&raqote::Transform::create_scale(1000.0, 1000.0));
 	overlay.set_transform(&raqote::Transform::create_scale(1000.0, 1000.0));
 
-	let black  = Source::Solid(SolidSource::from_unpremultiplied_argb(255,   0,   0,   0));
-	let white  = Source::Solid(SolidSource::from_unpremultiplied_argb(255, 255, 255, 255));
-	let red    = Source::Solid(SolidSource::from_unpremultiplied_argb(255, 190,   0,   0));
-	let yellow = Source::Solid(SolidSource::from_unpremultiplied_argb(255, 255, 215,  85));
-	let blue   = Source::Solid(SolidSource::from_unpremultiplied_argb(255,   0,  50, 160));
+	let black  = raqote::Color::new(255,   0,   0,   0).into();
+	let white  = raqote::Color::new(255, 255, 255, 255).into();
+	let red    = raqote::Color::new(255, 190,   0,   0).into();
+	let yellow = raqote::Color::new(255, 255, 215,  85).into();
+	let blue   = raqote::Color::new(255,   0,  50, 160).into();
 
 	let draw_options = DrawOptions::new();
 
