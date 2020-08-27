@@ -9,21 +9,22 @@
 //! support for third party libraries must be enabled explicitly with feature flags.
 //!
 //! Currently, the following types are supported:
-//!   * Tuples of binary data and [`ImageInfo`].
-//!   * [`image::DynamicImage`] and [`image::ImageBuffer`] with the `image` feature.
-//!   * [`tch::Tensor`](::tch::Tensor) with the `tch` feature.
+//!   * The [`Image`] and [`ImageView`] types from this crate.
+//!   * [`image::DynamicImage`][::image::DynamicImage] and [`image::ImageBuffer`][::image::ImageBuffer] (requires the `"image"` feature).
+//!   * [`tch::Tensor`](::tch::Tensor) (requires the `"tch"` feature).
+//!   * [`raqote::DrawTarget`][::raqote::DrawTarget] and [`raqote::Image`][::raqote::Image] (requires the `"raqote"` feature).
 //!
 //! If you think support for a some data type is missing,
 //! feel free to send a PR or create an issue on GitHub.
 //!
 //! # Event handling.
-//! You can receive events using [`Window::events`].
-//! This is a general channel on which all events for that window are sent.
-//! Alternatively you can use [`Window::add_event_handler`] to register an asynchronous event handler.
-//! This event handler will run in the context thread, so shouldn't block for too long.
+//! You can register an event handler to run in the global context thread using [`WindowProxy::add_event_handler()`] or some of the similar functions.
+//! You can also register an event handler directly with the context to handle global events (including all window events).
+//! Since these event handlers run in the event loop, they should not block for any significant time.
 //!
-//! You can also handle keyboard events for windows using [`Window::wait_key`] or [`Window::wait_key_deadline`].
-//! These functions will wait for key press events while discarding key up events.
+//! You can also receive events using [`WindowProxy::event_channel()`] or [`ContextProxy::event_channel()`].
+//! These functions create a new channel for receiving window events or global events, respectively.
+//! As long as you're receiving the events in your own thread, you can block as long as you like.
 //!
 //! # Saving displayed images.
 //! If the `save` feature is enabled, windows allow the displayed image to be saved using `Ctrl+S`.
@@ -34,7 +35,7 @@
 //!
 //! # Example 1: Showing an image.
 //! This example uses a tuple of `(&[u8], `[`ImageInfo`]`)` as image,
-//! but any type that implements [`ImageData`] will do.
+//! but any type that implements [`Into<show_image::Image>`] will do.
 //! ```no_run
 //! # use image;
 //! # let pixel_data = &[0u8][..];

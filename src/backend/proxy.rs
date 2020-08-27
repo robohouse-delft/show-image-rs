@@ -242,8 +242,8 @@ impl WindowProxy {
 	///
 	/// Events that are already queued with the event loop will not be passed to the handler.
 	///
-	/// This function uses [`ContextHandle::run_function_wait`] internally, so it blocks until the event handler is added.
-	/// To avoid blocking, you can use [`ContextHandle::run_function`] to post a lambda that adds an event handler instead.
+	/// This function uses [`ContextProxy::run_function_wait`] internally, so it blocks until the event handler is added.
+	/// To avoid blocking, you can use [`ContextProxy::run_function`] to post a lambda that adds an event handler instead.
 	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), InvalidWindowIdError>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,

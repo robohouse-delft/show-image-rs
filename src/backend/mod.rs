@@ -37,7 +37,7 @@ fn initialize_context() -> Result<Context, error::GetDeviceError> {
 /// The user task can call the [`context()`] function to obtain a [`ContextProxy`],
 /// or the [`create_window()`] function to create a new window directly.
 ///
-/// If the `macros` feature is enabled, you can also wrap your main function with the [`main`] macro
+/// If the `macros` feature is enabled, you can also wrap your main function with the [`main`][crate::main] macro
 /// instead of manually calling this function.
 ///
 /// # Panics
@@ -112,7 +112,7 @@ where
 /// You should not run a function that blocks for any significant time in the main thread.
 /// Doing so will prevent the event loop from processing events and will result in unresponsive windows.
 ///
-/// If you're looking for a place to run your own application code, you probably want to use [`run_context`] or the [`main`] macro.
+/// If you're looking for a place to run your own application code, you probably want to use [`run_context`] or the [`main`][crate::main] macro.
 /// However, if you can drive your entire application from event handlers, then this function is probably what you're looking for.
 ///
 /// # Panics

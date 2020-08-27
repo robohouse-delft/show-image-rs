@@ -12,7 +12,7 @@
 //! It is not always possible to interpret a tensor as the requested image format,
 //! so all function in the extension trait return a [`Result`].
 //! The [`Into<Image>`] trait is implemented for [`TensorImage`] and for [`Result`]`<`[`TensorImage`]`, `[`ImageDataError`]`>`,
-//! so you can directly pass the result to [`set_image`](crate::Window::set_image),
+//! so you can directly pass use the result to so set the image of a window directly.
 //!
 //! Both planar and interlaced tensors are supported.
 //! If you specify the format manually, you must also specify if the tensor contains interlaced or planar data.
