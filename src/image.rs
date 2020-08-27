@@ -163,6 +163,54 @@ impl AsImageView for ArcImage {
 	}
 }
 
+impl From<ImageView<'_>> for BoxImage {
+	fn from(other: ImageView) -> Self {
+		Self {
+			info: other.info,
+			data: other.data.into()
+		}
+	}
+}
+
+impl From<&'_ ImageView<'_>> for BoxImage {
+	fn from(other: &ImageView) -> Self {
+		Self {
+			info: other.info,
+			data: other.data.into()
+		}
+	}
+}
+
+impl From<ImageView<'_>> for ArcImage {
+	fn from(other: ImageView) -> Self {
+		Self {
+			info: other.info,
+			data: other.data.into()
+		}
+	}
+}
+
+impl From<&'_ ImageView<'_>> for ArcImage {
+	fn from(other: &ImageView) -> Self {
+		Self {
+			info: other.info,
+			data: other.data.into()
+		}
+	}
+}
+
+impl From<ImageView<'_>> for Image {
+	fn from(other: ImageView) -> Self {
+		Self::Box(BoxImage::from(other))
+	}
+}
+
+impl From<&'_ ImageView<'_>> for Image {
+	fn from(other: &ImageView) -> Self {
+		Self::Box(BoxImage::from(other))
+	}
+}
+
 impl From<BoxImage> for ArcImage {
 	fn from(other: BoxImage) -> Self {
 		Self {
