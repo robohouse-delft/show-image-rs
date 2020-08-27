@@ -4,14 +4,13 @@ pub mod proxy;
 pub mod util;
 pub mod window;
 
-pub use context::Context;
 pub use context::ContextHandle;
 pub use proxy::ContextProxy;
 pub use proxy::WindowProxy;
-pub use window::Window;
 pub use window::WindowHandle;
 pub use window::WindowOptions;
 
+use context::Context;
 use crate::error;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;

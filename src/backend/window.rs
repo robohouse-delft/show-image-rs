@@ -12,25 +12,25 @@ use crate::event::WindowEvent;
 /// A window.
 pub struct Window {
 	/// The winit window.
-	pub(crate) window: winit::window::Window,
+	pub window: winit::window::Window,
 
 	/// The window options.
-	pub(crate) options: WindowOptions,
+	pub options: WindowOptions,
 
 	/// The wgpu surface to render to.
-	pub(crate) surface: wgpu::Surface,
+	pub surface: wgpu::Surface,
 
 	/// The swap chain for the surface.
-	pub(crate) swap_chain: wgpu::SwapChain,
+	pub swap_chain: wgpu::SwapChain,
 
 	/// The window specific uniforms for the render pipeline.
-	pub(crate) uniforms: UniformsBuffer<WindowUniforms>,
+	pub uniforms: UniformsBuffer<WindowUniforms>,
 
 	/// The image to display (if any).
-	pub(crate) image: Option<GpuImage>,
+	pub image: Option<GpuImage>,
 
 	/// The event handlers for this specific window.
-	pub(crate) event_handlers: Vec<Box<dyn FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow)>>,
+	pub event_handlers: Vec<Box<dyn FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow)>>,
 }
 
 /// A handle to a window.
