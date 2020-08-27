@@ -49,12 +49,26 @@
 pub fn main(attribs: proc_macro::TokenStream, input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	match details::main(attribs.into(), input.into()) {
 		Ok(x) => x.into(),
-		Err(e) => e.to_compile_error().into(),
+		Err(e) => details::error_to_tokens(e).into(),
 	}
 }
 
 mod details {
 	use quote::quote;
+
+	/// Convert a syn::Error into a compile error with a dummy main.
+	///
+	/// The dummy main prevents the compiler from complaining about a missing entrypoint, which is confusing noise.
+	/// We only want the compiler to show the real error.
+	pub fn error_to_tokens(error: syn::Error) -> proc_macro2::TokenStream {
+		let error = error.to_compile_error();
+		quote! {
+			#error
+			fn main() {
+				panic!("#[show_image::main]: compilation should have failed, please report this bug");
+			}
+		}
+	}
 
 	pub fn main(arguments: proc_macro2::TokenStream, input: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
 		if !arguments.is_empty() {
