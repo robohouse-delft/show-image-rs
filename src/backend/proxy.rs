@@ -273,4 +273,24 @@ impl WindowProxy {
 		})?;
 		Ok(rx)
 	}
+
+	/// Wait for the window to be destroyed.
+	///
+	/// This can happen if the application code destroys the window or if the user closes the window.
+	///
+	/// *Warning:*
+	/// This function blocks until the window is closed.
+	/// You should never use this function from within an event handler or a function posted to the global context thread.
+	/// Doing so would cause a deadlock.
+	pub fn wait_until_destroyed(&self) -> Result<(), InvalidWindowIdError> {
+		let (tx, rx) = oneshot::channel::<()>();
+		self.add_event_handler(move |_window, _event, _control| {
+			// Need to mention the tx half so it gets moved into the closure.
+			let _tx = &tx;
+		})?;
+
+		// We actually want to wait for the transmit handle to be dropped, so ignore receive errors.
+		let _ = rx.recv();
+		Ok(())
+	}
 }
