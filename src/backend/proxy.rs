@@ -12,13 +12,21 @@ use crate::oneshot;
 
 use std::sync::mpsc;
 
-/// A proxy object to interact with the global context from a different thread.
+/// Proxy object to interact with the global context from a user thread.
+///
+/// You should not use proxy objects from withing the global context thread.
+/// The proxy objects often wait for the global context to perform some action.
+/// Doing so from within the global context thread would cause a deadlock.
 #[derive(Clone)]
 pub struct ContextProxy {
 	event_loop: EventLoopProxy,
 }
 
-/// A proxy object to interact with a window from a different thread.
+/// Proxy object to interact with a window from a user thread.
+///
+/// You should not use proxy objects from withing the global context thread.
+/// The proxy objects often wait for the global context to perform some action.
+/// Doing so from within the global context thread would cause a deadlock.
 #[derive(Clone)]
 pub struct WindowProxy {
 	window_id: WindowId,

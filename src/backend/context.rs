@@ -66,9 +66,9 @@ pub struct Context {
 	event_handlers: Vec<Box<dyn FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + 'static>>,
 }
 
-/// A handle to the global context.
+/// Handle to the global context.
 ///
-/// You can interact with the global context through a [`ContextHandle`] only from the context thread.
+/// You can interact with the global context through a [`ContextHandle`] only from the global context thread.
 /// To interact with the context from a different thread, use a [`ContextProxy`].
 pub struct ContextHandle<'a> {
 	context: &'a mut Context,
@@ -116,11 +116,6 @@ impl Context {
 			exit_with_last_window: false,
 			event_handlers: Vec::new(),
 		})
-	}
-
-	/// Get a proxy for the context to interact with it from a different thread.
-	pub fn proxy(&self) -> ContextProxy {
-		self.proxy.clone()
 	}
 
 	/// Add a global event handler.
@@ -178,8 +173,12 @@ impl<'a> ContextHandle<'a> {
 	}
 
 	/// Get a proxy for the context to interact with it from a different thread.
+	///
+	/// You should not use proxy objects from withing the global context thread.
+	/// The proxy objects often wait for the global context to perform some action.
+	/// Doing so from within the global context thread would cause a deadlock.
 	pub fn proxy(&self) -> ContextProxy {
-		self.context.proxy()
+		self.context.proxy.clone()
 	}
 
 	/// Exit the program when the last window closes.

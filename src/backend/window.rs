@@ -1,8 +1,9 @@
+use crate::AsImageView;
 use crate::Color;
 use crate::ContextHandle;
 use crate::EventHandlerControlFlow;
-use crate::AsImageView;
 use crate::WindowId;
+use crate::WindowProxy;
 use crate::backend::util::GpuImage;
 use crate::backend::util::UniformsBuffer;
 use crate::error::InvalidWindowIdError;
@@ -33,7 +34,10 @@ pub struct Window {
 	pub event_handlers: Vec<Box<dyn FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow)>>,
 }
 
-/// A handle to a window.
+/// Handle to a window.
+///
+/// A [`WindowHandle`] can be used to interact with a window from within the global context thread.
+/// To interact with a window from another thread, you need a [`WindowProxy`].
 pub struct WindowHandle<'a> {
 	/// The context handle to use.
 	context_handle: ContextHandle<'a>,
@@ -51,6 +55,15 @@ impl<'a> WindowHandle<'a> {
 	/// Get the window ID.
 	pub fn id(&self) -> WindowId {
 		self.window_id
+	}
+
+	/// Get a proxy object for the window to interact with it from a different thread.
+	///
+	/// You should not use proxy objects from withing the global context thread.
+	/// The proxy objects often wait for the global context to perform some action.
+	/// Doing so from within the global context thread would cause a deadlock.
+	pub fn proxy(&self) -> WindowProxy {
+		WindowProxy::new(self.window_id, self.context_handle.proxy())
 	}
 
 	/// Get the context handle as mutable reference.
