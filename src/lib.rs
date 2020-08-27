@@ -34,8 +34,6 @@
 //! To ensure that no data loss occurs, call [`stop`] to gracefully stop and join the background thread.
 //!
 //! # Example 1: Showing an image.
-//! This example uses a tuple of `(&[u8], `[`ImageInfo`]`)` as image,
-//! but any type that implements [`Into<show_image::Image>`] will do.
 //! ```no_run
 //! # use image;
 //! # let pixel_data = &[0u8][..];
@@ -74,15 +72,16 @@
 //! # Result::<(), Box<dyn std::error::Error>>::Ok(())
 //! ```
 
+#![cfg_attr(feature = "nightly", feature(doc_cfg))]
+
 mod backend;
-mod error;
+pub mod error;
 mod event_handler;
 mod features;
 mod image;
 mod image_info;
 mod oneshot;
 
-pub use self::error::*;
 pub use self::backend::*;
 pub use self::features::*;
 pub use self::image::*;
@@ -110,6 +109,7 @@ pub type Event<'a> = winit::event::Event<'a, AllWindowsClosed>;
 
 /// Save an image to the given path.
 #[cfg(feature = "save")]
+#[cfg_attr(feature = "nightly", doc(cfg(feature = "save")))]
 pub fn save_image(path: &std::path::Path, data: &[u8], info: ImageInfo) -> Result<(), String> {
 	let color_type = match info.pixel_format {
 		PixelFormat::Mono8 => ::image::ColorType::L8,
@@ -163,6 +163,7 @@ pub fn save_image(path: &std::path::Path, data: &[u8], info: ImageInfo) -> Resul
 ///
 /// The name hint is used as initial path for the prompt.
 #[cfg(feature = "save")]
+#[cfg_attr(feature = "nightly", doc(cfg(feature = "save")))]
 pub fn prompt_save_image(name_hint: &str, data: &[u8], info: ImageInfo) -> Result<(), String> {
 	let path = match tinyfiledialogs::save_file_dialog("Save image", name_hint) {
 		Some(x) => x,

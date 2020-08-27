@@ -1,3 +1,5 @@
+//! Error types for the crate.
+
 use crate::WindowId;
 
 /// An error that can occur while creating a new window.

@@ -1,3 +1,7 @@
+//! Local version of [`std::process::Termination`] untill it is stabalized.
+//!
+//! On `nightly`, this module just re-exports the real [`std::process::Termination`] trait.
+
 #[cfg(feature = "nightly")]
 mod contents {
 	pub use std::process::Termination;

@@ -1,3 +1,5 @@
+//! Support for the [`image`][::image] crate.
+
 use crate::Alpha;
 use crate::AsImageView;
 use crate::BoxImage;

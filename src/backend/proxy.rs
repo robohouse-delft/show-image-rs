@@ -33,7 +33,7 @@ pub struct WindowProxy {
 	context_proxy: ContextProxy,
 }
 
-/// A dynamic function that can be run by the global context.
+/// Dynamic function that can be run by the global context.
 pub type ContextFunction = Box<dyn FnOnce(&mut ContextHandle) + Send>;
 
 /// Internal shorthand for the correct `winit::event::EventLoopProxy`.

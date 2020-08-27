@@ -14,7 +14,7 @@ pub fn image_info(image: &impl AsImageView) -> Result<ImageInfo, ImageDataError>
 	Ok(image.as_image_view()?.info())
 }
 
-/// A borrowed view of image data,
+/// Borrowed view of image data,
 #[derive(Debug, Copy, Clone)]
 pub struct ImageView<'a> {
 	info: ImageInfo,
@@ -44,7 +44,7 @@ impl<'a> AsImageView for ImageView<'a> {
 	}
 }
 
-/// An owning image that can be send to another thread.
+/// Owning image that can be sent to another thread.
 ///
 /// The image is backed by either a [`Box`] or [`Arc`].
 /// It can either directly own the data or through a [`dyn AsImageView`].
@@ -93,14 +93,14 @@ impl<T: AsImageView> AsImageView for Arc<T> {
 	}
 }
 
-/// An image backed by a `Box<[u8]>`.
+/// Image backed by a `Box<[u8]>`.
 #[derive(Debug, Clone)]
 pub struct BoxImage {
 	info: ImageInfo,
 	data: Box<[u8]>,
 }
 
-/// An image backed by an `Arc<[u8]>`.
+/// Image backed by an `Arc<[u8]>`.
 #[derive(Debug, Clone)]
 pub struct ArcImage {
 	info: ImageInfo,

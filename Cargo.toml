@@ -48,7 +48,7 @@ assert2    = "0.3.1"
 rustc_version = "0.2.3"
 
 [package.metadata.docs.rs]
-features = ["doc-only", "full"]
+features = ["doc-only", "full", "nightly"]
 
 [workspace]
 members = ["show-image-macros"]

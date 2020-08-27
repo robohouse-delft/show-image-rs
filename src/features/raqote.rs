@@ -1,3 +1,5 @@
+//! Support for the [`raqote`][::raqote] crate.
+
 use crate::BoxImage;
 use crate::Image;
 use crate::ImageInfo;

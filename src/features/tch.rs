@@ -1,4 +1,4 @@
-//! Support for [`tch::Tensor`].
+//! Support for the [`tch`][::tch] crate.
 //!
 //! This module adds support for displaying [`tch::Tensor`] as images.
 //! The main interface is provided by an extension trait [`TensorAsImage`],

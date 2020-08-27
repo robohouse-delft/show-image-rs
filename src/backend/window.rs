@@ -10,7 +10,7 @@ use crate::error::InvalidWindowIdError;
 use crate::error::SetImageError;
 use crate::event::WindowEvent;
 
-/// A window.
+/// Window capable of displaying images using wgpu.
 pub struct Window {
 	/// The winit window.
 	pub window: winit::window::Window,
@@ -97,6 +97,7 @@ impl<'a> WindowHandle<'a> {
 	}
 }
 
+/// Options for creating a new window.
 #[derive(Debug, Clone)]
 pub struct WindowOptions {
 	/// Preserve the aspect ratio of the image when scaling.
