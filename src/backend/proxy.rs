@@ -10,6 +10,8 @@ use crate::error::SetImageError;
 use crate::event::WindowEvent;
 use crate::oneshot;
 
+use std::sync::mpsc;
+
 /// A proxy object to interact with the global context from a different thread.
 #[derive(Clone)]
 pub struct ContextProxy {
@@ -174,6 +176,28 @@ impl ContextProxy {
 		result_rx.recv()
 			.expect("global context failed to send function return value back, which can only happen if the event loop stopped, but that should also kill the process")
 	}
+
+	/// Create a channel that receives events from the context.
+	///
+	/// To close the channel, simply drop de receiver.
+	///
+	/// *Warning:*
+	/// The created channel blocks when you request an event until one is available.
+	/// You should never use the receiver from within an event handler or a function posted to the global context thread.
+	/// Doing so would cause a deadlock.
+	pub fn event_channel(&self) -> mpsc::Receiver<crate::Event<'static>> {
+		let (tx, rx) = mpsc::channel();
+		self.add_event_handler(move |_context, event, control| {
+			// Filter out non-static events.
+			if let Some(event) = super::event::clone_static_event(event) {
+				// If the receiver is dropped, remove the handler.
+				if let Err(_) = tx.send(event) {
+					control.remove_handler = true;
+				}
+			}
+		});
+		rx
+	}
 }
 
 impl WindowProxy {
@@ -225,5 +249,28 @@ impl WindowProxy {
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
 		self.context_proxy.add_window_event_handler(self.window_id, handler)
+	}
+
+	/// Create a channel that receives events from the window.
+	///
+	/// To close the channel, simply drop de receiver.
+	/// The channel is closed automatically when the window is destroyed.
+	///
+	/// *Warning:*
+	/// The created channel blocks when you request an event until one is available.
+	/// You should never use the receiver from within an event handler or a function posted to the global context thread.
+	/// Doing so would cause a deadlock.
+	pub fn event_channel(&self) -> Result<mpsc::Receiver<crate::event::WindowEvent<'static>>, InvalidWindowIdError> {
+		let (tx, rx) = mpsc::channel();
+		self.add_event_handler(move |_window, event, control| {
+			// Filter out non-static events.
+			if let Some(event) = super::event::clone_static_window_event(event) {
+				// If the receiver is dropped, remove the handler.
+				if let Err(_) = tx.send(event) {
+					control.remove_handler = true;
+				}
+			}
+		})?;
+		Ok(rx)
 	}
 }

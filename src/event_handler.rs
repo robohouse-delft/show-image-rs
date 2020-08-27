@@ -1,4 +1,5 @@
 /// Event indicating that all open windows have been closed.
+#[derive(Debug, Copy, Clone)]
 pub struct AllWindowsClosed;
 
 /// Control flow properties for event handlers.

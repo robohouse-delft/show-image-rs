@@ -24,17 +24,15 @@ fn main() -> Result<(), String> {
 
 	window.set_image(name, image).map_err(|e| e.to_string())?;
 
-	window.add_event_handler(|window, event, _control| {
+	// Wait for the window to be closed or Escape to be pressed.
+	for event in window.event_channel().map_err(|e| e.to_string())? {
 		if let event::WindowEvent::KeyboardInput { input, .. } = event {
 			if input.virtual_keycode == Some(event::VirtualKeyCode::Escape) && input.state == event::ElementState::Pressed {
-				let _ = window.destroy();
+				println!("Escape pressed!");
+				break;
 			}
 		}
-	}).map_err(|e| e.to_string())?;
-
-	// Wait forever until the window is closed or escape is pressed.
-	show_image::context().set_exit_with_last_window(true);
-	loop {
-		std::thread::park();
 	}
+
+	Ok(())
 }
