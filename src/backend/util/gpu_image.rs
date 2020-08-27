@@ -1,5 +1,5 @@
 use crate::ImageView;
-use crate::PixelFormat;
+use crate::{Alpha, PixelFormat};
 use super::buffer::create_buffer_with_value;
 
 /// A GPU image buffer ready to be used with the rendering pipeline.
@@ -30,10 +30,14 @@ impl GpuImage {
 	) -> Self {
 		let format = match image.info().pixel_format {
 			PixelFormat::Mono8 => 0,
-			PixelFormat::Bgr8 => 1,
-			PixelFormat::Bgra8 => 2,
-			PixelFormat::Rgb8 => 3,
-			PixelFormat::Rgba8 => 4,
+			PixelFormat::MonoAlpha8(Alpha::Unpremultiplied) => 1,
+			PixelFormat::MonoAlpha8(Alpha::Premultiplied) => 2,
+			PixelFormat::Bgr8 => 3,
+			PixelFormat::Bgra8(Alpha::Unpremultiplied) => 4,
+			PixelFormat::Bgra8(Alpha::Premultiplied) => 5,
+			PixelFormat::Rgb8 => 6,
+			PixelFormat::Rgba8(Alpha::Unpremultiplied) => 7,
+			PixelFormat::Rgba8(Alpha::Premultiplied) => 8,
 		};
 
 		let uniforms = GpuImageUniforms {

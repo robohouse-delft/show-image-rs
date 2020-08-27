@@ -1,8 +1,9 @@
+use crate::Alpha;
+use crate::AsImageView;
 use crate::BoxImage;
 use crate::Image;
-use crate::ImageView;
-use crate::AsImageView;
 use crate::ImageInfo;
+use crate::ImageView;
 use crate::PixelFormat;
 use crate::error::ImageDataError;
 
@@ -138,11 +139,12 @@ fn dynamic_image_info(image: &image::DynamicImage) -> Result<ImageInfo, ImageDat
 /// Extract the PixelFormat from an [`image::Pixel`].
 fn pixel_format<P: image::Pixel>() -> Result<PixelFormat, ImageDataError> {
 	match P::COLOR_TYPE {
-		image::ColorType::Bgr8  => Ok(PixelFormat::Bgr8),
-		image::ColorType::Bgra8 => Ok(PixelFormat::Bgra8),
-		image::ColorType::Rgb8  => Ok(PixelFormat::Rgb8),
-		image::ColorType::Rgba8 => Ok(PixelFormat::Rgba8),
 		image::ColorType::L8    => Ok(PixelFormat::Mono8),
+		image::ColorType::La8   => Ok(PixelFormat::MonoAlpha8(Alpha::Unpremultiplied)),
+		image::ColorType::Bgr8  => Ok(PixelFormat::Bgr8),
+		image::ColorType::Bgra8 => Ok(PixelFormat::Bgra8(Alpha::Unpremultiplied)),
+		image::ColorType::Rgb8  => Ok(PixelFormat::Rgb8),
+		image::ColorType::Rgba8 => Ok(PixelFormat::Rgba8(Alpha::Unpremultiplied)),
 		x  => Err(format!("unsupported color type: {:?}", x).into()),
 	}
 }

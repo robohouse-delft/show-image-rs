@@ -112,11 +112,14 @@ pub type Event<'a> = winit::event::Event<'a, AllWindowsClosed>;
 pub fn save_image(path: &std::path::Path, data: &[u8], info: ImageInfo) -> Result<(), String> {
 	let color_type = match info.pixel_format {
 		PixelFormat::Mono8 => ::image::ColorType::L8,
-		PixelFormat::Rgb8  => ::image::ColorType::Rgb8,
-		PixelFormat::Rgba8 => ::image::ColorType::Rgba8,
-		PixelFormat::Bgr8  => ::image::ColorType::Bgr8,
-		PixelFormat::Bgra8 => ::image::ColorType::Bgra8,
+		PixelFormat::MonoAlpha8(_) => ::image::ColorType::La8,
+		PixelFormat::Rgb8 => ::image::ColorType::Rgb8,
+		PixelFormat::Rgba8(_) => ::image::ColorType::Rgba8,
+		PixelFormat::Bgr8 => ::image::ColorType::Bgr8,
+		PixelFormat::Bgra8(_) => ::image::ColorType::Bgra8,
 	};
+
+	// TODO: Do something about alpha premultiplication.
 
 	let bytes_per_pixel = u32::from(info.pixel_format.bytes_per_pixel());
 

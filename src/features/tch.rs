@@ -29,6 +29,7 @@
 //! # Result::<(), Box<dyn std::error::Error>>::Ok(())
 //! ```
 
+use crate::Alpha;
 use crate::BoxImage;
 use crate::Image;
 use crate::ImageInfo;
@@ -124,7 +125,7 @@ pub trait TensorAsImage {
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced RGBA data.
 	fn as_interlaced_rgba8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
-		self.as_interlaced(PixelFormat::Rgba8)
+		self.as_interlaced(PixelFormat::Rgba8(Alpha::Unpremultiplied))
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced BGR data.
@@ -134,7 +135,7 @@ pub trait TensorAsImage {
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds interlaced BGRA data.
 	fn as_interlaced_bgra8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
-		self.as_interlaced(PixelFormat::Bgra8)
+		self.as_interlaced(PixelFormat::Bgra8(Alpha::Unpremultiplied))
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar RGB data.
@@ -144,7 +145,7 @@ pub trait TensorAsImage {
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar RGBA data.
 	fn as_planar_rgba8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
-		self.as_planar(PixelFormat::Rgba8)
+		self.as_planar(PixelFormat::Rgba8(Alpha::Unpremultiplied))
 	}
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar BGR data.
@@ -154,7 +155,7 @@ pub trait TensorAsImage {
 
 	/// Wrap the tensor in a [`TensorImage`], assuming it holds planar BGRA data.
 	fn as_planar_bgra8<'a>(&'a self) -> Result<TensorImage<'a>, ImageDataError> {
-		self.as_planar(PixelFormat::Bgra8)
+		self.as_planar(PixelFormat::Bgra8(Alpha::Unpremultiplied))
 	}
 }
 
