@@ -38,7 +38,7 @@ impl ContextProxy {
 	}
 
 	/// Exit the program when the last window closes.
-	pub fn set_exit_with_last_window(&mut self, exit_with_last_window: bool) {
+	pub fn set_exit_with_last_window(&self, exit_with_last_window: bool) {
 		self.run_function(move |context| {
 			context.set_exit_with_last_window(exit_with_last_window);
 		})

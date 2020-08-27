@@ -4,11 +4,12 @@ use raqote::PathBuilder;
 use raqote::SolidSource;
 use raqote::Source;
 use raqote::StrokeStyle;
-use show_image::Event;
-use show_image::ImageData;
-use show_image::make_window;
+use show_image::event;
+use show_image::event::WindowEvent;
+use show_image::Image;
 
-fn main() -> Result<(), String> {
+#[show_image::main]
+fn main(mut context: show_image::ContextProxy) -> Result<(), String> {
 	let args: Vec<_> = std::env::args().collect();
 	if args.len() != 1 {
 		return Err(format!("usage: {}", args[0]));
@@ -63,22 +64,26 @@ fn main() -> Result<(), String> {
 	path.line_to(1.00, 1.00);
 	overlay.stroke(&path.finish(), &yellow, &StrokeStyle { width: 0.03, ..Default::default() }, &draw_options);
 
-	println!("{:#?}", image.info());
+	let image : Image = image.into();
+	let image_view = image.as_image_view().map_err(|x| x.to_string())?;
+	println!("{:#?}", image_view.info());
 
-	let window = make_window("image")?;
-	window.set_image("mondriaan", image)?;
-	let overlay = overlay.into_image_tuple()?;
-	window.execute(move |window| window.add_overlay(overlay))?;
+	let window = show_image::create_window("image", Default::default()).map_err(|e| e.to_string())?;
+	window.set_image("mondriaan", image).map_err(|e| e.to_string())?;
+	// let overlay = overlay.into_image()?;
+	// window.execute(move |window| window.add_overlay(overlay))?;
 
-	for event in window.events()? {
-		if let Event::KeyboardEvent(event) = event {
-			println!("{:#?}", event);
-			if event.key == show_image::KeyCode::Escape {
-				break;
+	window.add_event_handler(|window, event, _control| {
+		if let WindowEvent::KeyboardInput { input, .. } = event {
+			if input.virtual_keycode == Some(event::VirtualKeyCode::Escape) && input.state == event::ElementState::Pressed {
+				let _ = window.destroy();
 			}
 		}
-	}
+	}).map_err(|e| e.to_string())?;
 
-	show_image::stop()?;
-	Ok(())
+	// Wait forever until the window is closed or escape is pressed.
+	context.set_exit_with_last_window(true);
+	loop {
+		std::thread::park();
+	}
 }
