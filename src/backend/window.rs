@@ -59,9 +59,10 @@ impl<'a> WindowHandle<'a> {
 	}
 
 	/// Destroy the window.
-	pub fn destroy(mut self) -> Result<ContextHandle<'a>, InvalidWindowIdError> {
-		self.context_handle.destroy_window(self.window_id)?;
-		Ok(self.context_handle)
+	///
+	/// Any subsequent operation on the window will return [`InvalidWindowIdError`].
+	pub fn destroy(&mut self) -> Result<(), InvalidWindowIdError> {
+		self.context_handle.destroy_window(self.window_id)
 	}
 
 	/// Make the window visible or invisible.
