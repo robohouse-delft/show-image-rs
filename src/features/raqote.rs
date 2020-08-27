@@ -17,59 +17,62 @@ fn divide_by_alpha(data: &mut [u8]) {
 	}
 }
 
-impl std::convert::TryFrom<raqote::DrawTarget> for Image {
-	type Error = ImageDataError;
-
-	fn try_from(other: raqote::DrawTarget) -> Result<Self, Self::Error> {
-		let info = draw_target_info(&other)?;
+impl From<raqote::DrawTarget> for Image {
+	fn from(other: raqote::DrawTarget) -> Self {
+		let info = match draw_target_info(&other) {
+			Ok(x) => x,
+			Err(e) => return Image::Invalid(e),
+		};
 
 		let length = other.get_data_u8().len();
 		let buffer = Box::into_raw(other.into_vec().into_boxed_slice()) as *mut u8;
 		let mut buffer = unsafe { Box::from_raw(std::slice::from_raw_parts_mut(buffer, length)) };
 		divide_by_alpha(&mut buffer);
 
-		Ok(BoxImage::new(info, buffer).into())
+		BoxImage::new(info, buffer).into()
 	}
 }
 
-impl std::convert::TryFrom<&raqote::DrawTarget> for Image {
-	type Error = ImageDataError;
-
-	fn try_from(other: &raqote::DrawTarget) -> Result<Self, Self::Error> {
-		let info = draw_target_info(&other)?;
+impl From<&raqote::DrawTarget> for Image {
+	fn from(other: &raqote::DrawTarget) -> Self {
+		let info = match draw_target_info(&other) {
+			Ok(x) => x,
+			Err(e) => return Image::Invalid(e),
+		};
 
 		let mut buffer = Box::from(other.get_data_u8());
 		divide_by_alpha(&mut buffer);
 
-		Ok(BoxImage::new(info, buffer).into())
+		BoxImage::new(info, buffer).into()
 	}
 }
 
-impl std::convert::TryFrom<raqote::Image<'_>> for Image {
-	type Error = ImageDataError;
-
-	fn try_from(other: raqote::Image) -> Result<Self, Self::Error> {
-		let info = image_info(&other)?;
+impl From<raqote::Image<'_>> for Image {
+	fn from(other: raqote::Image) -> Self {
+		let info = match image_info(&other) {
+			Ok(x) => x,
+			Err(e) => return Image::Invalid(e),
+		};
 
 		let buffer = other.data.as_ptr() as *const u8;
 		let mut buffer = unsafe { Box::from(std::slice::from_raw_parts(buffer, other.data.len() * 4)) };
 		divide_by_alpha(&mut buffer);
 
-		Ok(BoxImage::new(info, buffer).into())
+		BoxImage::new(info, buffer).into()
 	}
 }
 
-fn draw_target_info(draw_target: &raqote::DrawTarget) -> Result<ImageInfo, String> {
+fn draw_target_info(draw_target: &raqote::DrawTarget) -> Result<ImageInfo, ImageDataError> {
 	if draw_target.width() < 0 || draw_target.height() < 0 {
-		Err(format!("DrawTarget has negative size: [{}, {}]", draw_target.width(), draw_target.height()))
+		Err(format!("DrawTarget has negative size: [{}, {}]", draw_target.width(), draw_target.height()).into())
 	} else {
 		Ok(ImageInfo::new(PixelFormat::Bgra8, draw_target.width() as u32, draw_target.height() as u32))
 	}
 }
 
-fn image_info(&image: &raqote::Image) -> Result<ImageInfo, String> {
+fn image_info(&image: &raqote::Image) -> Result<ImageInfo, ImageDataError> {
 	if image.width < 0 || image.height < 0 {
-		Err(format!("DrawTarget has negative size: [{}, {}]", image.width, image.height))
+		Err(format!("DrawTarget has negative size: [{}, {}]", image.width, image.height).into())
 	} else {
 		Ok(ImageInfo::new(PixelFormat::Bgra8, image.width as u32, image.height as u32))
 	}
