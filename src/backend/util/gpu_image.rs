@@ -87,12 +87,12 @@ impl GpuImage {
 
 	/// Get the width of the image.
 	pub fn width(&self) -> u32 {
-		self.size[0]
+		self.size()[0]
 	}
 
 	/// Get the height of the image.
 	pub fn height(&self) -> u32 {
-		self.size[1]
+		self.size()[1]
 	}
 
 	/// Get the bind group that should be used to render the image with the rendering pipeline.

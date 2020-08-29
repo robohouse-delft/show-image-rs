@@ -7,7 +7,7 @@ fn main() {
 	let image = image::open(args.get(1).unwrap()).unwrap();
 
 	context.add_event_handler(|_context, event, _control| {
-		if let show_image::Event::UserEvent(show_image::AllWindowsClosed) = event {
+		if let show_image::event::Event::AllWindowsClosed = event {
 			eprintln!("last window closed");
 			std::process::exit(0);
 		}

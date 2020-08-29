@@ -1,5 +1,4 @@
 use crate::ContextHandle;
-use crate::EventHandlerControlFlow;
 use crate::Image;
 use crate::WindowHandle;
 use crate::WindowId;
@@ -7,6 +6,8 @@ use crate::WindowOptions;
 use crate::error::CreateWindowError;
 use crate::error::InvalidWindowIdError;
 use crate::error::SetImageError;
+use crate::event::Event;
+use crate::event::EventHandlerControlFlow;
 use crate::event::WindowEvent;
 use crate::oneshot;
 
@@ -124,7 +125,7 @@ impl ContextProxy {
 	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
 	pub fn add_event_handler<F>(&self, handler: F)
 	where
-		F: FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + Send + 'static,
+		F: FnMut(&mut ContextHandle, &mut Event, &mut EventHandlerControlFlow) + Send + 'static,
 	{
 		self.run_function_wait(move |context| {
 			context.add_event_handler(handler)
@@ -193,17 +194,15 @@ impl ContextProxy {
 	/// The created channel blocks when you request an event until one is available.
 	/// You should never use the receiver from within an event handler or a function posted to the global context thread.
 	/// Doing so would cause a deadlock.
-	pub fn event_channel(&self) -> mpsc::Receiver<crate::Event<'static>> {
+	pub fn event_channel(&self) -> mpsc::Receiver<Event> {
 		let (tx, rx) = mpsc::channel();
 		self.add_event_handler(move |_context, event, control| {
-			// Filter out non-static events.
-			if let Some(event) = super::event::clone_static_event(event) {
-				// If the receiver is dropped, remove the handler.
-				if let Err(_) = tx.send(event) {
-					control.remove_handler = true;
-				}
+			// If the receiver is dropped, remove the handler.
+			if let Err(_) = tx.send(event.clone()) {
+				control.remove_handler = true;
 			}
 		});
+
 		rx
 	}
 }
@@ -268,15 +267,12 @@ impl WindowProxy {
 	/// The created channel blocks when you request an event until one is available.
 	/// You should never use the receiver from within an event handler or a function posted to the global context thread.
 	/// Doing so would cause a deadlock.
-	pub fn event_channel(&self) -> Result<mpsc::Receiver<crate::event::WindowEvent<'static>>, InvalidWindowIdError> {
+	pub fn event_channel(&self) -> Result<mpsc::Receiver<WindowEvent>, InvalidWindowIdError> {
 		let (tx, rx) = mpsc::channel();
 		self.add_event_handler(move |_window, event, control| {
-			// Filter out non-static events.
-			if let Some(event) = super::event::clone_static_window_event(event) {
-				// If the receiver is dropped, remove the handler.
-				if let Err(_) = tx.send(event) {
-					control.remove_handler = true;
-				}
+			// If the receiver is dropped, remove the handler.
+			if let Err(_) = tx.send(event.clone()) {
+				control.remove_handler = true;
 			}
 		})?;
 		Ok(rx)

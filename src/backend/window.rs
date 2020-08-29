@@ -1,13 +1,13 @@
 use crate::AsImageView;
 use crate::Color;
 use crate::ContextHandle;
-use crate::EventHandlerControlFlow;
 use crate::WindowId;
 use crate::WindowProxy;
 use crate::backend::util::GpuImage;
 use crate::backend::util::UniformsBuffer;
 use crate::error::InvalidWindowIdError;
 use crate::error::SetImageError;
+use crate::event::EventHandlerControlFlow;
 use crate::event::WindowEvent;
 
 /// Window capable of displaying images using wgpu.

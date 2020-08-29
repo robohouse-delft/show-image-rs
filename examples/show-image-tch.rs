@@ -26,8 +26,8 @@ fn main() -> Result<(), String> {
 
 	// Wait for the window to be closed or Escape to be pressed.
 	for event in window.event_channel().map_err(|e| e.to_string())? {
-		if let event::WindowEvent::KeyboardInput { input, .. } = event {
-			if input.virtual_keycode == Some(event::VirtualKeyCode::Escape) && input.state == event::ElementState::Pressed {
+		if let event::WindowEvent::KeyboardInput(event) = event {
+			if event.input.key_code == Some(event::VirtualKeyCode::Escape) && event.input.state.is_pressed() {
 				println!("Escape pressed!");
 				break;
 			}

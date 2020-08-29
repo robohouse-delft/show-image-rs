@@ -70,17 +70,15 @@ fn main() -> Result<(), String> {
 	// let overlay = overlay.into_image()?;
 	// window.execute(move |window| window.add_overlay(overlay))?;
 
-	window.add_event_handler(|window, event, _control| {
-		if let event::WindowEvent::KeyboardInput { input, .. } = event {
-			if input.virtual_keycode == Some(event::VirtualKeyCode::Escape) && input.state == event::ElementState::Pressed {
-				let _ = window.destroy();
+	// Wait for the window to be closed or Escape to be pressed.
+	for event in window.event_channel().map_err(|e| e.to_string())? {
+		if let event::WindowEvent::KeyboardInput(event) = event {
+			if event.input.key_code == Some(event::VirtualKeyCode::Escape) && event.input.state.is_pressed() {
+				println!("Escape pressed!");
+				break;
 			}
 		}
-	}).map_err(|e| e.to_string())?;
-
-	// Wait forever until the window is closed or escape is pressed.
-	show_image::context().set_exit_with_last_window(true);
-	loop {
-		std::thread::park();
 	}
+
+	Ok(())
 }

@@ -1,6 +1,5 @@
 use crate::AsImageView;
 use crate::ContextProxy;
-use crate::EventHandlerControlFlow;
 use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
@@ -12,7 +11,9 @@ use crate::error::InvalidWindowIdError;
 use crate::error::NoSuitableAdapterFoundError;
 use crate::error::SetImageError;
 use crate::event::Event;
+use crate::event::EventHandlerControlFlow;
 use crate::event::WindowEvent;
+use crate::event;
 
 /// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
 ///
@@ -74,7 +75,7 @@ pub struct Context {
 	pub exit_with_last_window: bool,
 
 	/// The global event handlers.
-	pub event_handlers: Vec<Box<dyn FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + 'static>>,
+	pub event_handlers: Vec<Box<dyn FnMut(&mut ContextHandle, &mut Event, &mut event::EventHandlerControlFlow) + 'static>>,
 }
 
 /// Handle to the global context.
@@ -132,7 +133,7 @@ impl Context {
 	/// Add a global event handler.
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
-		F: 'static + FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow),
+		F: 'static + FnMut(&mut ContextHandle, &mut Event, &mut EventHandlerControlFlow),
 	{
 		self.event_handlers.push(Box::new(handler))
 	}
@@ -168,7 +169,7 @@ impl Context {
 				if self.exit_with_last_window {
 					std::process::exit(0);
 				}
-				self.run_event_handlers(&mut crate::Event::UserEvent(crate::AllWindowsClosed), event_loop);
+				self.run_event_handlers(&mut Event::AllWindowsClosed, event_loop);
 			}
 		});
 	}
@@ -224,7 +225,7 @@ impl<'a> ContextHandle<'a> {
 	/// Add a global event handler.
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
-		F: 'static + FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow),
+		F: 'static + FnMut(&mut ContextHandle, &mut Event, &mut EventHandlerControlFlow),
 	{
 		self.context.add_event_handler(handler);
 	}
@@ -365,14 +366,14 @@ impl Context {
 	/// Handle an event from the event loop.
 	fn handle_event(
 		&mut self,
-		event: Event<ContextFunction>,
+		event: winit::event::Event<ContextFunction>,
 		event_loop: &EventLoopWindowTarget,
 		control_flow: &mut winit::event_loop::ControlFlow,
 	) {
 		*control_flow = winit::event_loop::ControlFlow::Wait;
 
 		// Split between Event<ContextFunction> and ContextFunction commands.
-		let mut event = match super::event::map_nonuser_event(event) {
+		let event = match super::event::map_nonuser_event(event) {
 			Ok(event) => event,
 			Err(function) => {
 				(function)(&mut ContextHandle::new(self, event_loop));
@@ -380,31 +381,54 @@ impl Context {
 			},
 		};
 
+		// Convert to own event type.
+		let mut event = match super::event::convert_winit_event(event) {
+			Some(x) => x,
+			None => return,
+		};
+
+		// Run window event handlers.
 		let run_context_handlers = match &mut event {
-			Event::WindowEvent { window_id, event } => self.run_window_event_handlers(*window_id, event, event_loop),
+			Event::WindowEvent(event) => self.run_window_event_handlers(event, event_loop),
 			_ => true,
 		};
 
+		// Run context event handlers.
 		if run_context_handlers {
 			self.run_event_handlers(&mut event, event_loop);
 		}
 
+		// Perform default actions for events.
 		match event {
-			Event::WindowEvent { window_id, event: WindowEvent::Resized(new_size) } => {
-				let _  = self.resize_window(window_id, new_size);
+			#[cfg(feature = "save")]
+			#[allow(deprecated)]
+			Event::WindowEvent(WindowEvent::KeyboardInput(event)) => {
+				let pressed = event.input.state.is_pressed();
+				let ctrl_only = event.input.modifiers == event::ModifiersState::CTRL;
+				if pressed && ctrl_only && event.input.key_code == Some(event::VirtualKeyCode::S) {
+					if let Some(window) = self.windows.iter().find(|x| x.id() == event.window_id) {
+						if let Some(_image) = &window.image {
+							// TODO: Save image.
+							eprintln!("would save image if it was implemented");
+						}
+					}
+				}
+			},
+			Event::WindowEvent(WindowEvent::Resized(event)) => {
+				let _  = self.resize_window(event.window_id, event.size);
 			}
-			Event::RedrawRequested(window_id) => {
-				let _ = self.render_window(window_id);
+			Event::WindowEvent(WindowEvent::RedrawRequested(event)) => {
+				let _ = self.render_window(event.window_id);
 			}
-			Event::WindowEvent { window_id, event: WindowEvent::CloseRequested } => {
-				let _ = self.destroy_window(window_id);
+			Event::WindowEvent(WindowEvent::CloseRequested(event)) => {
+				let _ = self.destroy_window(event.window_id);
 			},
 			_ => {},
 		}
 	}
 
 	/// Run global event handlers.
-	fn run_event_handlers(&mut self, event: &mut crate::Event, event_loop: &EventLoopWindowTarget) {
+	fn run_event_handlers(&mut self, event: &mut Event, event_loop: &EventLoopWindowTarget) {
 		use super::util::RetainMut;
 
 		// Event handlers could potentially modify the list of event handlers.
@@ -433,10 +457,10 @@ impl Context {
 	}
 
 	/// Run window-specific event handlers.
-	fn run_window_event_handlers(&mut self, window_id: WindowId, event: &mut WindowEvent, event_loop: &EventLoopWindowTarget) -> bool {
+	fn run_window_event_handlers(&mut self, event: &mut WindowEvent, event_loop: &EventLoopWindowTarget) -> bool {
 		use super::util::RetainMut;
 
-		let window_index = match self.windows.iter().position(|x| x.id() == window_id) {
+		let window_index = match self.windows.iter().position(|x| x.id() == event.window_id()) {
 			Some(x) => x,
 			None => return true,
 		};
@@ -449,7 +473,7 @@ impl Context {
 				false
 			} else {
 				let context_handle = ContextHandle::new(self, event_loop);
-				let mut window_handle = WindowHandle::new(context_handle, window_id);
+				let mut window_handle = WindowHandle::new(context_handle, event.window_id());
 				let mut control = EventHandlerControlFlow::default();
 				(handler)(&mut window_handle, event, &mut control);
 				stop_propagation = control.stop_propagation;

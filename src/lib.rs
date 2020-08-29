@@ -48,7 +48,7 @@
 //! # Result::<(), Box<dyn std::error::Error>>::Ok(())
 //! ```
 //!
-//! # Example 2: Handling keyboard events.
+//! # Example 2: Handling keyboard events using an event channel.
 //! ```no_run
 //! # use show_image::{ImageInfo, ImageView};
 //! use show_image::{event, create_window};
@@ -61,9 +61,9 @@
 //! // Print keyboard events until Escape is pressed, then exit.
 //! // If the user closes the window, the channel is closed and the loop also exits.
 //! for event in window.event_channel()? {
-//!   if let event::WindowEvent::KeyboardInput { input, .. } = event {
+//!   if let event::WindowEvent::KeyboardInput(event) = event {
 //!         println!("{:#?}", event);
-//!         if input.virtual_keycode == Some(event::VirtualKeyCode::Escape) {
+//!         if event.input.key_code == Some(event::VirtualKeyCode::Escape) && event.input.state.is_pressed() {
 //!             break;
 //!         }
 //!     }
@@ -76,7 +76,7 @@
 
 mod backend;
 pub mod error;
-mod event_handler;
+pub mod event;
 mod features;
 mod image;
 mod image_info;
@@ -86,10 +86,8 @@ pub use self::backend::*;
 pub use self::features::*;
 pub use self::image::*;
 pub use self::image_info::*;
-pub use self::event_handler::*;
 
 pub use winit;
-pub use winit::event;
 pub use winit::window::WindowId;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -122,15 +120,6 @@ pub mod termination;
 
 #[cfg(feature = "macros")]
 pub use show_image_macros::main;
-
-/// The event type that can be handled by event handlers.
-///
-/// Note that the user event from [`winit::event::Event`] is used internally.
-/// User event handlers will never see a `Event::UserEvent`.
-///
-/// When the `never` type is stabalized, this type alias will change to [`winit::event::Event<!>`].
-/// Do not worry, the library will receive a semver bump when that happens.
-pub type Event<'a> = winit::event::Event<'a, AllWindowsClosed>;
 
 /// Save an image to the given path.
 #[cfg(feature = "save")]
