@@ -38,43 +38,43 @@ impl From<crate::Color> for wgpu::Color {
 /// The global context managing all windows and the main event loop.
 pub struct Context {
 	/// The wgpu instance to create surfaces with.
-	instance: wgpu::Instance,
+	pub instance: wgpu::Instance,
 
 	/// The event loop to use.
 	///
 	/// Running the event loop consumes it,
 	/// so from that point on this field is `None`.
-	event_loop: Option<EventLoop>,
+	pub event_loop: Option<EventLoop>,
 
 	/// A proxy object to clone for new requests.
-	proxy: ContextProxy,
+	pub proxy: ContextProxy,
 
 	/// The wgpu device to use.
-	device: wgpu::Device,
+	pub device: wgpu::Device,
 
 	/// The wgpu command queue to use.
-	queue: wgpu::Queue,
+	pub queue: wgpu::Queue,
 
 	/// The swap chain format to use.
-	swap_chain_format: wgpu::TextureFormat,
+	pub swap_chain_format: wgpu::TextureFormat,
 
 	/// The bind group layout for the window specific bindings.
-	window_bind_group_layout: wgpu::BindGroupLayout,
+	pub window_bind_group_layout: wgpu::BindGroupLayout,
 
 	/// The bind group layout for the image specific bindings.
-	image_bind_group_layout: wgpu::BindGroupLayout,
+	pub image_bind_group_layout: wgpu::BindGroupLayout,
 
 	/// The render pipeline to use.
-	render_pipeline: wgpu::RenderPipeline,
+	pub render_pipeline: wgpu::RenderPipeline,
 
 	/// The windows.
-	windows: Vec<Window>,
+	pub windows: Vec<Window>,
 
 	/// If true, exit the program when the last window closes.
-	exit_with_last_window: bool,
+	pub exit_with_last_window: bool,
 
 	/// The global event handlers.
-	event_handlers: Vec<Box<dyn FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + 'static>>,
+	pub event_handlers: Vec<Box<dyn FnMut(&mut ContextHandle, &mut crate::Event, &mut EventHandlerControlFlow) + 'static>>,
 }
 
 /// Handle to the global context.

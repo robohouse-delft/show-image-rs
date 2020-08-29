@@ -22,7 +22,7 @@ static mut CONTEXT_PROXY: Option<ContextProxy> = None;
 fn initialize_context() -> Result<Context, error::GetDeviceError> {
 	let context = Context::new(wgpu::TextureFormat::Bgra8UnormSrgb)?;
 	unsafe {
-		CONTEXT_PROXY = Some(context.proxy());
+		CONTEXT_PROXY = Some(context.proxy.clone());
 	}
 	CONTEXT_PROXY_VALID.store(true, Ordering::Release);
 	Ok(context)
@@ -130,7 +130,7 @@ where
 
 	// Queue the user task.
 	// It won't be executed until context.run() is called.
-	context.proxy().run_function(user_task);
+	context.proxy.run_function(user_task);
 	context.run();
 }
 
@@ -159,7 +159,7 @@ where
 
 	// Queue the user task.
 	// It won't be executed until context.run() is called.
-	context.proxy().run_function(|context| user_task(Ok(context)));
+	context.proxy.run_function(|context| user_task(Ok(context)));
 	context.run();
 }
 
