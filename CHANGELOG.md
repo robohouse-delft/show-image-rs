@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 v0.7.0
   * Add support for showing overlays on top of images.
   * Fold consecutive mouse move events to reduce number of events.
