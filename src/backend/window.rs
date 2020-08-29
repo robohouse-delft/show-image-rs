@@ -128,7 +128,7 @@ impl Default for WindowOptions {
 	fn default() -> Self {
 		Self {
 			preserve_aspect_ratio: true,
-			background_color: Color::BLACK,
+			background_color: Color::black(),
 			start_hidden: false,
 			size: None,
 			resizable: true,

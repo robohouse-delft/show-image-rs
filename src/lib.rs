@@ -88,10 +88,35 @@ pub use self::image::*;
 pub use self::image_info::*;
 pub use self::event_handler::*;
 
-pub use wgpu::Color;
 pub use winit;
 pub use winit::event;
 pub use winit::window::WindowId;
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct Color {
+	pub red: f64,
+	pub green: f64,
+	pub blue: f64,
+	pub alpha: f64,
+}
+
+impl Color {
+	pub const fn rgb(red: f64, green: f64, blue: f64) -> Self {
+		Self::rgba(red, green, blue, 1.0)
+	}
+
+	pub const fn rgba(red: f64, green: f64, blue: f64, alpha: f64) -> Self {
+		Self { red, green, blue, alpha }
+	}
+
+	pub const fn black() -> Self {
+		Self::rgb(0.0, 0.0, 0.0)
+	}
+
+	pub const fn white() -> Self {
+		Self::rgb(1.0, 1.0, 1.0)
+	}
+}
 
 pub mod termination;
 

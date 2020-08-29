@@ -24,6 +24,17 @@ type EventLoop = winit::event_loop::EventLoop<ContextFunction>;
 /// Not for use in public APIs.
 type EventLoopWindowTarget = winit::event_loop::EventLoopWindowTarget<ContextFunction>;
 
+impl From<crate::Color> for wgpu::Color {
+	fn from(other: crate::Color) -> Self {
+		Self {
+			r: other.red,
+			g: other.green,
+			b: other.blue,
+			a: other.alpha,
+		}
+	}
+}
+
 /// The global context managing all windows and the main event loop.
 pub struct Context {
 	/// The wgpu instance to create surfaces with.
@@ -332,7 +343,7 @@ impl Context {
 		let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 			color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
 				ops: wgpu::Operations {
-					load: wgpu::LoadOp::Clear(window.options.background_color),
+					load: wgpu::LoadOp::Clear(window.options.background_color.into()),
 					store: true,
 				},
 				attachment: &frame.output.view,
