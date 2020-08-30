@@ -98,7 +98,7 @@ vec4 get_pixel(uint x, uint y) {
 }
 
 void main() {
-	uint x = uint(round(texture_coords.x * float(width)));
-	uint y = uint(round(texture_coords.y * float(height)));
+	uint x = uint(round(texture_coords.x * float(width - 1)));
+	uint y = uint(round(texture_coords.y * float(height - 1)));
 	out_color = get_pixel(x, y);
 }
