@@ -45,8 +45,9 @@ These functions create a new channel for receiving window events or global event
 As long as you're receiving the events in your own thread, you can block as long as you like.
 
 ## Saving displayed images.
-If the `save` feature is enabled, windows allow the displayed image to be saved using `Ctrl+S`.
-This will open a file dialog to save the currently displayed image.
+If the `save` feature is enabled, windows allow the displayed image to be saved using `Ctrl+S` or `Ctrl+Shift+S`.
+The first shortcut will open a file dialog to save the currently displayed image.
+The second shortcut will directly save the image in the current working directory using the name of the image.
 
 Note that images are saved in a background thread.
 To ensure that no data loss occurs, call `exit()` to terminate the process rather than `std::process::exit()`.
