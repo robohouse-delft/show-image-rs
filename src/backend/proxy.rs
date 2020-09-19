@@ -21,6 +21,7 @@ use std::sync::mpsc;
 #[derive(Clone)]
 pub struct ContextProxy {
 	event_loop: EventLoopProxy,
+	context_thread: std::thread::ThreadId,
 }
 
 /// Proxy object to interact with a window from a user thread.
@@ -44,8 +45,8 @@ type EventLoopProxy = winit::event_loop::EventLoopProxy<ContextFunction>;
 
 impl ContextProxy {
 	/// Wrap an [`EventLoopProxy`] in a [`ContextProxy`].
-	pub(crate) fn new(event_loop: EventLoopProxy) -> Self {
-		Self { event_loop }
+	pub(crate) fn new(event_loop: EventLoopProxy, context_thread: std::thread::ThreadId) -> Self {
+		Self { event_loop, context_thread }
 	}
 
 	/// Exit the program when the last window closes.
@@ -59,6 +60,9 @@ impl ContextProxy {
 	///
 	/// The real work is done in the context thread.
 	/// This function blocks until the context thread has performed the action.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn create_window(
 		&self,
 		title: impl Into<String>,
@@ -77,6 +81,9 @@ impl ContextProxy {
 	///
 	/// The real work is done in the context thread.
 	/// This function blocks until the context thread has performed the action.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn destroy_window(
 		&self,
 		window_id: WindowId,
@@ -90,6 +97,9 @@ impl ContextProxy {
 	///
 	/// The real work is done in the context thread.
 	/// This function blocks until the context thread has performed the action.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn set_window_visible(
 		&self,
 		window_id: WindowId,
@@ -104,6 +114,9 @@ impl ContextProxy {
 	///
 	/// The real work is done in the context thread.
 	/// This function blocks until the context thread has performed the action.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn set_window_image(
 		&self,
 		window_id: WindowId,
@@ -123,6 +136,9 @@ impl ContextProxy {
 	///
 	/// This function uses [`Self::run_function_wait`] internally, so it blocks until the event handler is added.
 	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn add_event_handler<F>(&self, handler: F)
 	where
 		F: FnMut(&mut ContextHandle, &mut Event, &mut EventHandlerControlFlow) + Send + 'static,
@@ -138,6 +154,9 @@ impl ContextProxy {
 	///
 	/// This function uses [`Self::run_function_wait`] internally, so it blocks until the event handler is added.
 	/// To avoid blocking, you can use [`Self::run_function`] to post a lambda that adds an error handler instead.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn add_window_event_handler<F>(&self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
@@ -156,6 +175,9 @@ impl ContextProxy {
 	/// You should not post functions to the context thread that block for a long time.
 	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
 	/// Consider using [`Self::run_background_task`] for long blocking tasks instead.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn run_function<F>(&self, function: F)
 	where
 		F: 'static + FnOnce(&mut ContextHandle) + Send,
@@ -175,11 +197,16 @@ impl ContextProxy {
 	/// You should not post functions to the context thread that block for a long time.
 	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
 	/// Consider using [`Self::run_background_task`] for long blocking tasks instead.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn run_function_wait<F, T>(&self, function: F) -> T
 	where
 		F: FnOnce(&mut ContextHandle) -> T + Send + 'static,
 		T: Send + 'static,
 	{
+		self.assert_thread();
+
 		let (result_tx, result_rx) = oneshot::channel();
 		self.run_function(move |context| {
 			result_tx.send((function)(context))
@@ -212,6 +239,9 @@ impl ContextProxy {
 	/// The created channel blocks when you request an event until one is available.
 	/// You should never use the receiver from within an event handler or a function posted to the global context thread.
 	/// Doing so would cause a deadlock.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn event_channel(&self) -> mpsc::Receiver<Event> {
 		let (tx, rx) = mpsc::channel();
 		self.add_event_handler(move |_context, event, control| {
@@ -230,10 +260,25 @@ impl ContextProxy {
 	/// To ensure no data loss occurs, you should use this function instead.
 	///
 	/// Background tasks are spawned when an image is saved through the built-in CTRL+S or CTRL+SHIFT+S shortcut, or by user code.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn exit(&self, code: i32) -> ! {
+		self.assert_thread();
 		self.run_function(move |context| context.exit(code));
 		loop {
 			std::thread::park();
+		}
+	}
+
+	/// Check that the current thread is not running the context event loop.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
+	#[track_caller]
+	fn assert_thread(&self) {
+		if std::thread::current().id() == self.context_thread {
+			panic!("ContextProxy used from within the context thread, which would cause a deadlock. Use ContextHandle instead.");
 		}
 	}
 }
@@ -255,11 +300,17 @@ impl WindowProxy {
 	}
 
 	/// Destroy the window.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn destroy(&self) -> Result<(), InvalidWindowIdError> {
 		self.context_proxy.destroy_window(self.window_id)
 	}
 
 	/// Set the image of the window.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn set_visible(
 		&self,
 		visible: bool,
@@ -268,6 +319,9 @@ impl WindowProxy {
 	}
 
 	/// Set the image of the window.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn set_image(
 		&self,
 		name: impl Into<String>,
@@ -282,6 +336,9 @@ impl WindowProxy {
 	///
 	/// This function uses [`ContextProxy::run_function_wait`] internally, so it blocks until the event handler is added.
 	/// To avoid blocking, you can use [`ContextProxy::run_function`] to post a lambda that adds an event handler instead.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), InvalidWindowIdError>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
@@ -298,6 +355,9 @@ impl WindowProxy {
 	/// The created channel blocks when you request an event until one is available.
 	/// You should never use the receiver from within an event handler or a function posted to the global context thread.
 	/// Doing so would cause a deadlock.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn event_channel(&self) -> Result<mpsc::Receiver<WindowEvent>, InvalidWindowIdError> {
 		let (tx, rx) = mpsc::channel();
 		self.add_event_handler(move |_window, event, control| {
@@ -317,6 +377,9 @@ impl WindowProxy {
 	/// This function blocks until the window is closed.
 	/// You should never use this function from within an event handler or a function posted to the global context thread.
 	/// Doing so would cause a deadlock.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
 	pub fn wait_until_destroyed(&self) -> Result<(), InvalidWindowIdError> {
 		let (tx, rx) = oneshot::channel::<()>();
 		self.add_event_handler(move |_window, _event, _control| {

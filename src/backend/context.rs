@@ -39,6 +39,9 @@ impl From<crate::Color> for wgpu::Color {
 
 /// The global context managing all windows and the main event loop.
 pub struct Context {
+	/// Marker to make context !Send.
+	pub unsend: std::marker::PhantomData<*const ()>,
+
 	/// The wgpu instance to create surfaces with.
 	pub instance: wgpu::Instance,
 
@@ -100,7 +103,7 @@ impl Context {
 	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
 		let instance = wgpu::Instance::new(wgpu::BackendBit::all());
 		let event_loop = EventLoop::with_user_event();
-		let proxy = ContextProxy::new(event_loop.create_proxy());
+		let proxy = ContextProxy::new(event_loop.create_proxy(), std::thread::current().id());
 
 		let (device, queue) = futures::executor::block_on(get_device(&instance))?;
 
@@ -119,6 +122,7 @@ impl Context {
 		let render_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader, swap_chain_format);
 
 		Ok(Self {
+			unsend: Default::default(),
 			instance,
 			event_loop: Some(event_loop),
 			proxy,
