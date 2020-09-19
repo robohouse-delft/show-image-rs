@@ -34,7 +34,7 @@ vec4 get_pixel(uint x, uint y) {
 		float mono = pow(extract_unorm8(i), 2.2);
 		return vec4(mono, mono, mono, 1.0);
 
-	// MonoAlpha8(Straight)
+	// MonoAlpha8(Unpremultiplied)
 	} else if (format == 1) {
 		float mono = pow(extract_unorm8(i), 2.2);
 		float a    = extract_unorm8(i + 1);
@@ -53,7 +53,7 @@ vec4 get_pixel(uint x, uint y) {
 		float r = pow(extract_unorm8(i + 2), 2.2);
 		return vec4(r, g, b, 1.0);
 
-	// Bgra8(Straight)
+	// Bgra8(Unpremultiplied)
 	} else if (format == 4) {
 		float b = pow(extract_unorm8(i + 0), 2.2);
 		float g = pow(extract_unorm8(i + 1), 2.2);
@@ -76,7 +76,7 @@ vec4 get_pixel(uint x, uint y) {
 		float b = pow(extract_unorm8(i + 2), 2.2);
 		return vec4(r, g, b, 1.0);
 
-	// Rgba8(Straight)
+	// Rgba8(Unpremultiplied)
 	} else if (format == 7) {
 		float r = pow(extract_unorm8(i + 0), 2.2);
 		float g = pow(extract_unorm8(i + 1), 2.2);
