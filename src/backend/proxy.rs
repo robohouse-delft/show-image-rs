@@ -254,6 +254,29 @@ impl ContextProxy {
 		rx
 	}
 
+	/// Create a channel that receives events from a window.
+	///
+	/// To close the channel, simply drop de receiver.
+	/// The channel is closed automatically when the window is destroyed.
+	///
+	/// *Warning:*
+	/// The created channel blocks when you request an event until one is available.
+	/// You should never use the receiver from within an event handler or a function posted to the global context thread.
+	/// Doing so would cause a deadlock.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
+	pub fn window_event_channel(&self, window_id: WindowId) -> Result<mpsc::Receiver<WindowEvent>, InvalidWindowIdError> {
+		let (tx, rx) = mpsc::channel();
+		self.add_window_event_handler(window_id, move |_window, event, control| {
+			// If the receiver is dropped, remove the handler.
+			if let Err(_) = tx.send(event.clone()) {
+				control.remove_handler = true;
+			}
+		})?;
+		Ok(rx)
+	}
+
 	/// Join all background tasks and then exit the process.
 	///
 	/// If you use [`std::process::exit`], running background tasks may be killed.
@@ -359,14 +382,7 @@ impl WindowProxy {
 	/// # Panics
 	/// This function will panic if called from within the context thread.
 	pub fn event_channel(&self) -> Result<mpsc::Receiver<WindowEvent>, InvalidWindowIdError> {
-		let (tx, rx) = mpsc::channel();
-		self.add_event_handler(move |_window, event, control| {
-			// If the receiver is dropped, remove the handler.
-			if let Err(_) = tx.send(event.clone()) {
-				control.remove_handler = true;
-			}
-		})?;
-		Ok(rx)
+		self.context_proxy.window_event_channel(self.window_id)
 	}
 
 	/// Wait for the window to be destroyed.
