@@ -475,7 +475,7 @@ impl Context {
 			stride_x: 4,
 			stride_y: bytes_per_row,
 		};
-		let data: Box<[u8]> = Box::from(&*view);
+		let data: Box<[u8]> = Box::from(&view[..]);
 		Ok(Some((image.name().to_string(), crate::BoxImage::new(info, data))))
 	}
 
