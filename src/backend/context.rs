@@ -274,7 +274,7 @@ impl<'a> ContextHandle<'a> {
 	/// If you use [`std::process::exit`], running background tasks may be killed.
 	/// To ensure no data loss occurs, you should use this function instead.
 	///
-	/// Background tasks are spawned when an image is saved through the built-in CTRL+S or CTRL+SHIFT+S shortcut, or by user code.
+	/// Background tasks are spawned when an image is saved through the built-in Ctrl+S or Ctrl+Shift+S shortcut, or by user code.
 	pub fn exit(&mut self, code: i32) -> ! {
 		self.context.exit(code);
 	}
