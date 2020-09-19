@@ -5,7 +5,7 @@ use crate::WindowId;
 use crate::WindowProxy;
 use crate::backend::util::GpuImage;
 use crate::backend::util::UniformsBuffer;
-use crate::error::InvalidWindowIdError;
+use crate::error::InvalidWindowId;
 use crate::error::SetImageError;
 use crate::event::EventHandlerControlFlow;
 use crate::event::WindowEvent;
@@ -73,13 +73,13 @@ impl<'a> WindowHandle<'a> {
 
 	/// Destroy the window.
 	///
-	/// Any subsequent operation on the window will return [`InvalidWindowIdError`].
-	pub fn destroy(&mut self) -> Result<(), InvalidWindowIdError> {
+	/// Any subsequent operation on the window will return [`InvalidWindowId`].
+	pub fn destroy(&mut self) -> Result<(), InvalidWindowId> {
 		self.context_handle.destroy_window(self.window_id)
 	}
 
 	/// Make the window visible or invisible.
-	pub fn set_visible(&mut self, visible: bool) -> Result<(), InvalidWindowIdError> {
+	pub fn set_visible(&mut self, visible: bool) -> Result<(), InvalidWindowId> {
 		self.context_handle.set_window_visible(self.window_id, visible)
 	}
 
@@ -89,7 +89,7 @@ impl<'a> WindowHandle<'a> {
 	}
 
 	/// Add an event handler to the window.
-	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), InvalidWindowIdError>
+	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), InvalidWindowId>
 	where
 		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{

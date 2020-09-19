@@ -4,7 +4,7 @@ use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
 use crate::error::CreateWindowError;
-use crate::error::InvalidWindowIdError;
+use crate::error::InvalidWindowId;
 use crate::error::SetImageError;
 use crate::event::Event;
 use crate::event::EventHandlerControlFlow;
@@ -87,7 +87,7 @@ impl ContextProxy {
 	pub fn destroy_window(
 		&self,
 		window_id: WindowId,
-	) -> Result<(), InvalidWindowIdError> {
+	) -> Result<(), InvalidWindowId> {
 		self.run_function_wait(move |context| {
 			context.destroy_window(window_id)
 		})
@@ -104,7 +104,7 @@ impl ContextProxy {
 		&self,
 		window_id: WindowId,
 		visible: bool,
-	) -> Result<(), InvalidWindowIdError> {
+	) -> Result<(), InvalidWindowId> {
 		self.run_function_wait(move |context| {
 			context.set_window_visible(window_id, visible)
 		})
@@ -157,7 +157,7 @@ impl ContextProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn add_window_event_handler<F>(&self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
+	pub fn add_window_event_handler<F>(&self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowId>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
@@ -266,7 +266,7 @@ impl ContextProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn window_event_channel(&self, window_id: WindowId) -> Result<mpsc::Receiver<WindowEvent>, InvalidWindowIdError> {
+	pub fn window_event_channel(&self, window_id: WindowId) -> Result<mpsc::Receiver<WindowEvent>, InvalidWindowId> {
 		let (tx, rx) = mpsc::channel();
 		self.add_window_event_handler(window_id, move |_window, event, control| {
 			// If the receiver is dropped, remove the handler.
@@ -326,7 +326,7 @@ impl WindowProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn destroy(&self) -> Result<(), InvalidWindowIdError> {
+	pub fn destroy(&self) -> Result<(), InvalidWindowId> {
 		self.context_proxy.destroy_window(self.window_id)
 	}
 
@@ -337,7 +337,7 @@ impl WindowProxy {
 	pub fn set_visible(
 		&self,
 		visible: bool,
-	) -> Result<(), InvalidWindowIdError> {
+	) -> Result<(), InvalidWindowId> {
 		self.context_proxy.set_window_visible(self.window_id, visible)
 	}
 
@@ -362,7 +362,7 @@ impl WindowProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), InvalidWindowIdError>
+	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), InvalidWindowId>
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
@@ -381,7 +381,7 @@ impl WindowProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn event_channel(&self) -> Result<mpsc::Receiver<WindowEvent>, InvalidWindowIdError> {
+	pub fn event_channel(&self) -> Result<mpsc::Receiver<WindowEvent>, InvalidWindowId> {
 		self.context_proxy.window_event_channel(self.window_id)
 	}
 
@@ -396,7 +396,7 @@ impl WindowProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn wait_until_destroyed(&self) -> Result<(), InvalidWindowIdError> {
+	pub fn wait_until_destroyed(&self) -> Result<(), InvalidWindowId> {
 		let (tx, rx) = oneshot::channel::<()>();
 		self.add_event_handler(move |_window, _event, _control| {
 			// Need to mention the tx half so it gets moved into the closure.

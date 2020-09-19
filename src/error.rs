@@ -13,7 +13,7 @@ pub enum CreateWindowError {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ImageDataError {
 	/// The image data is not in a supported format.
-	UnsupportedImageFormat(UnsupportedImageFormatError),
+	UnsupportedImageFormat(UnsupportedImageFormat),
 
 	/// An other error occured.
 	Other(String),
@@ -21,31 +21,38 @@ pub enum ImageDataError {
 
 /// An error indicating that the image data is not in a supported format.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct UnsupportedImageFormatError {
+pub struct UnsupportedImageFormat {
 	/// The unsupported format.
 	pub format: String,
 }
 
+/// The window ID is not valid.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct InvalidWindowIdError {
+pub struct InvalidWindowId {
+	/// The invalid window ID.
 	pub window_id: WindowId,
 }
 
 /// An error that can occur when setting the image of a window.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SetImageError {
-	InvalidWindowId(InvalidWindowIdError),
+	InvalidWindowId(InvalidWindowId),
 	ImageDataError(ImageDataError),
 }
 
+/// An error occured trying to find a usable graphics device.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum GetDeviceError {
-	NoSuitableAdapterFound(NoSuitableAdapterFoundError),
+	/// No suitable video adapter was found.
+	NoSuitableAdapterFound(NoSuitableAdapterFound),
+
+	/// No suitable graphics device was found.
 	NoSuitableDeviceFound(wgpu::RequestDeviceError),
 }
 
+/// No suitable video adapter was found.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct NoSuitableAdapterFoundError;
+pub struct NoSuitableAdapterFound;
 
 impl From<winit::error::OsError> for CreateWindowError {
 	fn from(other: winit::error::OsError) -> Self {
@@ -59,14 +66,14 @@ impl From<ImageDataError> for SetImageError {
 	}
 }
 
-impl From<InvalidWindowIdError> for SetImageError {
-	fn from(other: InvalidWindowIdError) -> Self {
+impl From<InvalidWindowId> for SetImageError {
+	fn from(other: InvalidWindowId) -> Self {
 		Self::InvalidWindowId(other)
 	}
 }
 
-impl From<UnsupportedImageFormatError> for ImageDataError {
-	fn from(other: UnsupportedImageFormatError) -> Self {
+impl From<UnsupportedImageFormat> for ImageDataError {
+	fn from(other: UnsupportedImageFormat) -> Self {
 		Self::UnsupportedImageFormat(other)
 	}
 }
@@ -83,8 +90,8 @@ impl<'a> From<&'a str> for ImageDataError {
 	}
 }
 
-impl From<NoSuitableAdapterFoundError> for GetDeviceError {
-	fn from(other: NoSuitableAdapterFoundError) -> Self {
+impl From<NoSuitableAdapterFound> for GetDeviceError {
+	fn from(other: NoSuitableAdapterFound) -> Self {
 		Self::NoSuitableAdapterFound(other)
 	}
 }
@@ -97,11 +104,11 @@ impl From<wgpu::RequestDeviceError> for GetDeviceError {
 
 impl std::error::Error for CreateWindowError {}
 impl std::error::Error for ImageDataError {}
-impl std::error::Error for UnsupportedImageFormatError {}
-impl std::error::Error for InvalidWindowIdError {}
+impl std::error::Error for UnsupportedImageFormat {}
+impl std::error::Error for InvalidWindowId {}
 impl std::error::Error for SetImageError {}
 impl std::error::Error for GetDeviceError {}
-impl std::error::Error for NoSuitableAdapterFoundError {}
+impl std::error::Error for NoSuitableAdapterFound {}
 
 impl std::fmt::Display for CreateWindowError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -120,13 +127,13 @@ impl std::fmt::Display for ImageDataError {
 	}
 }
 
-impl std::fmt::Display for UnsupportedImageFormatError {
+impl std::fmt::Display for UnsupportedImageFormat {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		write!(f, "unsupported image format: {}", self.format)
 	}
 }
 
-impl std::fmt::Display for InvalidWindowIdError {
+impl std::fmt::Display for InvalidWindowId {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		write!(f, "invalid window ID: {:?}", self.window_id)
 	}
@@ -150,7 +157,7 @@ impl std::fmt::Display for GetDeviceError {
 	}
 }
 
-impl std::fmt::Display for NoSuitableAdapterFoundError {
+impl std::fmt::Display for NoSuitableAdapterFound {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		write!(f, "no suitable graphics adapter found")
 	}

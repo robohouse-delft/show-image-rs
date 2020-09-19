@@ -10,8 +10,8 @@ use crate::backend::window::WindowUniforms;
 use crate::background_thread::BackgroundThread;
 use crate::error::CreateWindowError;
 use crate::error::GetDeviceError;
-use crate::error::InvalidWindowIdError;
-use crate::error::NoSuitableAdapterFoundError;
+use crate::error::InvalidWindowId;
+use crate::error::NoSuitableAdapterFound;
 use crate::error::SetImageError;
 use crate::event::Event;
 use crate::event::EventHandlerControlFlow;
@@ -156,13 +156,13 @@ impl Context {
 	}
 
 	/// Add a window-specific event handler.
-	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
+	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowId>
 	where
 		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{
 		let window = self.windows.iter_mut()
 			.find(|x| x.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+			.ok_or_else(|| InvalidWindowId { window_id })?;
 
 		window.event_handlers.push(Box::new(handler));
 		Ok(())
@@ -225,12 +225,12 @@ impl<'a> ContextHandle<'a> {
 	}
 
 	/// Destroy a window.
-	pub fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
+	pub fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
 		self.context.destroy_window(window_id)
 	}
 
 	/// Make a window visible or invisible.
-	pub fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowIdError> {
+	pub fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowId> {
 		self.context.set_window_visible(window_id, visible)
 	}
 
@@ -248,7 +248,7 @@ impl<'a> ContextHandle<'a> {
 	}
 
 	/// Add a window-specific event handler.
-	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowIdError>
+	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowId>
 	where
 		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{
@@ -320,18 +320,18 @@ impl Context {
 	}
 
 	/// Destroy a window.
-	fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
+	fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
 		let index = self.windows.iter().position(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+			.ok_or_else(|| InvalidWindowId { window_id })?;
 		self.windows.remove(index);
 		Ok(())
 	}
 
 	/// Make a window visible or invisible.
-	fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowIdError> {
+	fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowId> {
 		let window = self.windows.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+			.ok_or_else(|| InvalidWindowId { window_id })?;
 		window.set_visible(visible);
 		Ok(())
 	}
@@ -340,7 +340,7 @@ impl Context {
 	fn set_window_image(&mut self, window_id: WindowId, name: String, image: &impl AsImageView) -> Result<(), SetImageError> {
 		let window = self.windows.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+			.ok_or_else(|| InvalidWindowId { window_id })?;
 
 		let image = image.as_image_view()?;
 		let texture = super::util::GpuImage::from_data(name, &self.device, &self.image_bind_group_layout, image);
@@ -350,11 +350,11 @@ impl Context {
 	}
 
 	/// Resize a window.
-	fn resize_window(&mut self, window_id: WindowId, new_size: winit::dpi::PhysicalSize<u32>) -> Result<(), InvalidWindowIdError> {
+	fn resize_window(&mut self, window_id: WindowId, new_size: winit::dpi::PhysicalSize<u32>) -> Result<(), InvalidWindowId> {
 		let window = self.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+			.ok_or_else(|| InvalidWindowId { window_id })?;
 
 		window.swap_chain = create_swap_chain(new_size, &window.surface, self.swap_chain_format, &self.device);
 		window.uniforms.mark_dirty(true);
@@ -362,10 +362,10 @@ impl Context {
 	}
 
 	/// Render the contents of a window.
-	fn render_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowIdError> {
+	fn render_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
 		let window = self.windows.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+			.ok_or_else(|| InvalidWindowId { window_id })?;
 
 		let image = match &window.image {
 			Some(x) => x,
@@ -387,10 +387,10 @@ impl Context {
 		Ok(())
 	}
 
-	fn render_to_texture(&self, window_id: WindowId) -> Result<Option<(String, crate::BoxImage)>, InvalidWindowIdError> {
+	fn render_to_texture(&self, window_id: WindowId) -> Result<Option<(String, crate::BoxImage)>, InvalidWindowId> {
 		let window = self.windows.iter()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+			.ok_or_else(|| InvalidWindowId { window_id })?;
 
 		let image = match &window.image {
 			Some(x) => x,
@@ -661,7 +661,7 @@ async fn get_device(instance: &wgpu::Instance) -> Result<(wgpu::Device, wgpu::Qu
 		compatible_surface: None, // TODO: can we use a hidden window or something?
 	}).await;
 
-	let adapter = adapter.ok_or(NoSuitableAdapterFoundError)?;
+	let adapter = adapter.ok_or(NoSuitableAdapterFound)?;
 
 	// Create the logical device and command queue
 	let (device, queue) = adapter.request_device(
