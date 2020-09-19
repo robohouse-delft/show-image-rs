@@ -6,9 +6,11 @@
 ///
 /// The `show-image` global context will run in the main thread,
 /// and your own entry point will be executed in a new thread.
-/// When the thread running your entry point terminates, the whole process will terminate with exit status 0.
-/// Any other running threads will be killed at that point.
-/// To exit with a different status code, just call [`std::process::exit`].
+/// When your entry point returns, the whole process will exit.
+///
+/// Any background tasks spawned by `show-image` will be joined before the process terminates,
+/// but any threads spawned by user code will be killed.
+/// You should manually join those if needed.
 ///
 /// Note that we are very sorry about stealing your main thread.
 /// We would rather let you keep the main thread and run the global context in a background thread.

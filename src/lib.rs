@@ -11,11 +11,24 @@
 //! Currently, the following types are supported:
 //!   * The [`Image`] and [`ImageView`] types from this crate.
 //!   * [`image::DynamicImage`][::image::DynamicImage] and [`image::ImageBuffer`][::image::ImageBuffer] (requires the `"image"` feature).
-//!   * [`tch::Tensor`](::tch::Tensor) (requires the `"tch"` feature).
+//!   * [`tch::Tensor`][::tch::Tensor] (requires the `"tch"` feature).
 //!   * [`raqote::DrawTarget`][::raqote::DrawTarget] and [`raqote::Image`][::raqote::Image] (requires the `"raqote"` feature).
 //!
 //! If you think support for a some data type is missing,
 //! feel free to send a PR or create an issue on GitHub.
+//!
+//! # Global context and threading
+//! The library uses a global context that runs an event loop.
+//! This context must be initialized before any `show-image` functions can be used.
+//! Additionally, some platforms require the event loop to be run in the main thread.
+//! To ensure portability, the same restriction is enforced on all platforms.
+//!
+//! The easiest way to initialize the global context and run the event loop in the main thread
+//! is to use the [`main`] attribute macro on your main function.
+//! If you want to run some code in the main thread before the global context takes over,
+//! you can use the [`run_context()`] function or one of it's variations instead.
+//! Note that you must still call those functions from the main thread,
+//! and they do not return control back to the caller.
 //!
 //! # Event handling.
 //! You can register an event handler to run in the global context thread using [`WindowProxy::add_event_handler()`] or some of the similar functions.
@@ -31,7 +44,7 @@
 //! This will open a file dialog to save the currently displayed image.
 //!
 //! Note that images are saved in a background thread.
-//! To ensure that no data loss occurs, call [`exit()`] to terminate the process rather than [`std::process::exit`].
+//! To ensure that no data loss occurs, call [`exit()`] to terminate the process rather than [`std::process::exit()`].
 //! That will ensure that the background threads are joined before the process is terminated.
 //!
 //! # Example 1: Showing an image.
@@ -40,13 +53,17 @@
 //! # let pixel_data = &[0u8][..];
 //! use show_image::{ImageView, ImageInfo, create_window};
 //!
-//! let image = ImageView::new(ImageInfo::rgb8(1920, 1080), pixel_data);
+//! #[show_image::main]
+//! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
-//! // Create a window with default options and display the image.
-//! let window = create_window("image", Default::default())?;
-//! window.set_image("image-001", image)?;
+//!   let image = ImageView::new(ImageInfo::rgb8(1920, 1080), pixel_data);
 //!
-//! # Result::<(), Box<dyn std::error::Error>>::Ok(())
+//!   // Create a window with default options and display the image.
+//!   let window = create_window("image", Default::default())?;
+//!   window.set_image("image-001", image)?;
+//!
+//!   Ok(())
+//! }
 //! ```
 //!
 //! # Example 2: Handling keyboard events using an event channel.
