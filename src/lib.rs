@@ -156,23 +156,3 @@ fn save_rgba8_image(
 		Ok(())
 	}
 }
-
-/// Prompt the user to save an image.
-///
-/// The name hint is used as initial path for the prompt.
-#[cfg(feature = "save")]
-#[cfg_attr(feature = "nightly", doc(cfg(feature = "save")))]
-fn prompt_save_rgba8_image(
-	name_hint: &str,
-	data: &[u8],
-	width: u32,
-	height: u32,
-	row_stride: u32,
-) -> Result<(), error::SaveImageError> {
-	let path = match tinyfiledialogs::save_file_dialog("Save image", name_hint) {
-		Some(x) => x,
-		None => return Ok(()),
-	};
-
-	save_rgba8_image(path, &data, width, height, row_stride)
-}

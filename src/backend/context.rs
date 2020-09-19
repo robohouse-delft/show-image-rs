@@ -634,22 +634,40 @@ impl Context {
 
 	#[cfg(feature = "save")]
 	fn save_image_prompt(&mut self, window_id: WindowId) {
-		if let Ok(Some((name, image))) = self.render_to_texture(window_id) {
-			let info = image.info();
-			self.run_background_task(move || {
-				let _ = crate::prompt_save_rgba8_image(&name, image.data(), info.width, info.height, info.stride_y);
-			})
-		}
+		let (name, image) = match self.render_to_texture(window_id) {
+			Ok(Some(x)) => x,
+			Ok(None) => return,
+			Err(e) => return log::error!("failed to render window contents: {}", e),
+		};
+
+		let info = image.info();
+		let name = format!("{}.png", name);
+		self.run_background_task(move || {
+			let path = match tinyfiledialogs::save_file_dialog("Save image", &name) {
+				Some(x) => x,
+				_ => return,
+			};
+			if let Err(e) = crate::save_rgba8_image(&path, image.data(), info.width, info.height, info.stride_y) {
+				log::error!("failed to save image to {}: {}", path, e);
+			}
+		});
 	}
 
 	#[cfg(feature = "save")]
 	fn save_image(&mut self, window_id: WindowId) {
-		if let Ok(Some((name, image))) = self.render_to_texture(window_id) {
-			let info = image.info();
-			self.run_background_task(move || {
-				let _ = crate::save_rgba8_image(&format!("{}.png", name), image.data(), info.width, info.height, info.stride_y);
-			})
-		}
+		let (name, image) = match self.render_to_texture(window_id) {
+			Ok(Some(x)) => x,
+			Ok(None) => return,
+			Err(e) => return log::error!("failed to render window contents: {}", e),
+		};
+
+		let info = image.info();
+		let name = format!("{}.png", name);
+		self.run_background_task(move || {
+			if let Err(e) = crate::save_rgba8_image(&name, image.data(), info.width, info.height, info.stride_y) {
+				log::error!("failed to save image to {}: {}", name, e);
+			}
+		});
 	}
 }
 
