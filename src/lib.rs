@@ -75,6 +75,7 @@
 #![cfg_attr(feature = "nightly", feature(doc_cfg))]
 
 mod backend;
+mod background_thread;
 pub mod error;
 pub mod event;
 mod features;

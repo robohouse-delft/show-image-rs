@@ -155,6 +155,7 @@ impl ContextProxy {
 	/// *Note:*
 	/// You should not post functions to the context thread that block for a long time.
 	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
+	/// Consider using [`Self::run_background_task`] for long blocking tasks instead.
 	pub fn run_function<F>(&self, function: F)
 	where
 		F: 'static + FnOnce(&mut ContextHandle) + Send,
@@ -173,6 +174,7 @@ impl ContextProxy {
 	/// *Note:*
 	/// You should not post functions to the context thread that block for a long time.
 	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
+	/// Consider using [`Self::run_background_task`] for long blocking tasks instead.
 	pub fn run_function_wait<F, T>(&self, function: F) -> T
 	where
 		F: FnOnce(&mut ContextHandle) -> T + Send + 'static,
@@ -184,6 +186,22 @@ impl ContextProxy {
 		});
 		result_rx.recv()
 			.expect("global context failed to send function return value back, which can only happen if the event loop stopped, but that should also kill the process")
+	}
+
+	/// Run a task in a background thread and register it with the context.
+	///
+	/// The task will be executed in a different thread than the context.
+	/// Currently, each task is spawned in a separate thread.
+	/// In the future, tasks may be run in a dedicated thread pool.
+	///
+	/// The background task will be joined before the process is terminated when you use [`Self::exit()`] or one of the other exit functions of this crate.
+	pub fn run_background_task<F>(&mut self, task: F)
+	where
+		F: FnOnce() + Send + 'static,
+	{
+		self.run_function(move |context| {
+			context.run_background_task(task);
+		});
 	}
 
 	/// Create a channel that receives events from the context.
@@ -204,6 +222,19 @@ impl ContextProxy {
 		});
 
 		rx
+	}
+
+	/// Join all background tasks and then exit the process.
+	///
+	/// If you use [`std::process::exit`], running background tasks may be killed.
+	/// To ensure no data loss occurs, you should use this function instead.
+	///
+	/// Background tasks are spawned when an image is saved through the built-in CTRL+S or CTRL+SHIFT+S shortcut, or by user code.
+	pub fn exit(&self, code: i32) -> ! {
+		self.run_function(move |context| context.exit(code));
+		loop {
+			std::thread::park();
+		}
 	}
 }
 

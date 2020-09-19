@@ -5,6 +5,7 @@ use crate::WindowId;
 use crate::WindowOptions;
 use crate::backend::proxy::ContextFunction;
 use crate::backend::window::Window;
+use crate::background_thread::BackgroundThread;
 use crate::error::CreateWindowError;
 use crate::error::GetDeviceError;
 use crate::error::InvalidWindowIdError;
@@ -76,6 +77,9 @@ pub struct Context {
 
 	/// The global event handlers.
 	pub event_handlers: Vec<Box<dyn FnMut(&mut ContextHandle, &mut Event, &mut event::EventHandlerControlFlow) + 'static>>,
+
+	/// Background tasks, like saving images.
+	pub background_tasks: Vec<BackgroundThread<()>>,
 }
 
 /// Handle to the global context.
@@ -127,6 +131,7 @@ impl Context {
 			windows: Vec::new(),
 			exit_with_last_window: false,
 			event_handlers: Vec::new(),
+			background_tasks: Vec::new(),
 		})
 	}
 
@@ -167,7 +172,7 @@ impl Context {
 			// If so, generate an AllWIndowsClosed event for the event handlers.
 			if self.windows.is_empty() && initial_window_count > 0 {
 				if self.exit_with_last_window {
-					std::process::exit(0);
+					self.exit(0);
 				}
 				self.run_event_handlers(&mut Event::AllWindowsClosed, event_loop);
 			}
@@ -236,6 +241,30 @@ impl<'a> ContextHandle<'a> {
 		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{
 		self.context.add_window_event_handler(window_id, handler)
+	}
+
+	/// Run a task in a background thread and register it with the context.
+	///
+	/// The task will be executed in a different thread than the context.
+	/// Currently, each task is spawned in a separate thread.
+	/// In the future, tasks may be run in a dedicated thread pool.
+	///
+	/// The background task will be joined before the process is terminated when you use [`Self::exit()`] or one of the other exit functions of this crate.
+	pub fn run_background_task<F>(&mut self, task: F)
+	where
+		F: FnOnce() + Send + 'static,
+	{
+		self.context.run_background_task(task);
+	}
+
+	/// Join all background tasks and then exit the process.
+	///
+	/// If you use [`std::process::exit`], running background tasks may be killed.
+	/// To ensure no data loss occurs, you should use this function instead.
+	///
+	/// Background tasks are spawned when an image is saved through the built-in CTRL+S or CTRL+SHIFT+S shortcut, or by user code.
+	pub fn exit(&mut self, code: i32) -> ! {
+		self.context.exit(code);
 	}
 }
 
@@ -387,6 +416,11 @@ impl Context {
 			None => return,
 		};
 
+		// If we have nothing more to do, clean the background tasks.
+		if let Event::MainEventsCleared = &event {
+			self.clean_background_tasks();
+		}
+
 		// Run window event handlers.
 		let run_context_handlers = match &mut event {
 			Event::WindowEvent(event) => self.run_window_event_handlers(event, event_loop),
@@ -486,6 +520,32 @@ impl Context {
 		self.windows[window_index].event_handlers = event_handlers;
 
 		return !stop_propagation;
+	}
+
+	/// Run a background task in a separate thread.
+	fn run_background_task<F>(&mut self, task: F)
+	where
+		F: FnOnce() + Send + 'static,
+	{
+		self.background_tasks.push(BackgroundThread::new(task))
+	}
+
+	/// Clean-up finished background tasks.
+	fn clean_background_tasks(&mut self) {
+		self.background_tasks.retain(|task| !task.is_done());
+	}
+
+	/// Join all background tasks.
+	fn join_background_tasks(&mut self) {
+		for task in std::mem::replace(&mut self.background_tasks, Vec::new()) {
+			task.join().unwrap();
+		}
+	}
+
+	/// Join all background tasks and then exit the process.
+	fn exit(&mut self, code: i32) -> ! {
+		self.join_background_tasks();
+		std::process::exit(code);
 	}
 }
 

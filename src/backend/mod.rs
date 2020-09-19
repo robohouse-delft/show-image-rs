@@ -190,3 +190,13 @@ pub fn context() -> ContextProxy {
 pub fn create_window(title: impl Into<String>, options: WindowOptions) -> Result<WindowProxy, error::CreateWindowError> {
 	context().create_window(title, options)
 }
+
+/// Join all background tasks and then exit the process.
+///
+/// If you use [`std::process::exit`], running background tasks may be killed.
+/// To ensure no data loss occurs, you should use this function instead.
+///
+/// Background tasks are spawned when an image is saved through the built-in CTRL+S or CTRL+SHIFT+S shortcut, or by user code.
+pub fn exit(code: i32) -> ! {
+	context().exit(code);
+}
