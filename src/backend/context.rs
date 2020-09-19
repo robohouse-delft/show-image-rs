@@ -218,8 +218,8 @@ impl<'a> ContextHandle<'a> {
 	}
 
 	/// Set the image to be displayed on a window.
-	pub fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &impl AsImageView) -> Result<(), SetImageError> {
-		self.context.set_window_image(window_id, name, image)
+	pub fn set_window_image(&mut self, window_id: WindowId, name: impl Into<String>, image: &impl AsImageView) -> Result<(), SetImageError> {
+		self.context.set_window_image(window_id, name.into(), image)
 	}
 
 	/// Add a global event handler.
@@ -296,13 +296,13 @@ impl Context {
 	}
 
 	/// Set the image to be displayed on a window.
-	fn set_window_image(&mut self, window_id: WindowId, name: &str, image: &impl AsImageView) -> Result<(), SetImageError> {
+	fn set_window_image(&mut self, window_id: WindowId, name: String, image: &impl AsImageView) -> Result<(), SetImageError> {
 		let window = self.windows.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowIdError { window_id })?;
 
 		let image = image.as_image_view()?;
-		let texture = super::util::GpuImage::from_data(&self.device, &self.image_bind_group_layout, name, image);
+		let texture = super::util::GpuImage::from_data(name, &self.device, &self.image_bind_group_layout, image);
 		window.image = Some(texture);
 		window.uniforms.mark_dirty(true);
 		Ok(())

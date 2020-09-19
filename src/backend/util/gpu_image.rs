@@ -4,6 +4,7 @@ use super::buffer::create_buffer_with_value;
 
 /// A GPU image buffer ready to be used with the rendering pipeline.
 pub struct GpuImage {
+	name: String,
 	size: [u32; 2],
 	bind_group: wgpu::BindGroup,
 	_uniforms: wgpu::Buffer,
@@ -23,9 +24,9 @@ pub struct GpuImageUniforms {
 impl GpuImage {
 	/// Create a [`GpuImage`] from an image buffer.
 	pub fn from_data(
+		name: String,
 		device: &wgpu::Device,
 		bind_group_layout: &wgpu::BindGroupLayout,
-		name: &str,
 		image: ImageView,
 	) -> Self {
 		let format = match image.info().pixel_format {
@@ -73,11 +74,17 @@ impl GpuImage {
 		});
 
 		Self {
+			name,
 			size: [image.info().width, image.info().height],
 			bind_group,
 			_uniforms: uniforms,
 			_data: data,
 		}
+	}
+
+	/// Get the name of the image.
+	pub fn name(&self) -> &str {
+		&self.name
 	}
 
 	/// Get the dimensions of the image.
