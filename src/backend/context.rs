@@ -183,10 +183,10 @@ impl Context {
 			// Check if the event handlers caused the last window(s) to close.
 			// If so, generate an AllWIndowsClosed event for the event handlers.
 			if self.windows.is_empty() && initial_window_count > 0 {
+				self.run_event_handlers(&mut Event::AllWindowsClosed, event_loop);
 				if self.exit_with_last_window {
 					self.exit(0);
 				}
-				self.run_event_handlers(&mut Event::AllWindowsClosed, event_loop);
 			}
 		});
 	}

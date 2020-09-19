@@ -73,6 +73,8 @@ pub enum Event {
 	RedrawEventsCleared,
 
 	/// All windows were closed.
+	///
+	/// This event can be received multiple times if you open a new window after all windows were closed.
 	AllWindowsClosed,
 }
 
