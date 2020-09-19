@@ -131,33 +131,28 @@ fn save_rgba8_image(
 	width: u32,
 	height: u32,
 	row_stride: u32,
-) -> Result<(), String> {
+) -> Result<(), error::SaveImageError> {
 	let path = path.as_ref();
 
-	let file = std::fs::File::create(path)
-		.map_err(|e| format!("failed to create {}: {}", path.display(), e))?;
-	let file = std::io::BufWriter::new(file);
+	let file = std::fs::File::create(path)?;
 
 	let mut encoder = png::Encoder::new(file, width, height);
 	encoder.set_color(png::ColorType::RGBA);
 	encoder.set_depth(png::BitDepth::Eight);
 
-	let mut writer = encoder.write_header()
-		.map_err(|e| format!("failed to write PNG header: {}", e))?;
+	let mut writer = encoder.write_header()?;
 
 	if row_stride == width * 4 {
-		writer.write_image_data(data).map_err(|e| format!("failed to write image data: {}", e))
+		Ok(writer.write_image_data(data)?)
 	} else {
 		use std::io::Write;
 
 		let mut writer = writer.into_stream_writer();
 		for row in data.chunks(row_stride as usize) {
 			let row = &row[..width as usize * 4];
-			writer.write_all(row)
-				.map_err(|e| format!("failed to write image data: {}", e))?;
+			writer.write_all(row)?;
 		}
-		writer.finish()
-			.map_err(|e| format!("failed to write image data: {}", e))?;
+		writer.finish()?;
 		Ok(())
 	}
 }
@@ -173,7 +168,7 @@ fn prompt_save_rgba8_image(
 	width: u32,
 	height: u32,
 	row_stride: u32,
-) -> Result<(), String> {
+) -> Result<(), error::SaveImageError> {
 	let path = match tinyfiledialogs::save_file_dialog("Save image", name_hint) {
 		Some(x) => x,
 		None => return Ok(()),

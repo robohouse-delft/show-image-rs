@@ -54,6 +54,15 @@ pub enum GetDeviceError {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NoSuitableAdapterFound;
 
+/// An error occured trying to save an image.
+#[derive(Debug)]
+pub enum SaveImageError {
+	IoError(std::io::Error),
+
+	#[cfg(feature = "png")]
+	PngError(png::EncodingError),
+}
+
 impl From<winit::error::OsError> for CreateWindowError {
 	fn from(other: winit::error::OsError) -> Self {
 		Self::Winit(other)
@@ -102,6 +111,22 @@ impl From<wgpu::RequestDeviceError> for GetDeviceError {
 	}
 }
 
+impl From<std::io::Error> for SaveImageError {
+	fn from(other: std::io::Error) -> Self {
+		Self::IoError(other)
+	}
+}
+
+#[cfg(feature = "png")]
+impl From<png::EncodingError> for SaveImageError {
+	fn from(other: png::EncodingError) -> Self {
+		match other {
+			png::EncodingError::IoError(e) => Self::IoError(e),
+			e => Self::PngError(e),
+		}
+	}
+}
+
 impl std::error::Error for CreateWindowError {}
 impl std::error::Error for ImageDataError {}
 impl std::error::Error for UnsupportedImageFormat {}
@@ -109,6 +134,7 @@ impl std::error::Error for InvalidWindowId {}
 impl std::error::Error for SetImageError {}
 impl std::error::Error for GetDeviceError {}
 impl std::error::Error for NoSuitableAdapterFound {}
+impl std::error::Error for SaveImageError {}
 
 impl std::fmt::Display for CreateWindowError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -160,5 +186,15 @@ impl std::fmt::Display for GetDeviceError {
 impl std::fmt::Display for NoSuitableAdapterFound {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		write!(f, "no suitable graphics adapter found")
+	}
+}
+
+impl std::fmt::Display for SaveImageError {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			Self::IoError(e) => write!(f, "{}", e),
+			#[cfg(feature = "png")]
+			Self::PngError(e) => write!(f, "{}", e),
+		}
 	}
 }
