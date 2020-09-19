@@ -193,30 +193,30 @@ impl Window {
 	}
 
 	/// Recalculate the uniforms for the render pipeline from the window state.
-	pub(crate) fn calculate_uniforms(&self) -> WindowUniforms {
-		WindowUniforms {
-			scale: self.calculate_scale(),
-		}
-	}
-
-	/// Calculate the image size in normalized window coordinates.
-	///
-	/// The normalized window coordinates go from (0, 0) to (1, 1).
-	fn calculate_scale(&self) -> [f32; 2] {
+	pub fn calculate_uniforms(&self) -> WindowUniforms {
 		if !self.options.preserve_aspect_ratio {
-			[1.0, 1.0]
+			Default::default()
 		} else if let Some(image) = &self.image {
 			let image_size = [image.width() as f32, image.height() as f32];
 			let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
 			let ratios = [image_size[0] / window_size[0], image_size[1] / window_size[1]];
 
+			let w;
+			let h;
 			if ratios[0] >= ratios[1] {
-				[1.0, ratios[1] / ratios[0]]
+				w = 1.0;
+				h = ratios[1] / ratios[0];
 			} else {
-				[ratios[0] / ratios[1], 1.0]
+				w = ratios[0] / ratios[1];
+				h = 1.0;
+			}
+
+			WindowUniforms {
+				offset: [0.5 - 0.5 * w, 0.5 - 0.5 * h],
+				size: [w, h],
 			}
 		} else {
-			[1.0, 1.0]
+			Default::default()
 		}
 	}
 }
@@ -225,13 +225,22 @@ impl Window {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct WindowUniforms {
-	pub scale: [f32; 2],
+	/// The offset of the image in normalized window coordinates.
+	///
+	/// The normalized window coordinates go from (0, 0) to (1, 1).
+	pub offset: [f32; 2],
+
+	/// The size of the image in normalized window coordinates.
+	///
+	/// The normalized window coordinates go from (0, 0) to (1, 1).
+	pub size: [f32; 2],
 }
 
 impl Default for WindowUniforms {
 	fn default() -> Self {
 		Self {
-			scale: [1.0, 1.0],
+			offset: [0.0, 0.0],
+			size: [1.0, 1.0],
 		}
 	}
 }
