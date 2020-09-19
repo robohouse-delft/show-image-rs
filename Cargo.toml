@@ -28,7 +28,7 @@ doc-only = ["tch/doc-only"]
 full     = ["save", "image", "tch", "raqote", "macros"]
 macros   = ["show-image-macros"]
 nightly  = []
-save     = ["tinyfiledialogs", "image"]
+save     = ["tinyfiledialogs", "png"]
 
 [dependencies]
 wgpu              = "0.6.0"
@@ -39,6 +39,7 @@ raqote            = { version="0.8.0", optional=true }
 tch               = { version=">=0.1.6, <0.3.0",  optional=true }
 tinyfiledialogs   = { version="3.3.9", optional=true }
 show-image-macros = { version="0.7.0", optional=true, path="show-image-macros" }
+png               = { version="0.16.7", optional=true }
 
 [dev-dependencies]
 show-image = { path = ".", features=["full"] }

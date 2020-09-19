@@ -125,52 +125,40 @@ pub use show_image_macros::main;
 /// Save an image to the given path.
 #[cfg(feature = "save")]
 #[cfg_attr(feature = "nightly", doc(cfg(feature = "save")))]
-pub fn save_image(path: &std::path::Path, data: &[u8], info: ImageInfo) -> Result<(), String> {
-	let color_type = match info.pixel_format {
-		PixelFormat::Mono8 => ::image::ColorType::L8,
-		PixelFormat::MonoAlpha8(_) => ::image::ColorType::La8,
-		PixelFormat::Rgb8 => ::image::ColorType::Rgb8,
-		PixelFormat::Rgba8(_) => ::image::ColorType::Rgba8,
-		PixelFormat::Bgr8 => ::image::ColorType::Bgr8,
-		PixelFormat::Bgra8(_) => ::image::ColorType::Bgra8,
-	};
+fn save_rgba8_image(
+	path: impl AsRef<std::path::Path>,
+	data: &[u8],
+	width: u32,
+	height: u32,
+	row_stride: u32,
+) -> Result<(), String> {
+	let path = path.as_ref();
 
-	// TODO: Do something about alpha premultiplication.
+	let file = std::fs::File::create(path)
+		.map_err(|e| format!("failed to create {}: {}", path.display(), e))?;
+	let file = std::io::BufWriter::new(file);
 
-	let bytes_per_pixel = u32::from(info.pixel_format.bytes_per_pixel());
+	let mut encoder = png::Encoder::new(file, width, height);
+	encoder.set_color(png::ColorType::RGBA);
+	encoder.set_depth(png::BitDepth::Eight);
 
-	if info.stride_x == info.width * bytes_per_pixel && info.stride_y == bytes_per_pixel {
-		::image::save_buffer(path, data, info.width, info.height, color_type)
-			.map_err(|e| format!("failed to save image: {}", e))
+	let mut writer = encoder.write_header()
+		.map_err(|e| format!("failed to write PNG header: {}", e))?;
 
+	if row_stride == width * 4 {
+		writer.write_image_data(data).map_err(|e| format!("failed to write image data: {}", e))
 	} else {
-		let bytes_per_pixel = bytes_per_pixel as usize;
-		let stride_x = info.stride_x as usize;
-		let stride_y = info.stride_y as usize;
-		let width = info.width as usize;
-		let height = info.height as usize;
+		use std::io::Write;
 
-		let mut packed = Vec::with_capacity(width * height * bytes_per_pixel);
-		if stride_y == bytes_per_pixel {
-			for row in 0..height {
-				packed.extend_from_slice(&data[stride_x * row..][..width * bytes_per_pixel]);
-			}
-		} else if stride_x > stride_y {
-			for x in 0..width {
-				for y in 0..height {
-					packed.extend_from_slice(&data[stride_x * x + stride_y * y..][..bytes_per_pixel])
-				}
-			}
-		} else {
-			for y in 0..height {
-				for x in 0..width {
-					packed.extend_from_slice(&data[stride_x * x + stride_y * y..][..bytes_per_pixel])
-				}
-			}
+		let mut writer = writer.into_stream_writer();
+		for row in data.chunks(row_stride as usize) {
+			let row = &row[..width as usize * 4];
+			writer.write_all(row)
+				.map_err(|e| format!("failed to write image data: {}", e))?;
 		}
-
-		::image::save_buffer(path, &packed, info.width as u32, info.height as u32, color_type)
-			.map_err(|e| format!("failed to save image: {}", e))
+		writer.finish()
+			.map_err(|e| format!("failed to write image data: {}", e))?;
+		Ok(())
 	}
 }
 
@@ -179,11 +167,17 @@ pub fn save_image(path: &std::path::Path, data: &[u8], info: ImageInfo) -> Resul
 /// The name hint is used as initial path for the prompt.
 #[cfg(feature = "save")]
 #[cfg_attr(feature = "nightly", doc(cfg(feature = "save")))]
-pub fn prompt_save_image(name_hint: &str, data: &[u8], info: ImageInfo) -> Result<(), String> {
+fn prompt_save_rgba8_image(
+	name_hint: &str,
+	data: &[u8],
+	width: u32,
+	height: u32,
+	row_stride: u32,
+) -> Result<(), String> {
 	let path = match tinyfiledialogs::save_file_dialog("Save image", name_hint) {
 		Some(x) => x,
 		None => return Ok(()),
 	};
 
-	save_image(path.as_ref(), &data, info)
+	save_rgba8_image(path, &data, width, height, row_stride)
 }

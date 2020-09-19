@@ -524,14 +524,11 @@ impl Context {
 			#[cfg(feature = "save")]
 			#[allow(deprecated)]
 			Event::WindowEvent(WindowEvent::KeyboardInput(event)) => {
-				let pressed = event.input.state.is_pressed();
-				let ctrl_only = event.input.modifiers == event::ModifiersState::CTRL;
-				if pressed && ctrl_only && event.input.key_code == Some(event::VirtualKeyCode::S) {
-					if let Some(window) = self.windows.iter().find(|x| x.id() == event.window_id) {
-						if let Some(_image) = &window.image {
-							// TODO: Save image.
-							eprintln!("would save image if it was implemented");
-						}
+				if event.input.state.is_pressed() && event.input.key_code == Some(event::VirtualKeyCode::S) {
+					if event.input.modifiers == event::ModifiersState::CTRL {
+						self.save_image_prompt(event.window_id);
+					} else if event.input.modifiers == event::ModifiersState::CTRL | event::ModifiersState::SHIFT {
+						self.save_image(event.window_id);
 					}
 				}
 			},
@@ -633,6 +630,26 @@ impl Context {
 	fn exit(&mut self, code: i32) -> ! {
 		self.join_background_tasks();
 		std::process::exit(code);
+	}
+
+	#[cfg(feature = "save")]
+	fn save_image_prompt(&mut self, window_id: WindowId) {
+		if let Ok(Some((name, image))) = self.render_to_texture(window_id) {
+			let info = image.info();
+			self.run_background_task(move || {
+				let _ = crate::prompt_save_rgba8_image(&name, image.data(), info.width, info.height, info.stride_y);
+			})
+		}
+	}
+
+	#[cfg(feature = "save")]
+	fn save_image(&mut self, window_id: WindowId) {
+		if let Ok(Some((name, image))) = self.render_to_texture(window_id) {
+			let info = image.info();
+			self.run_background_task(move || {
+				let _ = crate::save_rgba8_image(&format!("{}.png", name), image.data(), info.width, info.height, info.stride_y);
+			})
+		}
 	}
 }
 

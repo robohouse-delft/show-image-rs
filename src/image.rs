@@ -32,7 +32,7 @@ impl<'a> ImageView<'a> {
 		self.info
 	}
 
-	/// Borrow the image data as byte slice.
+	/// Get the image data as byte slice.
 	pub fn data(&self) -> &[u8] {
 		self.data
 	}
@@ -136,6 +136,16 @@ impl BoxImage {
 	pub fn as_view(&self) -> ImageView  {
 		ImageView::new(self.info, &self.data)
 	}
+
+	/// Get the image information.
+	pub fn info(&self) -> ImageInfo {
+		self.info
+	}
+
+	/// Get the image data as byte slice.
+	pub fn data(&self) -> &[u8] {
+		&self.data
+	}
 }
 
 impl AsImageView for BoxImage {
@@ -153,6 +163,16 @@ impl ArcImage {
 	/// Get a non-owning view of the image data.
 	pub fn as_view(&self) -> ImageView  {
 		ImageView::new(self.info, &self.data)
+	}
+
+	/// Get the image information.
+	pub fn info(&self) -> ImageInfo {
+		self.info
+	}
+
+	/// Get the image data as byte slice.
+	pub fn data(&self) -> &[u8] {
+		&self.data
 	}
 
 }
