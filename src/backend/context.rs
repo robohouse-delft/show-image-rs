@@ -4,7 +4,9 @@ use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
 use crate::backend::proxy::ContextFunction;
+use crate::backend::util::UniformsBuffer;
 use crate::backend::window::Window;
+use crate::backend::window::WindowUniforms;
 use crate::background_thread::BackgroundThread;
 use crate::error::CreateWindowError;
 use crate::error::GetDeviceError;
@@ -69,8 +71,11 @@ pub struct Context {
 	/// The bind group layout for the image specific bindings.
 	pub image_bind_group_layout: wgpu::BindGroupLayout,
 
-	/// The render pipeline to use.
-	pub render_pipeline: wgpu::RenderPipeline,
+	/// The render pipeline to use for windows.
+	pub window_pipeline: wgpu::RenderPipeline,
+
+	/// The render pipeline to use for rendering to image.
+	pub image_pipeline: wgpu::RenderPipeline,
 
 	/// The windows.
 	pub windows: Vec<Window>,
@@ -111,7 +116,8 @@ impl Context {
 		let image_bind_group_layout = create_image_bind_group_layout(&device);
 
 		let vertex_shader = device.create_shader_module(wgpu::include_spirv!("../../shaders/shader.vert.spv"));
-		let fragment_shader = device.create_shader_module(wgpu::include_spirv!("../../shaders/shader.frag.spv"));
+		let fragment_shader_unorm8 = device.create_shader_module(wgpu::include_spirv!("../../shaders/unorm8.frag.spv"));
+		let fragment_shader_uint8 = device.create_shader_module(wgpu::include_spirv!("../../shaders/uint8.frag.spv"));
 
 		let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			label: Some("show-image-pipeline-layout"),
@@ -119,7 +125,8 @@ impl Context {
 			push_constant_ranges: &[],
 		});
 
-		let render_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader, swap_chain_format);
+		let window_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader_unorm8, swap_chain_format);
+		let image_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader_uint8, wgpu::TextureFormat::Rgba8Uint);
 
 		Ok(Self {
 			unsend: Default::default(),
@@ -131,7 +138,8 @@ impl Context {
 			swap_chain_format,
 			window_bind_group_layout,
 			image_bind_group_layout,
-			render_pipeline,
+			window_pipeline,
+			image_pipeline,
 			windows: Vec::new(),
 			exit_with_last_window: false,
 			event_handlers: Vec::new(),
@@ -294,7 +302,7 @@ impl Context {
 
 		let surface = unsafe { self.instance.create_surface(&window) };
 		let swap_chain = create_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
-		let uniforms = super::util::UniformsBuffer::from_value(&self.device, &Default::default(), &self.window_bind_group_layout);
+		let uniforms = UniformsBuffer::from_value(&self.device, &Default::default(), &self.window_bind_group_layout);
 
 		let window = Window {
 			window,
@@ -368,32 +376,107 @@ impl Context {
 			.get_current_frame()
 			.expect("Failed to acquire next swap chain texture");
 
-		let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+		let mut encoder = self.device.create_command_encoder(&Default::default());
 
 		if window.uniforms.is_dirty() {
 			window.uniforms.update_from(&self.device, &mut encoder, &window.calculate_uniforms());
 		}
 
-		let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-			color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-				ops: wgpu::Operations {
-					load: wgpu::LoadOp::Clear(window.options.background_color.into()),
-					store: true,
-				},
-				attachment: &frame.output.view,
-				resolve_target: None,
-			}],
-			depth_stencil_attachment: None,
-		});
-
-		render_pass.set_pipeline(&self.render_pipeline);
-		render_pass.set_bind_group(0, window.uniforms.bind_group(), &[]);
-		render_pass.set_bind_group(1, image.bind_group(), &[]);
-		render_pass.draw(0..6, 0..1);
-		drop(render_pass);
-
+		render_pass(&mut encoder, &self.window_pipeline, &window.uniforms, image, window.options.background_color, &frame.output.view);
 		self.queue.submit(std::iter::once(encoder.finish()));
 		Ok(())
+	}
+
+	fn render_to_texture(&self, window_id: WindowId) -> Result<Option<(String, crate::BoxImage)>, InvalidWindowIdError> {
+		let window = self.windows.iter()
+			.find(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowIdError { window_id })?;
+
+		let image = match &window.image {
+			Some(x) => x,
+			None => return Ok(None),
+		};
+
+		let bytes_per_row = align_next_u32(image.width() * 4, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
+
+		let size = wgpu::Extent3d {
+			width: div_round_up(bytes_per_row, 4),
+			height: image.height(),
+			depth: 1,
+		};
+
+		let window_uniforms = WindowUniforms {
+			offset: [0.0, 0.0],
+			size: [image.width() as f32 / size.width as f32, 1.0],
+		};
+		let window_uniforms = UniformsBuffer::from_value(&self.device, &window_uniforms, &self.window_bind_group_layout);
+
+		let target = self.device.create_texture(&wgpu::TextureDescriptor {
+			label: Some(&format!("{}_render", image.name())),
+			usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+			sample_count: 1,
+			mip_level_count: 1,
+			format: wgpu::TextureFormat::Rgba8Uint,
+			dimension: wgpu::TextureDimension::D2,
+			size,
+		});
+
+		let mut encoder = self.device.create_command_encoder(&Default::default());
+		let transparent = crate::Color::rgba(0.0, 0.0, 0.0, 0.0);
+		render_pass(
+			&mut encoder,
+			&self.image_pipeline,
+			&window_uniforms,
+			image,
+			transparent,
+			&target.create_view(&wgpu::TextureViewDescriptor {
+				label: None,
+				format: None,
+				dimension: None,
+				aspect: wgpu::TextureAspect::All,
+				base_mip_level: 0,
+				level_count: None,
+				base_array_layer: 0,
+				array_layer_count: None,
+			}),
+		);
+
+		let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+			label: None,
+			size: u64::from(bytes_per_row) * u64::from(image.height()),
+			usage: wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
+			mapped_at_creation: false,
+		});
+
+		encoder.copy_texture_to_buffer(
+			wgpu::TextureCopyView {
+				texture: &target,
+				mip_level: 0,
+				origin: wgpu::Origin3d::ZERO,
+			},
+			wgpu::BufferCopyView {
+				buffer: &buffer,
+				layout: wgpu::TextureDataLayout {
+					bytes_per_row,
+					rows_per_image: image.height(),
+					offset: 0,
+				},
+			},
+			size,
+		);
+
+		self.queue.submit(std::iter::once(encoder.finish()));
+
+		let view = super::util::map_buffer(&self.device, buffer.slice(..)).unwrap();
+		let info = crate::ImageInfo {
+			pixel_format: crate::PixelFormat::Rgba8(crate::Alpha::Unpremultiplied),
+			width: image.width(),
+			height: image.height(),
+			stride_x: 4,
+			stride_y: bytes_per_row,
+		};
+		let data: Box<[u8]> = Box::from(&*view);
+		Ok(Some((image.name().to_string(), crate::BoxImage::new(info, data))))
 	}
 
 	/// Handle an event from the event loop.
@@ -587,7 +670,7 @@ fn create_window_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
 				count: None,
 				ty: wgpu::BindingType::UniformBuffer {
 					dynamic: false,
-					min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<super::window::WindowUniforms>() as u64).unwrap()),
+					min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<WindowUniforms>() as u64).unwrap()),
 				},
 			},
 		],
@@ -680,4 +763,49 @@ fn create_swap_chain(size: winit::dpi::PhysicalSize<u32>, surface: &wgpu::Surfac
 	};
 
 	device.create_swap_chain(&surface, &swap_chain_desc)
+}
+
+/// Perform a render pass of an image.
+fn render_pass(
+	encoder: &mut wgpu::CommandEncoder,
+	render_pipeline: &wgpu::RenderPipeline,
+	window_uniforms: &UniformsBuffer<WindowUniforms>,
+	image: &super::util::GpuImage,
+	background_color: crate::Color,
+	target: &wgpu::TextureView,
+) {
+	let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+		color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+			ops: wgpu::Operations {
+				load: wgpu::LoadOp::Clear(background_color.into()),
+				store: true,
+			},
+			attachment: &target,
+			resolve_target: None,
+		}],
+		depth_stencil_attachment: None,
+	});
+
+	render_pass.set_pipeline(render_pipeline);
+	render_pass.set_bind_group(0, window_uniforms.bind_group(), &[]);
+	render_pass.set_bind_group(1, image.bind_group(), &[]);
+	render_pass.draw(0..6, 0..1);
+	drop(render_pass);
+}
+
+fn align_next_u32(input: u32, alignment: u32) -> u32 {
+	let remainder = input % alignment;
+	if remainder == 0 {
+		input
+	} else {
+		input - remainder + alignment
+	}
+}
+
+fn div_round_up(input: u32, divisor: u32) -> u32 {
+	if input % divisor == 0 {
+		input / divisor
+	} else {
+		input / divisor + 1
+	}
 }
