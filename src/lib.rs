@@ -31,7 +31,8 @@
 //! This will open a file dialog to save the currently displayed image.
 //!
 //! Note that images are saved in a background thread.
-//! To ensure that no data loss occurs, call [`stop`] to gracefully stop and join the background thread.
+//! To ensure that no data loss occurs, call [`exit()`] to terminate the process rather than [`std::process::exit`].
+//! That will ensure that the background threads are joined before the process is terminated.
 //!
 //! # Example 1: Showing an image.
 //! ```no_run

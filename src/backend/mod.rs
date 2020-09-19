@@ -58,7 +58,7 @@ where
 	// Spawn the user task.
 	std::thread::spawn(move || {
 		let termination = (user_task)();
-		std::process::exit(termination.report());
+		exit(termination.report());
 	});
 
 	context.run();
@@ -93,7 +93,7 @@ where
 	// Spawn the user task.
 	std::thread::spawn(move || {
 		let termination = (user_task)(Ok(()));
-		std::process::exit(termination.report());
+		exit(termination.report());
 	});
 
 	context.run();
