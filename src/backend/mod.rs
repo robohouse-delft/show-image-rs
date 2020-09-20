@@ -20,7 +20,7 @@ static mut CONTEXT_PROXY: Option<ContextProxy> = None;
 
 /// Initialize the global context.
 fn initialize_context() -> Result<Context, error::GetDeviceError> {
-	let context = Context::new(wgpu::TextureFormat::Bgra8UnormSrgb)?;
+	let context = Context::new(wgpu::TextureFormat::Bgra8Unorm)?;
 	unsafe {
 		CONTEXT_PROXY = Some(context.proxy.clone());
 	}

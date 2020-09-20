@@ -31,65 +31,65 @@ vec4 get_pixel(uint x, uint y) {
 
 	// Mono8
 	if (format == 0) {
-		float mono = pow(extract_unorm8(i), 2.2);
+		float mono = extract_unorm8(i);
 		return vec4(mono, mono, mono, 1.0);
 
 	// MonoAlpha8(Unpremultiplied)
 	} else if (format == 1) {
-		float mono = pow(extract_unorm8(i), 2.2);
+		float mono = extract_unorm8(i);
 		float a    = extract_unorm8(i + 1);
 		return vec4(mono, mono, mono, a);
 
 	// MonoAlpha8(Premultiplied)
 	} else if (format == 2) {
 		float a    = float(extract_u8(i + 1));
-		float mono = pow(float(extract_u8(i)) / a, 2.2);
+		float mono = float(extract_u8(i)) / a;
 		return vec4(mono, mono, mono, a);
 
 	// Bgr8
 	} else if (format == 3) {
-		float b = pow(extract_unorm8(i + 0), 2.2);
-		float g = pow(extract_unorm8(i + 1), 2.2);
-		float r = pow(extract_unorm8(i + 2), 2.2);
+		float b = extract_unorm8(i + 0);
+		float g = extract_unorm8(i + 1);
+		float r = extract_unorm8(i + 2);
 		return vec4(r, g, b, 1.0);
 
 	// Bgra8(Unpremultiplied)
 	} else if (format == 4) {
-		float b = pow(extract_unorm8(i + 0), 2.2);
-		float g = pow(extract_unorm8(i + 1), 2.2);
-		float r = pow(extract_unorm8(i + 2), 2.2);
+		float b = extract_unorm8(i + 0);
+		float g = extract_unorm8(i + 1);
+		float r = extract_unorm8(i + 2);
 		float a = extract_unorm8(i + 3);
 		return vec4(r, g, b, a);
 
 	// Bgra8(Premultiplied)
 	} else if (format == 5) {
 		float a = float(extract_u8(i + 3));
-		float b = pow(float(extract_u8(i + 0)) / a, 2.2);
-		float g = pow(float(extract_u8(i + 1)) / a, 2.2);
-		float r = pow(float(extract_u8(i + 2)) / a, 2.2);
+		float b = float(extract_u8(i + 0)) / a;
+		float g = float(extract_u8(i + 1)) / a;
+		float r = float(extract_u8(i + 2)) / a;
 		return vec4(r, g, b, a / 255.0);
 
 	// Rgb8
 	} else if (format == 6) {
-		float r = pow(extract_unorm8(i + 0), 2.2);
-		float g = pow(extract_unorm8(i + 1), 2.2);
-		float b = pow(extract_unorm8(i + 2), 2.2);
+		float r = extract_unorm8(i + 0);
+		float g = extract_unorm8(i + 1);
+		float b = extract_unorm8(i + 2);
 		return vec4(r, g, b, 1.0);
 
 	// Rgba8(Unpremultiplied)
 	} else if (format == 7) {
-		float r = pow(extract_unorm8(i + 0), 2.2);
-		float g = pow(extract_unorm8(i + 1), 2.2);
-		float b = pow(extract_unorm8(i + 2), 2.2);
+		float r = extract_unorm8(i + 0);
+		float g = extract_unorm8(i + 1);
+		float b = extract_unorm8(i + 2);
 		float a = extract_unorm8(i + 3);
 		return vec4(r, g, b, a);
 
 	// Rgba8(Premultiplied)
 	} else if (format == 8) {
 		float a = float(extract_u8(i + 3));
-		float r = pow(float(extract_u8(i + 0)) / a, 2.2);
-		float g = pow(float(extract_u8(i + 1)) / a, 2.2);
-		float b = pow(float(extract_u8(i + 2)) / a, 2.2);
+		float r = float(extract_u8(i + 0)) / a;
+		float g = float(extract_u8(i + 1)) / a;
+		float b = float(extract_u8(i + 2)) / a;
 		return vec4(r, g, b, a / 255.0);
 
 	} else {
