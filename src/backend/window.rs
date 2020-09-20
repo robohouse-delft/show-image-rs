@@ -1,14 +1,14 @@
-use crate::AsImageView;
-use crate::Color;
-use crate::ContextHandle;
-use crate::WindowId;
-use crate::WindowProxy;
 use crate::backend::util::GpuImage;
 use crate::backend::util::UniformsBuffer;
 use crate::error::InvalidWindowId;
 use crate::error::SetImageError;
 use crate::event::EventHandlerControlFlow;
 use crate::event::WindowEvent;
+use crate::AsImageView;
+use crate::Color;
+use crate::ContextHandle;
+use crate::WindowId;
+use crate::WindowProxy;
 
 /// Internal shorthand for window event handlers.
 type DynWindowEventHandler = dyn FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow);
@@ -92,7 +92,7 @@ impl<'a> WindowHandle<'a> {
 	/// Change the options of the window.
 	pub fn set_options<F>(&mut self, make_options: F) -> Result<(), InvalidWindowId>
 	where
-		F: FnOnce(&WindowOptions) -> WindowOptions
+		F: FnOnce(&WindowOptions) -> WindowOptions,
 	{
 		self.context_handle.set_window_options(self.window_id, make_options)
 	}
@@ -177,6 +177,7 @@ impl WindowOptions {
 		self.preserve_aspect_ratio = preserve_aspect_ratio;
 		self
 	}
+
 	/// Set the background color of the window.
 	///
 	/// This function consumes and returns `self` to allow daisy chaining.

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use crate::ImageInfo;
 use crate::error::ImageDataError;
+use crate::ImageInfo;
 
 /// Trait for borriwing image data from a struct.
 pub trait AsImageView {
@@ -109,7 +109,7 @@ pub struct ArcImage {
 
 impl Image {
 	/// Get a non-owning view of the image data.
-	pub fn as_image_view(&self) -> Result<ImageView, ImageDataError>  {
+	pub fn as_image_view(&self) -> Result<ImageView, ImageDataError> {
 		match self {
 			Self::Box(x) => Ok(x.as_view()),
 			Self::Arc(x) => Ok(x.as_view()),
@@ -121,7 +121,7 @@ impl Image {
 }
 
 impl AsImageView for Image {
-	fn as_image_view(&self) -> Result<ImageView, ImageDataError>  {
+	fn as_image_view(&self) -> Result<ImageView, ImageDataError> {
 		self.as_image_view()
 	}
 }
@@ -133,7 +133,7 @@ impl BoxImage {
 	}
 
 	/// Get a non-owning view of the image data.
-	pub fn as_view(&self) -> ImageView  {
+	pub fn as_view(&self) -> ImageView {
 		ImageView::new(self.info, &self.data)
 	}
 
@@ -149,7 +149,7 @@ impl BoxImage {
 }
 
 impl AsImageView for BoxImage {
-	fn as_image_view(&self) -> Result<ImageView, ImageDataError>  {
+	fn as_image_view(&self) -> Result<ImageView, ImageDataError> {
 		Ok(self.as_view())
 	}
 }
@@ -161,7 +161,7 @@ impl ArcImage {
 	}
 
 	/// Get a non-owning view of the image data.
-	pub fn as_view(&self) -> ImageView  {
+	pub fn as_view(&self) -> ImageView {
 		ImageView::new(self.info, &self.data)
 	}
 
@@ -174,11 +174,10 @@ impl ArcImage {
 	pub fn data(&self) -> &[u8] {
 		&self.data
 	}
-
 }
 
 impl AsImageView for ArcImage {
-	fn as_image_view(&self) -> Result<ImageView, ImageDataError>  {
+	fn as_image_view(&self) -> Result<ImageView, ImageDataError> {
 		Ok(self.as_view())
 	}
 }
@@ -187,7 +186,7 @@ impl From<ImageView<'_>> for BoxImage {
 	fn from(other: ImageView) -> Self {
 		Self {
 			info: other.info,
-			data: other.data.into()
+			data: other.data.into(),
 		}
 	}
 }
@@ -196,7 +195,7 @@ impl From<&'_ ImageView<'_>> for BoxImage {
 	fn from(other: &ImageView) -> Self {
 		Self {
 			info: other.info,
-			data: other.data.into()
+			data: other.data.into(),
 		}
 	}
 }
@@ -205,7 +204,7 @@ impl From<ImageView<'_>> for ArcImage {
 	fn from(other: ImageView) -> Self {
 		Self {
 			info: other.info,
-			data: other.data.into()
+			data: other.data.into(),
 		}
 	}
 }
@@ -214,7 +213,7 @@ impl From<&'_ ImageView<'_>> for ArcImage {
 	fn from(other: &ImageView) -> Self {
 		Self {
 			info: other.info,
-			data: other.data.into()
+			data: other.data.into(),
 		}
 	}
 }
@@ -235,7 +234,7 @@ impl From<BoxImage> for ArcImage {
 	fn from(other: BoxImage) -> Self {
 		Self {
 			info: other.info,
-			data: other.data.into()
+			data: other.data.into(),
 		}
 	}
 }

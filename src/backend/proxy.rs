@@ -1,8 +1,3 @@
-use crate::ContextHandle;
-use crate::Image;
-use crate::WindowHandle;
-use crate::WindowId;
-use crate::WindowOptions;
 use crate::error::CreateWindowError;
 use crate::error::InvalidWindowId;
 use crate::error::SetImageError;
@@ -10,6 +5,11 @@ use crate::event::Event;
 use crate::event::EventHandlerControlFlow;
 use crate::event::WindowEvent;
 use crate::oneshot;
+use crate::ContextHandle;
+use crate::Image;
+use crate::WindowHandle;
+use crate::WindowId;
+use crate::WindowOptions;
 
 use std::sync::mpsc;
 
@@ -46,7 +46,10 @@ type EventLoopProxy = winit::event_loop::EventLoopProxy<ContextFunction>;
 impl ContextProxy {
 	/// Wrap an [`EventLoopProxy`] in a [`ContextProxy`].
 	pub(crate) fn new(event_loop: EventLoopProxy, context_thread: std::thread::ThreadId) -> Self {
-		Self { event_loop, context_thread }
+		Self {
+			event_loop,
+			context_thread,
+		}
 	}
 
 	/// Exit the program when the last window closes.
@@ -63,16 +66,9 @@ impl ContextProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn create_window(
-		&self,
-		title: impl Into<String>,
-		options: WindowOptions,
-	) -> Result<WindowProxy, CreateWindowError> {
+	pub fn create_window(&self, title: impl Into<String>, options: WindowOptions) -> Result<WindowProxy, CreateWindowError> {
 		let title = title.into();
-		let window_id = self.run_function_wait(move |context| {
-			context.create_window(title, options)
-				.map(|window| window.id())
-		})?;
+		let window_id = self.run_function_wait(move |context| context.create_window(title, options).map(|window| window.id()))?;
 
 		Ok(WindowProxy::new(window_id, self.clone()))
 	}
@@ -84,13 +80,8 @@ impl ContextProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn destroy_window(
-		&self,
-		window_id: WindowId,
-	) -> Result<(), InvalidWindowId> {
-		self.run_function_wait(move |context| {
-			context.destroy_window(window_id)
-		})
+	pub fn destroy_window(&self, window_id: WindowId) -> Result<(), InvalidWindowId> {
+		self.run_function_wait(move |context| context.destroy_window(window_id))
 	}
 
 	/// Make a window visible or invisible.
@@ -100,14 +91,8 @@ impl ContextProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn set_window_visible(
-		&self,
-		window_id: WindowId,
-		visible: bool,
-	) -> Result<(), InvalidWindowId> {
-		self.run_function_wait(move |context| {
-			context.set_window_visible(window_id, visible)
-		})
+	pub fn set_window_visible(&self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowId> {
+		self.run_function_wait(move |context| context.set_window_visible(window_id, visible))
 	}
 
 	/// Change the options of a window.
@@ -116,11 +101,9 @@ impl ContextProxy {
 	/// This function will panic if called from within the context thread.
 	pub fn set_window_options<F>(&self, window_id: WindowId, make_options: F) -> Result<(), InvalidWindowId>
 	where
-		F: FnOnce(&WindowOptions) -> WindowOptions + Send + 'static
+		F: FnOnce(&WindowOptions) -> WindowOptions + Send + 'static,
 	{
-		self.run_function_wait(move |context| {
-			context.set_window_options(window_id, make_options)
-		})
+		self.run_function_wait(move |context| context.set_window_options(window_id, make_options))
 	}
 
 	/// Set the shown image for a window.
@@ -130,17 +113,10 @@ impl ContextProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn set_window_image(
-		&self,
-		window_id: WindowId,
-		name: impl Into<String>,
-		image: impl Into<Image>,
-	) -> Result<(), SetImageError> {
+	pub fn set_window_image(&self, window_id: WindowId, name: impl Into<String>, image: impl Into<Image>) -> Result<(), SetImageError> {
 		let name = name.into();
 		let image = image.into();
-		self.run_function_wait(move |context| {
-			context.set_window_image(window_id, name, &image)
-		})
+		self.run_function_wait(move |context| context.set_window_image(window_id, name, &image))
 	}
 
 	/// Add an overlay to a window.
@@ -153,16 +129,10 @@ impl ContextProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn add_window_overlay(&self,
-		window_id: WindowId,
-		name: impl Into<String>,
-		image: impl Into<Image>,
-	) -> Result<(), SetImageError> {
+	pub fn add_window_overlay(&self, window_id: WindowId, name: impl Into<String>, image: impl Into<Image>) -> Result<(), SetImageError> {
 		let name = name.into();
 		let image = image.into();
-		self.run_function_wait(move |context| {
-			context.add_window_overlay(window_id, name, &image)
-		})
+		self.run_function_wait(move |context| context.add_window_overlay(window_id, name, &image))
 	}
 
 	/// Clear the overlays of a window.
@@ -174,9 +144,7 @@ impl ContextProxy {
 	/// # Panics
 	/// This function will panic if called from within the context thread.
 	pub fn clear_window_overlays(&self, window_id: WindowId) -> Result<(), InvalidWindowId> {
-		self.run_function_wait(move |context| {
-			context.clear_window_overlays(window_id)
-		})
+		self.run_function_wait(move |context| context.clear_window_overlays(window_id))
 	}
 
 	/// Add a global event handler to the context.
@@ -192,9 +160,7 @@ impl ContextProxy {
 	where
 		F: FnMut(&mut ContextHandle, &mut Event, &mut EventHandlerControlFlow) + Send + 'static,
 	{
-		self.run_function_wait(move |context| {
-			context.add_event_handler(handler)
-		})
+		self.run_function_wait(move |context| context.add_event_handler(handler))
 	}
 
 	/// Add an event handler for a specific window.
@@ -210,9 +176,7 @@ impl ContextProxy {
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
-		self.run_function_wait(move |context| {
-			context.add_window_event_handler(window_id, handler)
-		})
+		self.run_function_wait(move |context| context.add_window_event_handler(window_id, handler))
 	}
 
 	/// Post a function for execution in the context thread without waiting for it to execute.
@@ -257,9 +221,7 @@ impl ContextProxy {
 		self.assert_thread();
 
 		let (result_tx, result_rx) = oneshot::channel();
-		self.run_function(move |context| {
-			result_tx.send((function)(context))
-		});
+		self.run_function(move |context| result_tx.send((function)(context)));
 		result_rx.recv()
 			.expect("global context failed to send function return value back, which can only happen if the event loop stopped, but that should also kill the process")
 	}
@@ -383,10 +345,7 @@ impl WindowProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn set_visible(
-		&self,
-		visible: bool,
-	) -> Result<(), InvalidWindowId> {
+	pub fn set_visible(&self, visible: bool) -> Result<(), InvalidWindowId> {
 		self.context_proxy.set_window_visible(self.window_id, visible)
 	}
 
@@ -396,7 +355,7 @@ impl WindowProxy {
 	/// This function will panic if called from within the context thread.
 	pub fn set_options<F>(&self, make_options: F) -> Result<(), InvalidWindowId>
 	where
-		F: FnOnce(&WindowOptions) -> WindowOptions + Send + 'static
+		F: FnOnce(&WindowOptions) -> WindowOptions + Send + 'static,
 	{
 		self.context_proxy.set_window_options(self.window_id, make_options)
 	}
@@ -405,11 +364,7 @@ impl WindowProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn set_image(
-		&self,
-		name: impl Into<String>,
-		image: impl Into<Image>,
-	) -> Result<(), SetImageError> {
+	pub fn set_image(&self, name: impl Into<String>, image: impl Into<Image>) -> Result<(), SetImageError> {
 		self.context_proxy.set_window_image(self.window_id, name, image)
 	}
 
@@ -424,10 +379,7 @@ impl WindowProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn add_overlay(&self,
-		name: impl Into<String>,
-		image: impl Into<Image>,
-	) -> Result<(), SetImageError> {
+	pub fn add_overlay(&self, name: impl Into<String>, image: impl Into<Image>) -> Result<(), SetImageError> {
 		self.context_proxy.add_window_overlay(self.window_id, name, image)
 	}
 

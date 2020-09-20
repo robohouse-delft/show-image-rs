@@ -1,9 +1,9 @@
 //! Support for the [`raqote`][::raqote] crate.
 
+use crate::error::ImageDataError;
 use crate::BoxImage;
 use crate::Image;
 use crate::ImageInfo;
-use crate::error::ImageDataError;
 
 impl From<raqote::DrawTarget> for Image {
 	fn from(other: raqote::DrawTarget) -> Self {
@@ -51,7 +51,10 @@ fn draw_target_info(draw_target: &raqote::DrawTarget) -> Result<ImageInfo, Image
 	if draw_target.width() < 0 || draw_target.height() < 0 {
 		Err(format!("DrawTarget has negative size: [{}, {}]", draw_target.width(), draw_target.height()).into())
 	} else {
-		Ok(ImageInfo::bgra8_premultiplied(draw_target.width() as u32, draw_target.height() as u32))
+		Ok(ImageInfo::bgra8_premultiplied(
+			draw_target.width() as u32,
+			draw_target.height() as u32,
+		))
 	}
 }
 

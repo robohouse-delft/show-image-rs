@@ -10,8 +10,8 @@ pub use proxy::WindowProxy;
 pub use window::WindowHandle;
 pub use window::WindowOptions;
 
-use context::Context;
 use crate::error;
+use context::Context;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
@@ -56,8 +56,7 @@ where
 	F: FnOnce() -> R + Send + 'static,
 	R: crate::termination::Termination,
 {
-	let context = initialize_context()
-		.expect("failed to initialize global context");
+	let context = initialize_context().expect("failed to initialize global context");
 
 	// Spawn the user task.
 	std::thread::spawn(move || {
@@ -96,7 +95,7 @@ where
 		Err(e) => {
 			let termination = (user_task)(Err(e));
 			std::process::exit(termination.report());
-		}
+		},
 	};
 
 	// Spawn the user task.
@@ -165,7 +164,7 @@ where
 		Err(e) => {
 			(user_task)(Err(e));
 			std::process::exit(0);
-		}
+		},
 	};
 
 	// Queue the user task.
@@ -186,9 +185,7 @@ pub fn context() -> ContextProxy {
 	if !CONTEXT_PROXY_VALID.load(Ordering::Acquire) {
 		panic!("show-image: global context is not yet fully initialized");
 	}
-	unsafe {
-		CONTEXT_PROXY.clone().unwrap()
-	}
+	unsafe { CONTEXT_PROXY.clone().unwrap() }
 }
 
 /// Create a new window with the global context.

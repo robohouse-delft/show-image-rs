@@ -1,16 +1,16 @@
+use std::sync::atomic::AtomicU8;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Condvar;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
-use std::sync::atomic::AtomicU8;
-use std::sync::atomic::Ordering;
 
-const NOT_READY     : u8 = 0;
-const FINISHED      : u8 = 1;
-const DISCONNECTED  : u8 = 2;
+const NOT_READY: u8 = 0;
+const FINISHED: u8 = 1;
+const DISCONNECTED: u8 = 2;
 
 pub fn channel<T: Send>() -> (Sender<T>, Receiver<T>) {
-	let inner =  Arc::new(Inner::new());
+	let inner = Arc::new(Inner::new());
 	(Sender::new(inner.clone()), Receiver::new(inner))
 }
 
@@ -126,9 +126,9 @@ impl<T> Receiver<T> {
 
 	fn internal_try_recv(&self, lock: &mut MutexGuard<Option<T>>) -> Result<T, TryReceiveError> {
 		match self.inner.state.load(Ordering::Acquire) {
-			FINISHED     => lock.take().ok_or(TryReceiveError::AlreadyRetrieved),
+			FINISHED => lock.take().ok_or(TryReceiveError::AlreadyRetrieved),
 			DISCONNECTED => Err(TryReceiveError::Disconnected),
-			NOT_READY    => Err(TryReceiveError::NotReady),
+			NOT_READY => Err(TryReceiveError::NotReady),
 			x => unreachable!("invalid one-shot channel state: {}", x),
 		}
 	}
@@ -140,7 +140,7 @@ impl std::error::Error for TryReceiveError {}
 impl std::fmt::Display for ReceiveError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
-			ReceiveError::Disconnected     => write!(f, "the sender of the oneshot channel was dropped without setting a value"),
+			ReceiveError::Disconnected => write!(f, "the sender of the oneshot channel was dropped without setting a value"),
 			ReceiveError::AlreadyRetrieved => write!(f, "the value of the oneshot channel has already been retrieved"),
 		}
 	}
@@ -149,9 +149,9 @@ impl std::fmt::Display for ReceiveError {
 impl std::fmt::Display for TryReceiveError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
-			TryReceiveError::Disconnected     => ReceiveError::Disconnected.fmt(f),
+			TryReceiveError::Disconnected => ReceiveError::Disconnected.fmt(f),
 			TryReceiveError::AlreadyRetrieved => ReceiveError::AlreadyRetrieved.fmt(f),
-			TryReceiveError::NotReady         => write!(f, "the value of the oneshot channel is not available yet"),
+			TryReceiveError::NotReady => write!(f, "the value of the oneshot channel is not available yet"),
 		}
 	}
 }

@@ -9,7 +9,7 @@ pub struct UniformsBuffer<T> {
 	buffer: wgpu::Buffer,
 	bind_group: wgpu::BindGroup,
 	dirty: bool,
-	_phantom: std::marker::PhantomData<fn (&T)>,
+	_phantom: std::marker::PhantomData<fn(&T)>,
 }
 
 impl<T> UniformsBuffer<T> {
@@ -21,12 +21,10 @@ impl<T> UniformsBuffer<T> {
 		let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 			label: Some("uniforms_bind_group"),
 			layout,
-			entries: &[
-				wgpu::BindGroupEntry {
-					binding: 0,
-					resource: wgpu::BindingResource::Buffer(buffer.slice(..)),
-				},
-			],
+			entries: &[wgpu::BindGroupEntry {
+				binding: 0,
+				resource: wgpu::BindingResource::Buffer(buffer.slice(..)),
+			}],
 		});
 
 		Self {
@@ -54,7 +52,6 @@ impl<T> UniformsBuffer<T> {
 
 	/// Update the buffer contents using the provided command encoder and clear the dirty flag.
 	pub fn update_from(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, value: &T) {
-
 		let buffer = create_buffer_with_value(device, None, value, wgpu::BufferUsage::COPY_SRC);
 		encoder.copy_buffer_to_buffer(&buffer, 0, &self.buffer, 0, std::mem::size_of::<T>() as wgpu::BufferAddress);
 		self.mark_dirty(false);

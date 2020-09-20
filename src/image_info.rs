@@ -51,7 +51,6 @@ pub enum Alpha {
 	Premultiplied,
 }
 
-
 impl ImageInfo {
 	/// Create a new info struct with the given format, width and height.
 	///
@@ -60,7 +59,13 @@ impl ImageInfo {
 	pub fn new(pixel_format: PixelFormat, width: u32, height: u32) -> Self {
 		let stride_x = u32::from(pixel_format.bytes_per_pixel());
 		let stride_y = stride_x * width;
-		Self { pixel_format, width, height, stride_x, stride_y }
+		Self {
+			pixel_format,
+			width,
+			height,
+			stride_x,
+			stride_y,
+		}
 	}
 
 	/// Create a new info struct for an 8-bit monochrome image with the given width and height.

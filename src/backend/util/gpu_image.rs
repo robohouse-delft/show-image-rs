@@ -1,6 +1,6 @@
+use super::buffer::create_buffer_with_value;
 use crate::ImageView;
 use crate::{Alpha, PixelFormat};
-use super::buffer::create_buffer_with_value;
 
 /// A GPU image buffer ready to be used with the rendering pipeline.
 pub struct GpuImage {
@@ -23,12 +23,7 @@ pub struct GpuImageUniforms {
 
 impl GpuImage {
 	/// Create a [`GpuImage`] from an image buffer.
-	pub fn from_data(
-		name: String,
-		device: &wgpu::Device,
-		bind_group_layout: &wgpu::BindGroupLayout,
-		image: ImageView,
-	) -> Self {
+	pub fn from_data(name: String, device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, image: ImageView) -> Self {
 		let format = match image.info().pixel_format {
 			PixelFormat::Mono8 => 0,
 			PixelFormat::MonoAlpha8(Alpha::Unpremultiplied) => 1,
@@ -49,7 +44,12 @@ impl GpuImage {
 			stride_y: image.info().stride_y,
 		};
 
-		let uniforms = create_buffer_with_value(device, Some(&format!("{}_uniforms_buffer", name)), &uniforms, wgpu::BufferUsage::UNIFORM);
+		let uniforms = create_buffer_with_value(
+			device,
+			Some(&format!("{}_uniforms_buffer", name)),
+			&uniforms,
+			wgpu::BufferUsage::UNIFORM,
+		);
 
 		use wgpu::util::DeviceExt;
 		let data = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

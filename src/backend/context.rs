@@ -1,11 +1,6 @@
-use crate::AsImageView;
-use crate::ContextProxy;
-use crate::WindowHandle;
-use crate::WindowId;
-use crate::WindowOptions;
 use crate::backend::proxy::ContextFunction;
-use crate::backend::util::UniformsBuffer;
 use crate::backend::util::GpuImage;
+use crate::backend::util::UniformsBuffer;
 use crate::backend::window::Window;
 use crate::backend::window::WindowUniforms;
 use crate::background_thread::BackgroundThread;
@@ -14,10 +9,15 @@ use crate::error::GetDeviceError;
 use crate::error::InvalidWindowId;
 use crate::error::NoSuitableAdapterFound;
 use crate::error::SetImageError;
+use crate::event;
 use crate::event::Event;
 use crate::event::EventHandlerControlFlow;
 use crate::event::WindowEvent;
-use crate::event;
+use crate::AsImageView;
+use crate::ContextProxy;
+use crate::WindowHandle;
+use crate::WindowId;
+use crate::WindowOptions;
 
 /// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
 ///
@@ -128,8 +128,20 @@ impl Context {
 			push_constant_ranges: &[],
 		});
 
-		let window_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader_unorm8, swap_chain_format);
-		let image_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader_unorm8, wgpu::TextureFormat::Rgba8Unorm);
+		let window_pipeline = create_render_pipeline(
+			&device,
+			&pipeline_layout,
+			&vertex_shader,
+			&fragment_shader_unorm8,
+			swap_chain_format,
+		);
+		let image_pipeline = create_render_pipeline(
+			&device,
+			&pipeline_layout,
+			&vertex_shader,
+			&fragment_shader_unorm8,
+			wgpu::TextureFormat::Rgba8Unorm,
+		);
 
 		Ok(Self {
 			unsend: Default::default(),
@@ -163,7 +175,9 @@ impl Context {
 	where
 		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{
-		let window = self.windows.iter_mut()
+		let window = self
+			.windows
+			.iter_mut()
 			.find(|x| x.id() == window_id)
 			.ok_or_else(|| InvalidWindowId { window_id })?;
 
@@ -197,11 +211,16 @@ impl Context {
 
 impl<'a> ContextHandle<'a> {
 	/// Create a new context handle.
-	fn new(
-		context: &'a mut Context,
-		event_loop: &'a EventLoopWindowTarget,
-	) -> Self {
+	fn new(context: &'a mut Context, event_loop: &'a EventLoopWindowTarget) -> Self {
 		Self { context, event_loop }
+	}
+
+	/// Reborrow self with a shorter lifetime.
+	fn reborrow(&mut self) -> ContextHandle {
+		ContextHandle {
+			context: self.context,
+			event_loop: self.event_loop,
+		}
 	}
 
 	/// Get a proxy for the context to interact with it from a different thread.
@@ -221,10 +240,7 @@ impl<'a> ContextHandle<'a> {
 	/// Create a new window.
 	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowHandle, CreateWindowError> {
 		let window_id = self.context.create_window(self.event_loop, title, options)?;
-		Ok(WindowHandle::new(ContextHandle {
-			context: self.context,
-			event_loop: self.event_loop,
-		}, window_id))
+		Ok(WindowHandle::new(self.reborrow(), window_id))
 	}
 
 	/// Destroy a window.
@@ -240,9 +256,14 @@ impl<'a> ContextHandle<'a> {
 	/// Change the options of a window.
 	pub fn set_window_options<F>(&mut self, window_id: WindowId, make_options: F) -> Result<(), InvalidWindowId>
 	where
-		F: FnOnce(&WindowOptions) -> WindowOptions
+		F: FnOnce(&WindowOptions) -> WindowOptions,
 	{
-		let window = self.context.windows.iter_mut().find(|w| w.id() == window_id).ok_or_else(|| InvalidWindowId { window_id })?;
+		let window = self
+			.context
+			.windows
+			.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowId { window_id })?;
 		let options = (make_options)(&window.options);
 
 		window.window.set_resizable(options.resizable);
@@ -258,7 +279,12 @@ impl<'a> ContextHandle<'a> {
 	}
 
 	/// Set the image to be displayed on a window.
-	pub fn set_window_image(&mut self, window_id: WindowId, name: impl Into<String>, image: &impl AsImageView) -> Result<(), SetImageError> {
+	pub fn set_window_image(
+		&mut self,
+		window_id: WindowId,
+		name: impl Into<String>,
+		image: &impl AsImageView,
+	) -> Result<(), SetImageError> {
 		self.context.set_window_image(window_id, name.into(), image)
 	}
 
@@ -266,9 +292,24 @@ impl<'a> ContextHandle<'a> {
 	///
 	/// Overlays are drawn on top of the image.
 	/// Overlays remain active until you call they are cleared.
-	pub fn add_window_overlay(&mut self, window_id: WindowId, name: impl Into<String>, image: &impl AsImageView) -> Result<(), SetImageError> {
-		let window = self.context.windows.iter_mut().find(|w| w.id() == window_id).ok_or_else(|| InvalidWindowId { window_id })?;
-		let image = GpuImage::from_data(name.into(), &self.context.device, &self.context.image_bind_group_layout, image.as_image_view()?);
+	pub fn add_window_overlay(
+		&mut self,
+		window_id: WindowId,
+		name: impl Into<String>,
+		image: &impl AsImageView,
+	) -> Result<(), SetImageError> {
+		let window = self
+			.context
+			.windows
+			.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowId { window_id })?;
+		let image = GpuImage::from_data(
+			name.into(),
+			&self.context.device,
+			&self.context.image_bind_group_layout,
+			image.as_image_view()?,
+		);
 		window.overlays.push(image);
 		window.window.request_redraw();
 		Ok(())
@@ -276,7 +317,12 @@ impl<'a> ContextHandle<'a> {
 
 	/// Clear the overlays of a window.
 	pub fn clear_window_overlays(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
-		let window = self.context.windows.iter_mut().find(|w| w.id() == window_id).ok_or_else(|| InvalidWindowId { window_id })?;
+		let window = self
+			.context
+			.windows
+			.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or_else(|| InvalidWindowId { window_id })?;
 		window.overlays.clear();
 		window.window.request_redraw();
 		Ok(())
@@ -365,7 +411,10 @@ impl Context {
 
 	/// Destroy a window.
 	fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
-		let index = self.windows.iter().position(|w| w.id() == window_id)
+		let index = self
+			.windows
+			.iter()
+			.position(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowId { window_id })?;
 		self.windows.remove(index);
 		Ok(())
@@ -373,7 +422,9 @@ impl Context {
 
 	/// Make a window visible or invisible.
 	fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowId> {
-		let window = self.windows.iter_mut()
+		let window = self
+			.windows
+			.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowId { window_id })?;
 		window.set_visible(visible);
@@ -382,7 +433,9 @@ impl Context {
 
 	/// Set the image to be displayed on a window.
 	fn set_window_image(&mut self, window_id: WindowId, name: String, image: &impl AsImageView) -> Result<(), SetImageError> {
-		let window = self.windows.iter_mut()
+		let window = self
+			.windows
+			.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowId { window_id })?;
 
@@ -395,7 +448,8 @@ impl Context {
 
 	/// Resize a window.
 	fn resize_window(&mut self, window_id: WindowId, new_size: winit::dpi::PhysicalSize<u32>) -> Result<(), InvalidWindowId> {
-		let window = self.windows
+		let window = self
+			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowId { window_id })?;
@@ -407,7 +461,9 @@ impl Context {
 
 	/// Render the contents of a window.
 	fn render_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
-		let window = self.windows.iter_mut()
+		let window = self
+			.windows
+			.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowId { window_id })?;
 
@@ -416,20 +472,37 @@ impl Context {
 			None => return Ok(()),
 		};
 
-		let frame = window.swap_chain
+		let frame = window
+			.swap_chain
 			.get_current_frame()
 			.expect("Failed to acquire next swap chain texture");
 
 		let mut encoder = self.device.create_command_encoder(&Default::default());
 
 		if window.uniforms.is_dirty() {
-			window.uniforms.update_from(&self.device, &mut encoder, &window.calculate_uniforms());
+			window
+				.uniforms
+				.update_from(&self.device, &mut encoder, &window.calculate_uniforms());
 		}
 
-		render_pass(&mut encoder, &self.window_pipeline, &window.uniforms, image, Some(window.options.background_color), &frame.output.view);
+		render_pass(
+			&mut encoder,
+			&self.window_pipeline,
+			&window.uniforms,
+			image,
+			Some(window.options.background_color),
+			&frame.output.view,
+		);
 		if window.options.show_overlays {
 			for overlay in &window.overlays {
-				render_pass(&mut encoder, &self.window_pipeline, &window.uniforms, overlay, None, &frame.output.view);
+				render_pass(
+					&mut encoder,
+					&self.window_pipeline,
+					&window.uniforms,
+					overlay,
+					None,
+					&frame.output.view,
+				);
 			}
 		}
 		self.queue.submit(std::iter::once(encoder.finish()));
@@ -437,7 +510,9 @@ impl Context {
 	}
 
 	fn render_to_texture(&self, window_id: WindowId, overlays: bool) -> Result<Option<(String, crate::BoxImage)>, InvalidWindowId> {
-		let window = self.windows.iter()
+		let window = self
+			.windows
+			.iter()
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowId { window_id })?;
 
@@ -484,7 +559,14 @@ impl Context {
 			array_layer_count: None,
 		});
 
-		render_pass(&mut encoder, &self.image_pipeline, &window_uniforms, image, Some(transparent), &render_target);
+		render_pass(
+			&mut encoder,
+			&self.image_pipeline,
+			&window_uniforms,
+			image,
+			Some(transparent),
+			&render_target,
+		);
 		if overlays {
 			for overlay in &window.overlays {
 				render_pass(&mut encoder, &self.image_pipeline, &window_uniforms, overlay, None, &render_target);
@@ -585,11 +667,11 @@ impl Context {
 				}
 			},
 			Event::WindowEvent(WindowEvent::Resized(event)) => {
-				let _  = self.resize_window(event.window_id, event.size);
-			}
+				let _ = self.resize_window(event.window_id, event.size);
+			},
 			Event::WindowEvent(WindowEvent::RedrawRequested(event)) => {
 				let _ = self.render_window(event.window_id);
-			}
+			},
 			Event::WindowEvent(WindowEvent::CloseRequested(event)) => {
 				let _ = self.destroy_window(event.window_id);
 			},
@@ -729,19 +811,21 @@ async fn get_device(instance: &wgpu::Instance) -> Result<(wgpu::Device, wgpu::Qu
 	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
 		power_preference: wgpu::PowerPreference::Default,
 		compatible_surface: None, // TODO: can we use a hidden window or something?
-	}).await;
+	});
 
-	let adapter = adapter.ok_or(NoSuitableAdapterFound)?;
+	let adapter = adapter.await.ok_or(NoSuitableAdapterFound)?;
 
 	// Create the logical device and command queue
-	let (device, queue) = adapter.request_device(
+	let device = adapter.request_device(
 		&wgpu::DeviceDescriptor {
 			limits: wgpu::Limits::default(),
 			features: wgpu::Features::default(),
 			shader_validation: true,
 		},
 		None,
-	).await?;
+	);
+
+	let (device, queue) = device.await?;
 
 	Ok((device, queue))
 }
@@ -750,17 +834,15 @@ async fn get_device(instance: &wgpu::Instance) -> Result<(wgpu::Device, wgpu::Qu
 fn create_window_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 	device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("window_bind_group_layout"),
-		entries: &[
-			wgpu::BindGroupLayoutEntry {
-				binding: 0,
-				visibility: wgpu::ShaderStage::VERTEX,
-				count: None,
-				ty: wgpu::BindingType::UniformBuffer {
-					dynamic: false,
-					min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<WindowUniforms>() as u64).unwrap()),
-				},
+		entries: &[wgpu::BindGroupLayoutEntry {
+			binding: 0,
+			visibility: wgpu::ShaderStage::VERTEX,
+			count: None,
+			ty: wgpu::BindingType::UniformBuffer {
+				dynamic: false,
+				min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<WindowUniforms>() as u64).unwrap()),
 			},
-		],
+		}],
 	})
 }
 
@@ -840,7 +922,12 @@ fn create_render_pipeline(
 }
 
 /// Create a swap chain for a surface.
-fn create_swap_chain(size: winit::dpi::PhysicalSize<u32>, surface: &wgpu::Surface, format: wgpu::TextureFormat, device: &wgpu::Device) -> wgpu::SwapChain {
+fn create_swap_chain(
+	size: winit::dpi::PhysicalSize<u32>,
+	surface: &wgpu::Surface,
+	format: wgpu::TextureFormat,
+	device: &wgpu::Device,
+) -> wgpu::SwapChain {
 	let swap_chain_desc = wgpu::SwapChainDescriptor {
 		usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
 		format,
@@ -868,10 +955,7 @@ fn render_pass(
 
 	let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 		color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-			ops: wgpu::Operations {
-				load,
-				store: true,
-			},
+			ops: wgpu::Operations { load, store: true },
 			attachment: &target,
 			resolve_target: None,
 		}],

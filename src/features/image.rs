@@ -1,5 +1,6 @@
 //! Support for the [`image`][::image] crate.
 
+use crate::error::ImageDataError;
 use crate::Alpha;
 use crate::AsImageView;
 use crate::BoxImage;
@@ -7,7 +8,6 @@ use crate::Image;
 use crate::ImageInfo;
 use crate::ImageView;
 use crate::PixelFormat;
-use crate::error::ImageDataError;
 
 impl AsImageView for image::DynamicImage {
 	fn as_image_view(&self) -> Result<ImageView, ImageDataError> {
@@ -75,16 +75,16 @@ fn into_bytes<P: 'static + image::Pixel<Subpixel = u8>>(buffer: image::ImageBuff
 
 fn dynamic_image_into_bytes(image: image::DynamicImage) -> Box<[u8]> {
 	match image {
-		image::DynamicImage::ImageLuma8(x)   => into_bytes(x),
-		image::DynamicImage::ImageLumaA8(x)  => into_bytes(x),
-		image::DynamicImage::ImageLuma16(_)  => panic!("unsupported pixel format: Luma16"),
+		image::DynamicImage::ImageLuma8(x) => into_bytes(x),
+		image::DynamicImage::ImageLumaA8(x) => into_bytes(x),
+		image::DynamicImage::ImageLuma16(_) => panic!("unsupported pixel format: Luma16"),
 		image::DynamicImage::ImageLumaA16(_) => panic!("unsupported pixel format: LumaA16"),
-		image::DynamicImage::ImageRgb8(x)    => into_bytes(x),
-		image::DynamicImage::ImageRgba8(x)   => into_bytes(x),
-		image::DynamicImage::ImageRgb16(_)   => panic!("unsupported pixel format: Rgb16"),
-		image::DynamicImage::ImageRgba16(_)  => panic!("unsupported pixel format: Rgba16"),
-		image::DynamicImage::ImageBgr8(x)    => into_bytes(x),
-		image::DynamicImage::ImageBgra8(x)   => into_bytes(x),
+		image::DynamicImage::ImageRgb8(x) => into_bytes(x),
+		image::DynamicImage::ImageRgba8(x) => into_bytes(x),
+		image::DynamicImage::ImageRgb16(_) => panic!("unsupported pixel format: Rgb16"),
+		image::DynamicImage::ImageRgba16(_) => panic!("unsupported pixel format: Rgba16"),
+		image::DynamicImage::ImageBgr8(x) => into_bytes(x),
+		image::DynamicImage::ImageBgra8(x) => into_bytes(x),
 	}
 }
 
@@ -95,16 +95,16 @@ fn as_bytes<P: 'static + image::Pixel<Subpixel = u8>>(buffer: &image::ImageBuffe
 
 fn dynamic_image_as_bytes(image: &image::DynamicImage) -> &[u8] {
 	match image {
-		image::DynamicImage::ImageLuma8(x)   => as_bytes(x),
-		image::DynamicImage::ImageLumaA8(x)  => as_bytes(x),
-		image::DynamicImage::ImageLuma16(_)  => panic!("unsupported pixel format: Luma16"),
+		image::DynamicImage::ImageLuma8(x) => as_bytes(x),
+		image::DynamicImage::ImageLumaA8(x) => as_bytes(x),
+		image::DynamicImage::ImageLuma16(_) => panic!("unsupported pixel format: Luma16"),
 		image::DynamicImage::ImageLumaA16(_) => panic!("unsupported pixel format: LumaA16"),
-		image::DynamicImage::ImageRgb8(x)    => as_bytes(x),
-		image::DynamicImage::ImageRgba8(x)   => as_bytes(x),
-		image::DynamicImage::ImageRgb16(_)   => panic!("unsupported pixel format: Rgb16"),
-		image::DynamicImage::ImageRgba16(_)  => panic!("unsupported pixel format: Rgba16"),
-		image::DynamicImage::ImageBgr8(x)    => as_bytes(x),
-		image::DynamicImage::ImageBgra8(x)   => as_bytes(x),
+		image::DynamicImage::ImageRgb8(x) => as_bytes(x),
+		image::DynamicImage::ImageRgba8(x) => as_bytes(x),
+		image::DynamicImage::ImageRgb16(_) => panic!("unsupported pixel format: Rgb16"),
+		image::DynamicImage::ImageRgba16(_) => panic!("unsupported pixel format: Rgba16"),
+		image::DynamicImage::ImageBgr8(x) => as_bytes(x),
+		image::DynamicImage::ImageBgra8(x) => as_bytes(x),
 	}
 }
 
@@ -125,28 +125,28 @@ where
 
 fn dynamic_image_info(image: &image::DynamicImage) -> Result<ImageInfo, ImageDataError> {
 	match image {
-		image::DynamicImage::ImageLuma8(x)   => info(x),
-		image::DynamicImage::ImageLumaA8(x)  => info(x),
-		image::DynamicImage::ImageLuma16(_)  => Err("unsupported pixel format: Luma16".into()),
+		image::DynamicImage::ImageLuma8(x) => info(x),
+		image::DynamicImage::ImageLumaA8(x) => info(x),
+		image::DynamicImage::ImageLuma16(_) => Err("unsupported pixel format: Luma16".into()),
 		image::DynamicImage::ImageLumaA16(_) => Err("unsupported pixel format: LumaA16".into()),
-		image::DynamicImage::ImageRgb8(x)    => info(x),
-		image::DynamicImage::ImageRgba8(x)   => info(x),
-		image::DynamicImage::ImageRgb16(_)   => Err("unsupported pixel format: Rgb16".into()),
-		image::DynamicImage::ImageRgba16(_)  => Err("unsupported pixel format: Rgba16".into()),
-		image::DynamicImage::ImageBgr8(x)    => info(x),
-		image::DynamicImage::ImageBgra8(x)   => info(x),
+		image::DynamicImage::ImageRgb8(x) => info(x),
+		image::DynamicImage::ImageRgba8(x) => info(x),
+		image::DynamicImage::ImageRgb16(_) => Err("unsupported pixel format: Rgb16".into()),
+		image::DynamicImage::ImageRgba16(_) => Err("unsupported pixel format: Rgba16".into()),
+		image::DynamicImage::ImageBgr8(x) => info(x),
+		image::DynamicImage::ImageBgra8(x) => info(x),
 	}
 }
 
 /// Extract the PixelFormat from an [`image::Pixel`].
 fn pixel_format<P: image::Pixel>() -> Result<PixelFormat, ImageDataError> {
 	match P::COLOR_TYPE {
-		image::ColorType::L8    => Ok(PixelFormat::Mono8),
-		image::ColorType::La8   => Ok(PixelFormat::MonoAlpha8(Alpha::Unpremultiplied)),
-		image::ColorType::Bgr8  => Ok(PixelFormat::Bgr8),
+		image::ColorType::L8 => Ok(PixelFormat::Mono8),
+		image::ColorType::La8 => Ok(PixelFormat::MonoAlpha8(Alpha::Unpremultiplied)),
+		image::ColorType::Bgr8 => Ok(PixelFormat::Bgr8),
 		image::ColorType::Bgra8 => Ok(PixelFormat::Bgra8(Alpha::Unpremultiplied)),
-		image::ColorType::Rgb8  => Ok(PixelFormat::Rgb8),
+		image::ColorType::Rgb8 => Ok(PixelFormat::Rgb8),
 		image::ColorType::Rgba8 => Ok(PixelFormat::Rgba8(Alpha::Unpremultiplied)),
-		x  => Err(format!("unsupported color type: {:?}", x).into()),
+		x => Err(format!("unsupported color type: {:?}", x).into()),
 	}
 }

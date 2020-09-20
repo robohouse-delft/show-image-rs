@@ -29,12 +29,12 @@
 //! # Result::<(), Box<dyn std::error::Error>>::Ok(())
 //! ```
 
+use crate::error::ImageDataError;
 use crate::Alpha;
 use crate::BoxImage;
 use crate::Image;
 use crate::ImageInfo;
 use crate::PixelFormat;
-use crate::error::ImageDataError;
 
 /// Wrapper for [`tch::Tensor`] that implements `Into<Image>`.
 pub struct TensorImage<'a> {
@@ -167,11 +167,15 @@ pub trait TensorAsImage {
 impl TensorAsImage for tch::Tensor {
 	fn as_image(&self, pixel_format: TensorPixelFormat) -> Result<TensorImage, ImageDataError> {
 		let (planar, info) = match pixel_format {
-			TensorPixelFormat::Planar(pixel_format)     => tensor_info(self, pixel_format, true)?,
+			TensorPixelFormat::Planar(pixel_format) => tensor_info(self, pixel_format, true)?,
 			TensorPixelFormat::Interlaced(pixel_format) => tensor_info(self, pixel_format, false)?,
-			TensorPixelFormat::Guess(color_format)      => guess_tensor_info(self, color_format)?,
+			TensorPixelFormat::Guess(color_format) => guess_tensor_info(self, color_format)?,
 		};
-		Ok(TensorImage { tensor: self, info, planar })
+		Ok(TensorImage {
+			tensor: self,
+			info,
+			planar,
+		})
 	}
 }
 
@@ -221,7 +225,10 @@ fn tensor_info(tensor: &tch::Tensor, pixel_format: PixelFormat, planar: bool) ->
 		let (height, width) = tensor.size2().unwrap();
 		Ok((false, ImageInfo::new(pixel_format, width as u32, height as u32)))
 	} else {
-		Err(format!("wrong number of dimensions ({}) for format ({:?})", dimensions, pixel_format))
+		Err(format!(
+			"wrong number of dimensions ({}) for format ({:?})",
+			dimensions, pixel_format
+		))
 	}
 }
 
@@ -248,7 +255,10 @@ fn guess_tensor_info(tensor: &tch::Tensor, color_format: ColorFormat) -> Result<
 			_ => Err(format!("unable to guess pixel format for tensor with shape {:?}, expected (height, width) or (height, width, channels) or (channels, height, width) where channels is either 1, 3 or 4", shape))
 		}
 	} else {
-		Err(format!("unable to guess pixel format for tensor with {} dimensions, expected 2 or 3 dimensions", dimensions))
+		Err(format!(
+			"unable to guess pixel format for tensor with {} dimensions, expected 2 or 3 dimensions",
+			dimensions
+		))
 	}
 }
 

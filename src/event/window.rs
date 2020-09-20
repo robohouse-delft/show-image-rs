@@ -1,4 +1,3 @@
-use crate::WindowId;
 use super::AxisId;
 use super::DeviceId;
 use super::ElementState;
@@ -11,6 +10,7 @@ use super::PhysicalSize;
 use super::Theme;
 use super::Touch;
 use super::TouchPhase;
+use crate::WindowId;
 
 use std::path::PathBuf;
 

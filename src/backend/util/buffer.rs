@@ -8,10 +8,6 @@ pub fn create_buffer_with_value<T>(device: &wgpu::Device, label: Option<&str>, v
 	use wgpu::util::DeviceExt;
 	unsafe {
 		let contents = as_bytes(value);
-		device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-			label,
-			contents,
-			usage,
-		})
+		device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label, contents, usage })
 	}
 }
