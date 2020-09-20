@@ -13,6 +13,7 @@ mod contents {
 	///
 	/// This is used to allow user tasks to return `Result<(), E>` or just `()` on stable and beta.
 	pub trait Termination {
+		/// Print any messages to standard error and give the exit code for the process.
 		fn report(self) -> i32;
 	}
 

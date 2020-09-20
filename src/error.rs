@@ -36,7 +36,10 @@ pub struct InvalidWindowId {
 /// An error that can occur when setting the image of a window.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SetImageError {
+	/// The window ID is invalid.
 	InvalidWindowId(InvalidWindowId),
+
+	/// The image data is not supported.
 	ImageDataError(ImageDataError),
 }
 
@@ -57,8 +60,10 @@ pub struct NoSuitableAdapterFound;
 /// An error occured trying to save an image.
 #[derive(Debug)]
 pub enum SaveImageError {
+	/// An I/O error occured.
 	IoError(std::io::Error),
 
+	/// An error occured encoding the PNG image.
 	#[cfg(feature = "png")]
 	PngError(png::EncodingError),
 }

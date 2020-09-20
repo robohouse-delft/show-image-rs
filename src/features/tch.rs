@@ -46,8 +46,13 @@ pub struct TensorImage<'a> {
 /// The pixel format of a tensor, or a color format to guess the pixel format.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum TensorPixelFormat {
+	/// The tensor has planar pixel data.
 	Planar(PixelFormat),
+
+	/// The tensor has interlaced pixel data.
 	Interlaced(PixelFormat),
+
+	/// The library should guess if the pixel data is planar or interlaced.
 	Guess(ColorFormat),
 }
 

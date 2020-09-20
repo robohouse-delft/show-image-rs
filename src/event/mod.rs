@@ -107,15 +107,20 @@ pub struct KeyboardInput {
 /// OS theme (light or dark).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Theme {
+	/// The theme is a light theme.
 	Light,
+
+	/// The theme is a dark theme.
 	Dark,
 }
 
 impl Theme {
+	/// Check if the theme is light.
 	pub fn is_light(self) -> bool {
 		self == Self::Light
 	}
 
+	/// Check if the theme is dark.
 	pub fn is_dark(self) -> bool {
 		self == Self::Dark
 	}
@@ -124,15 +129,20 @@ impl Theme {
 /// State of a button or key.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ElementState {
+	/// The button or key is pressed.
 	Pressed,
+
+	/// The button or key is released.
 	Released,
 }
 
 impl ElementState {
+	/// Check if the button or key is pressed.
 	pub fn is_pressed(self) -> bool {
 		self == Self::Pressed
 	}
 
+	/// Check if the button or key is released.
 	pub fn is_released(self) -> bool {
 		self == Self::Released
 	}
