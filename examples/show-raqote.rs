@@ -72,9 +72,15 @@ fn main() -> Result<(), String> {
 	// Wait for the window to be closed or Escape to be pressed.
 	for event in window.event_channel().map_err(|e| e.to_string())? {
 		if let event::WindowEvent::KeyboardInput(event) = event {
-			if !event.is_synthetic && event.input.key_code == Some(event::VirtualKeyCode::Escape) && event.input.state.is_pressed() {
+			if event.is_synthetic {
+				continue;
+			}
+			if event.input.key_code == Some(event::VirtualKeyCode::Escape) && event.input.state.is_pressed() {
 				println!("Escape pressed!");
 				break;
+			} else if event.input.key_code == Some(event::VirtualKeyCode::O) && event.input.state.is_pressed() && event.input.modifiers == show_image::event::ModifiersState::CTRL {
+				println!("Ctrl+O pressed, toggling overlay");
+				window.set_options(|options| options.clone().set_show_overlays(!options.show_overlays)).map_err(|e| e.to_string())?;
 			}
 		}
 	}
