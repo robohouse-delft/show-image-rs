@@ -87,8 +87,8 @@ impl<'a> WindowHandle<'a> {
 	}
 
 	/// Set the image to display on the window.
-	pub fn set_image(&mut self, name: impl AsRef<str>, image: &impl AsImageView) -> Result<(), SetImageError> {
-		self.context_handle.set_window_image(self.window_id, name.as_ref(), image)
+	pub fn set_image(&mut self, name: impl Into<String>, image: &impl AsImageView) -> Result<(), SetImageError> {
+		self.context_handle.set_window_image(self.window_id, name, image)
 	}
 
 	/// Add an overlay to the window.

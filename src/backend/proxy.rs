@@ -126,7 +126,7 @@ impl ContextProxy {
 		let name = name.into();
 		let image = image.into();
 		self.run_function_wait(move |context| {
-			context.set_window_image(window_id, &name, &image)
+			context.set_window_image(window_id, name, &image)
 		})
 	}
 
