@@ -51,12 +51,12 @@
 //! # Example 1: Showing an image.
 //! ```no_run
 //! # use image;
-//! # let pixel_data = &[0u8][..];
 //! use show_image::{ImageView, ImageInfo, create_window};
 //!
 //! #[show_image::main]
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
+//! # let pixel_data = &[0u8][..];
 //!   let image = ImageView::new(ImageInfo::rgb8(1920, 1080), pixel_data);
 //!
 //!   // Create a window with default options and display the image.
