@@ -366,6 +366,7 @@ impl Context {
 		let image = GpuImage::from_data(name, &self.device, &self.image_bind_group_layout, image.as_image_view()?);
 		window.image = Some(image);
 		window.uniforms.mark_dirty(true);
+		window.window.request_redraw();
 		Ok(())
 	}
 
