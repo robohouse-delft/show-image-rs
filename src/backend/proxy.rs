@@ -258,7 +258,7 @@ impl ContextProxy {
 	/// In the future, tasks may be run in a dedicated thread pool.
 	///
 	/// The background task will be joined before the process is terminated when you use [`Self::exit()`] or one of the other exit functions of this crate.
-	pub fn run_background_task<F>(&mut self, task: F)
+	pub fn run_background_task<F>(&self, task: F)
 	where
 		F: FnOnce() + Send + 'static,
 	{
