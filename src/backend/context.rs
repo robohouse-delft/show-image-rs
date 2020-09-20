@@ -579,7 +579,7 @@ impl Context {
 		use super::util::RetainMut;
 
 		// Event handlers could potentially modify the list of event handlers.
-		// Also, even if they couldn't we'd still need borrow self mutably multible times to run the event handlers.
+		// Also, even if they couldn't we'd still need borrow self mutably multiple times to run the event handlers.
 		// That's not allowed, of course, so temporarily swap the event handlers with a new vector.
 		// When we've run all handlers, we add the new handlers to the original vector and place it back.
 		// https://newfastuff.com/wp-content/uploads/2019/05/dVIkgAf.png
