@@ -394,7 +394,7 @@ impl WindowProxy {
 	/// Overlays are drawn on top of the image and remain active until they are cleared.
 	///
 	/// If you want to update the image and overlays at the same time,
-	/// you should use [`Self::run_function_wait()`] to perform all actions in one go.
+	/// you should use [`ContextProxy::run_function_wait()`] to perform all actions in one go.
 	/// Otherwise, each call will have to wait for the context thread to finish the request.
 	/// Set the image of the window.
 	///
@@ -410,7 +410,7 @@ impl WindowProxy {
 	/// Clear the overlays of the window.
 	///
 	/// If you want to update the image and overlays at the same time,
-	/// you should use [`Self::run_function_wait()`] to perform all actions in one go.
+	/// you should use [`ContextProxy::run_function_wait()`] to perform all actions in one go.
 	/// Otherwise, each call will have to wait for the context thread to finish the request.
 	/// Set the image of the window.
 	///
