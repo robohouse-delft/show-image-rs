@@ -80,7 +80,7 @@ where
 /// It is the responsibility of the user code to join any manually spawned tasks.
 ///
 /// It is also possible to run a user task in the same thread as the context.
-/// See [`tryrun_context_with_local_task()`] for more details.
+/// See [`try_run_context_with_local_task()`] for more details.
 ///
 /// # Panics
 /// This function panics if it is called from any thread other than the main thread.
