@@ -403,7 +403,7 @@ impl Context {
 			window.uniforms.update_from(&self.device, &mut encoder, &window.calculate_uniforms());
 		}
 
-		render_pass(&mut encoder, &self.window_pipeline, &window.uniforms, image, window.options.background_color, &frame.output.view);
+		render_pass(&mut encoder, &self.window_pipeline, &window.uniforms, image, Some(window.options.background_color), &frame.output.view);
 		self.queue.submit(std::iter::once(encoder.finish()));
 		Ok(())
 	}
@@ -445,23 +445,18 @@ impl Context {
 
 		let mut encoder = self.device.create_command_encoder(&Default::default());
 		let transparent = crate::Color::rgba(0.0, 0.0, 0.0, 0.0);
-		render_pass(
-			&mut encoder,
-			&self.image_pipeline,
-			&window_uniforms,
-			image,
-			transparent,
-			&target.create_view(&wgpu::TextureViewDescriptor {
-				label: None,
-				format: None,
-				dimension: None,
-				aspect: wgpu::TextureAspect::All,
-				base_mip_level: 0,
-				level_count: None,
-				base_array_layer: 0,
-				array_layer_count: None,
-			}),
-		);
+		let render_target = target.create_view(&wgpu::TextureViewDescriptor {
+			label: None,
+			format: None,
+			dimension: None,
+			aspect: wgpu::TextureAspect::All,
+			base_mip_level: 0,
+			level_count: None,
+			base_array_layer: 0,
+			array_layer_count: None,
+		});
+
+		render_pass(&mut encoder, &self.image_pipeline, &window_uniforms, image, Some(transparent), &render_target);
 
 		let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
 			label: None,
@@ -828,13 +823,18 @@ fn render_pass(
 	render_pipeline: &wgpu::RenderPipeline,
 	window_uniforms: &UniformsBuffer<WindowUniforms>,
 	image: &GpuImage,
-	background_color: crate::Color,
+	clear: Option<crate::Color>,
 	target: &wgpu::TextureView,
 ) {
+	let load = match clear {
+		Some(color) => wgpu::LoadOp::Clear(color.into()),
+		None => wgpu::LoadOp::Load,
+	};
+
 	let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 		color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
 			ops: wgpu::Operations {
-				load: wgpu::LoadOp::Clear(background_color.into()),
+				load,
 				store: true,
 			},
 			attachment: &target,
