@@ -413,7 +413,7 @@ impl Context {
 		Ok(())
 	}
 
-	fn render_to_texture(&self, window_id: WindowId) -> Result<Option<(String, crate::BoxImage)>, InvalidWindowId> {
+	fn render_to_texture(&self, window_id: WindowId, overlays: bool) -> Result<Option<(String, crate::BoxImage)>, InvalidWindowId> {
 		let window = self.windows.iter()
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowId { window_id })?;
@@ -462,6 +462,11 @@ impl Context {
 		});
 
 		render_pass(&mut encoder, &self.image_pipeline, &window_uniforms, image, Some(transparent), &render_target);
+		if overlays {
+			for overlay in &window.overlays {
+				render_pass(&mut encoder, &self.image_pipeline, &window_uniforms, overlay, None, &render_target);
+			}
+		}
 
 		let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
 			label: None,
@@ -547,10 +552,12 @@ impl Context {
 			#[allow(deprecated)]
 			Event::WindowEvent(WindowEvent::KeyboardInput(event)) => {
 				if event.input.state.is_pressed() && event.input.key_code == Some(event::VirtualKeyCode::S) {
-					if event.input.modifiers == event::ModifiersState::CTRL {
-						self.save_image_prompt(event.window_id);
-					} else if event.input.modifiers == event::ModifiersState::CTRL | event::ModifiersState::SHIFT {
-						self.save_image(event.window_id);
+					let overlays = event.input.modifiers.alt();
+					let modifiers = event.input.modifiers & !event::ModifiersState::ALT;
+					if modifiers == event::ModifiersState::CTRL {
+						self.save_image_prompt(event.window_id, overlays);
+					} else if modifiers == event::ModifiersState::CTRL | event::ModifiersState::SHIFT {
+						self.save_image(event.window_id, overlays);
 					}
 				}
 			},
@@ -655,8 +662,8 @@ impl Context {
 	}
 
 	#[cfg(feature = "save")]
-	fn save_image_prompt(&mut self, window_id: WindowId) {
-		let (name, image) = match self.render_to_texture(window_id) {
+	fn save_image_prompt(&mut self, window_id: WindowId, overlays: bool) {
+		let (name, image) = match self.render_to_texture(window_id, overlays) {
 			Ok(Some(x)) => x,
 			Ok(None) => return,
 			Err(e) => return log::error!("failed to render window contents: {}", e),
@@ -676,8 +683,8 @@ impl Context {
 	}
 
 	#[cfg(feature = "save")]
-	fn save_image(&mut self, window_id: WindowId) {
-		let (name, image) = match self.render_to_texture(window_id) {
+	fn save_image(&mut self, window_id: WindowId, overlays: bool) {
+		let (name, image) = match self.render_to_texture(window_id, overlays) {
 			Ok(Some(x)) => x,
 			Ok(None) => return,
 			Err(e) => return log::error!("failed to render window contents: {}", e),
