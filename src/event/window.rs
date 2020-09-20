@@ -225,6 +225,7 @@ pub struct WindowTextInputEvent {
 	pub character: char,
 }
 
+/// The mouse cursor entered the window area.
 #[derive(Debug, Clone)]
 pub struct WindowCursorEnteredEvent {
 	/// The ID of the window.
@@ -234,6 +235,7 @@ pub struct WindowCursorEnteredEvent {
 	pub device_id: DeviceId,
 }
 
+/// The mouse cursor left the window area.
 #[derive(Debug, Clone)]
 pub struct WindowCursorLeftEvent {
 	/// The ID of the window.

@@ -1,3 +1,5 @@
+//! Event types.
+
 pub use device::*;
 pub use window::*;
 
