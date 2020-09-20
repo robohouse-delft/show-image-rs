@@ -194,29 +194,16 @@ impl Window {
 
 	/// Recalculate the uniforms for the render pipeline from the window state.
 	pub fn calculate_uniforms(&self) -> WindowUniforms {
-		if !self.options.preserve_aspect_ratio {
-			Default::default()
-		} else if let Some(image) = &self.image {
+		if let Some(image) = &self.image {
 			let image_size = [image.width() as f32, image.height() as f32];
-			let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
-			let ratios = [image_size[0] / window_size[0], image_size[1] / window_size[1]];
-
-			let w;
-			let h;
-			if ratios[0] >= ratios[1] {
-				w = 1.0;
-				h = ratios[1] / ratios[0];
+			if !self.options.preserve_aspect_ratio {
+				WindowUniforms::stretch(image_size)
 			} else {
-				w = ratios[0] / ratios[1];
-				h = 1.0;
-			}
-
-			WindowUniforms {
-				offset: [0.5 - 0.5 * w, 0.5 - 0.5 * h],
-				size: [w, h],
+				let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
+				WindowUniforms::fit(window_size, image_size)
 			}
 		} else {
-			Default::default()
+			WindowUniforms::no_image()
 		}
 	}
 }
@@ -233,14 +220,42 @@ pub struct WindowUniforms {
 	/// The size of the image in normalized window coordinates.
 	///
 	/// The normalized window coordinates go from (0, 0) to (1, 1).
-	pub size: [f32; 2],
+	pub relative_size: [f32; 2],
+
+	/// The size of the image in pixels.
+	pub pixel_size: [f32; 2],
 }
 
-impl Default for WindowUniforms {
-	fn default() -> Self {
+impl WindowUniforms {
+	pub fn no_image() -> Self {
+		Self::stretch([0.0; 2])
+	}
+
+	pub fn stretch(pixel_size: [f32; 2]) -> Self {
 		Self {
-			offset: [0.0, 0.0],
-			size: [1.0, 1.0],
+			offset: [0.0; 2],
+			relative_size: [1.0; 2],
+			pixel_size,
+		}
+	}
+
+	pub fn fit(window_size: [f32; 2], image_size: [f32; 2]) -> Self {
+		let ratios = [image_size[0] / window_size[0], image_size[1] / window_size[1]];
+
+		let w;
+		let h;
+		if ratios[0] >= ratios[1] {
+			w = 1.0;
+			h = ratios[1] / ratios[0];
+		} else {
+			w = ratios[0] / ratios[1];
+			h = 1.0;
+		}
+
+		Self {
+			offset: [0.5 - 0.5 * w, 0.5 - 0.5 * h],
+			relative_size: [w, h],
+			pixel_size: image_size,
 		}
 	}
 }

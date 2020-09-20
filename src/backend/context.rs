@@ -302,7 +302,7 @@ impl Context {
 
 		let surface = unsafe { self.instance.create_surface(&window) };
 		let swap_chain = create_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
-		let uniforms = UniformsBuffer::from_value(&self.device, &Default::default(), &self.window_bind_group_layout);
+		let uniforms = UniformsBuffer::from_value(&self.device, &WindowUniforms::no_image(), &self.window_bind_group_layout);
 
 		let window = Window {
 			window,
@@ -407,7 +407,8 @@ impl Context {
 
 		let window_uniforms = WindowUniforms {
 			offset: [0.0, 0.0],
-			size: [image.width() as f32 / size.width as f32, 1.0],
+			relative_size: [image.width() as f32 / size.width as f32, 1.0],
+			pixel_size: [image.width() as f32, image.height() as f32],
 		};
 		let window_uniforms = UniformsBuffer::from_value(&self.device, &window_uniforms, &self.window_bind_group_layout);
 
