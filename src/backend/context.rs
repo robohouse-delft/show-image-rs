@@ -24,6 +24,9 @@ use crate::event;
 /// Not for use in public APIs.
 type EventLoop = winit::event_loop::EventLoop<ContextFunction>;
 
+/// Internal shorthand for context event handlers.
+type DynContextEventHandler = dyn FnMut(&mut ContextHandle, &mut Event, &mut event::EventHandlerControlFlow);
+
 /// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoopWindowTarget`].
 ///
 /// Not for use in public APIs.
@@ -85,7 +88,7 @@ pub struct Context {
 	pub exit_with_last_window: bool,
 
 	/// The global event handlers.
-	pub event_handlers: Vec<Box<dyn FnMut(&mut ContextHandle, &mut Event, &mut event::EventHandlerControlFlow) + 'static>>,
+	pub event_handlers: Vec<Box<DynContextEventHandler>>,
 
 	/// Background tasks, like saving images.
 	pub background_tasks: Vec<BackgroundThread<()>>,
@@ -652,7 +655,7 @@ impl Context {
 		event_handlers.extend(new_event_handlers);
 		self.windows[window_index].event_handlers = event_handlers;
 
-		return !stop_propagation;
+		!stop_propagation
 	}
 
 	/// Run a background task in a separate thread.

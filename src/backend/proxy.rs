@@ -232,7 +232,7 @@ impl ContextProxy {
 		F: 'static + FnOnce(&mut ContextHandle) + Send,
 	{
 		let function = Box::new(function);
-		if let Err(_) = self.event_loop.send_event(function) {
+		if self.event_loop.send_event(function).is_err() {
 			panic!("global context stopped running but somehow the process is still alive");
 		}
 	}
@@ -295,7 +295,7 @@ impl ContextProxy {
 		let (tx, rx) = mpsc::channel();
 		self.add_event_handler(move |_context, event, control| {
 			// If the receiver is dropped, remove the handler.
-			if let Err(_) = tx.send(event.clone()) {
+			if tx.send(event.clone()).is_err() {
 				control.remove_handler = true;
 			}
 		});
@@ -319,7 +319,7 @@ impl ContextProxy {
 		let (tx, rx) = mpsc::channel();
 		self.add_window_event_handler(window_id, move |_window, event, control| {
 			// If the receiver is dropped, remove the handler.
-			if let Err(_) = tx.send(event.clone()) {
+			if tx.send(event.clone()).is_err() {
 				control.remove_handler = true;
 			}
 		})?;

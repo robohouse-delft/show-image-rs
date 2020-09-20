@@ -10,6 +10,9 @@ use crate::error::SetImageError;
 use crate::event::EventHandlerControlFlow;
 use crate::event::WindowEvent;
 
+/// Internal shorthand for window event handlers.
+type DynWindowEventHandler = dyn FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow);
+
 /// Window capable of displaying images using wgpu.
 pub struct Window {
 	/// The winit window.
@@ -34,7 +37,7 @@ pub struct Window {
 	pub overlays: Vec<GpuImage>,
 
 	/// The event handlers for this specific window.
-	pub event_handlers: Vec<Box<dyn FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow)>>,
+	pub event_handlers: Vec<Box<DynWindowEventHandler>>,
 }
 
 /// Handle to a window.
