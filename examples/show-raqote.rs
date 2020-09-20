@@ -67,8 +67,7 @@ fn main() -> Result<(), String> {
 
 	let window = show_image::create_window("image", Default::default()).map_err(|e| e.to_string())?;
 	window.set_image("mondriaan", image).map_err(|e| e.to_string())?;
-	// let overlay = overlay.into_image()?;
-	// window.execute(move |window| window.add_overlay(overlay))?;
+	window.add_overlay("overlay", overlay).map_err(|e| e.to_string())?;
 
 	// Wait for the window to be closed or Escape to be pressed.
 	for event in window.event_channel().map_err(|e| e.to_string())? {
