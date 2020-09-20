@@ -32,13 +32,17 @@ fn initialize_context() -> Result<Context, error::GetDeviceError> {
 ///
 /// This function never returns.
 /// Once the user task finishes, the program exits with status code 0.
-/// It is the responsibility of the user code to join any important threads at the end of the task.
+/// Any background threads spawned by `show-image` will be joined before the process exits.
+/// It is the responsibility of the user code to join any manually spawned tasks.
 ///
 /// The user task can call the [`context()`] function to obtain a [`ContextProxy`],
 /// or the [`create_window()`] function to create a new window directly.
 ///
 /// If the `macros` feature is enabled, you can also wrap your main function with the [`main`][crate::main] macro
 /// instead of manually calling this function.
+///
+/// It is also possible to run a user task in the same thread as the context.
+/// See [`run_context_with_local_task()`] for more details.
 ///
 /// # Panics
 /// This function panics if initialization of the global context fails.
@@ -72,6 +76,11 @@ where
 /// If initialization succeeds, the user task is started in a newly spawned thread.
 ///
 /// Whether or not initialization succeeded, the process will exit once the user task returns.
+/// Any background threads spawned by `show-image` will be joined before the process exits.
+/// It is the responsibility of the user code to join any manually spawned tasks.
+///
+/// It is also possible to run a user task in the same thread as the context.
+/// See [`tryrun_context_with_local_task()`] for more details.
 ///
 /// # Panics
 /// This function panics if it is called from any thread other than the main thread.
@@ -112,8 +121,10 @@ where
 /// You should not run a function that blocks for any significant time in the main thread.
 /// Doing so will prevent the event loop from processing events and will result in unresponsive windows.
 ///
-/// If you're looking for a place to run your own application code, you probably want to use [`run_context`] or the [`main`][crate::main] macro.
-/// However, if you can drive your entire application from event handlers, then this function is probably what you're looking for.
+/// If you're looking for a place to run your own application code,
+/// you probably want to use [`run_context`] or the [`main`][crate::main] macro.
+/// However, if you can drive your entire application from event handlers,
+/// then this function is probably what you're looking for.
 ///
 /// # Panics
 /// This function panics if initialization of the global context fails.
