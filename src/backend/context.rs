@@ -800,7 +800,7 @@ fn create_render_pipeline(
 			},
 			alpha_blend: wgpu::BlendDescriptor {
 				src_factor: wgpu::BlendFactor::One,
-				dst_factor: wgpu::BlendFactor::Zero,
+				dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
 				operation: wgpu::BlendOperation::Add,
 			},
 			write_mask: wgpu::ColorWrite::ALL,
