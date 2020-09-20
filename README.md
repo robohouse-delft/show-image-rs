@@ -49,6 +49,9 @@ If the `save` feature is enabled, windows allow the displayed image to be saved 
 The first shortcut will open a file dialog to save the currently displayed image.
 The second shortcut will directly save the image in the current working directory using the name of the image.
 
+The image is saved without any overlays.
+To save an image including overlays, add `Alt` to the shortcut: `Ctrl+Alt+S` and `Ctrl+Alt+Shift+S`.
+
 Note that images are saved in a background thread.
 To ensure that no data loss occurs, call `exit()` to terminate the process rather than `std::process::exit()`.
 That will ensure that the background threads are joined before the process is terminated.
