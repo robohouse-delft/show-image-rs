@@ -30,6 +30,9 @@ pub struct Window {
 	/// The image to display (if any).
 	pub image: Option<GpuImage>,
 
+	/// Overlays to draw on top of images.
+	pub overlays: Vec<GpuImage>,
+
 	/// The event handlers for this specific window.
 	pub event_handlers: Vec<Box<dyn FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow)>>,
 }
@@ -88,6 +91,19 @@ impl<'a> WindowHandle<'a> {
 		self.context_handle.set_window_image(self.window_id, name.as_ref(), image)
 	}
 
+	/// Add an overlay to the window.
+	///
+	/// Overlays are drawn on top of the image.
+	/// Overlays remain active until you call they are cleared.
+	pub fn add_overlay(&mut self, name: impl Into<String>, image: &impl AsImageView) -> Result<(), SetImageError> {
+		self.context_handle.add_window_overlay(self.window_id, name, image)
+	}
+
+	/// Clear the overlays of the window.
+	pub fn clear_overlays(&mut self) -> Result<(), InvalidWindowId> {
+		self.context_handle.clear_window_overlays(self.window_id)
+	}
+
 	/// Add an event handler to the window.
 	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), InvalidWindowId>
 	where
@@ -122,6 +138,11 @@ pub struct WindowOptions {
 	///
 	/// This may be ignored by a window manager.
 	pub resizable: bool,
+
+	/// If true, draw overlays on the image.
+	///
+	/// Defaults to true.
+	pub show_overlays: bool,
 }
 
 impl Default for WindowOptions {
@@ -132,6 +153,7 @@ impl Default for WindowOptions {
 			start_hidden: false,
 			size: None,
 			resizable: true,
+			show_overlays: true,
 		}
 	}
 }
@@ -177,6 +199,12 @@ impl WindowOptions {
 	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_resizable(mut self, resizable: bool) -> Self {
 		self.resizable = resizable;
+		self
+	}
+
+	/// Set wether or not overlays should be drawn on the window.
+	pub fn set_show_overlays(mut self, show_overlays: bool) -> Self {
+		self.show_overlays = show_overlays;
 		self
 	}
 }

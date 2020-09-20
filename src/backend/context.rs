@@ -5,6 +5,7 @@ use crate::WindowId;
 use crate::WindowOptions;
 use crate::backend::proxy::ContextFunction;
 use crate::backend::util::UniformsBuffer;
+use crate::backend::util::GpuImage;
 use crate::backend::window::Window;
 use crate::backend::window::WindowUniforms;
 use crate::background_thread::BackgroundThread;
@@ -239,6 +240,26 @@ impl<'a> ContextHandle<'a> {
 		self.context.set_window_image(window_id, name.into(), image)
 	}
 
+	/// Add an overlay to a window.
+	///
+	/// Overlays are drawn on top of the image.
+	/// Overlays remain active until you call they are cleared.
+	pub fn add_window_overlay(&mut self, window_id: WindowId, name: impl Into<String>, image: &impl AsImageView) -> Result<(), SetImageError> {
+		let window = self.context.windows.iter_mut().find(|w| w.id() == window_id).ok_or_else(|| InvalidWindowId { window_id })?;
+		let image = GpuImage::from_data(name.into(), &self.context.device, &self.context.image_bind_group_layout, image.as_image_view()?);
+		window.overlays.push(image);
+		window.window.request_redraw();
+		Ok(())
+	}
+
+	/// Clear the overlays of a window.
+	pub fn clear_window_overlays(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
+		let window = self.context.windows.iter_mut().find(|w| w.id() == window_id).ok_or_else(|| InvalidWindowId { window_id })?;
+		window.overlays.clear();
+		window.window.request_redraw();
+		Ok(())
+	}
+
 	/// Add a global event handler.
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
@@ -311,6 +332,7 @@ impl Context {
 			swap_chain,
 			uniforms,
 			image: None,
+			overlays: Vec::new(),
 			event_handlers: Vec::new(),
 		};
 
@@ -342,9 +364,8 @@ impl Context {
 			.find(|w| w.id() == window_id)
 			.ok_or_else(|| InvalidWindowId { window_id })?;
 
-		let image = image.as_image_view()?;
-		let texture = super::util::GpuImage::from_data(name, &self.device, &self.image_bind_group_layout, image);
-		window.image = Some(texture);
+		let image = GpuImage::from_data(name, &self.device, &self.image_bind_group_layout, image.as_image_view()?);
+		window.image = Some(image);
 		window.uniforms.mark_dirty(true);
 		Ok(())
 	}
@@ -806,7 +827,7 @@ fn render_pass(
 	encoder: &mut wgpu::CommandEncoder,
 	render_pipeline: &wgpu::RenderPipeline,
 	window_uniforms: &UniformsBuffer<WindowUniforms>,
-	image: &super::util::GpuImage,
+	image: &GpuImage,
 	background_color: crate::Color,
 	target: &wgpu::TextureView,
 ) {

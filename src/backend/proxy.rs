@@ -130,6 +130,42 @@ impl ContextProxy {
 		})
 	}
 
+	/// Add an overlay to a window.
+	///
+	/// Overlays are drawn on top of the image and remain active until they are cleared.
+	///
+	/// If you want to update the image and overlays at the same time,
+	/// you should use [`Self::run_function_wait()`] to perform all actions in one go.
+	/// Otherwise, each call will have to wait for the context thread to finish the request.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
+	pub fn add_window_overlay(&self,
+		window_id: WindowId,
+		name: impl Into<String>,
+		image: impl Into<Image>,
+	) -> Result<(), SetImageError> {
+		let name = name.into();
+		let image = image.into();
+		self.run_function_wait(move |context| {
+			context.add_window_overlay(window_id, name, &image)
+		})
+	}
+
+	/// Clear the overlays of a window.
+	///
+	/// If you want to update the image and overlays at the same time,
+	/// you should use [`Self::run_function_wait()`] to perform all actions in one go.
+	/// Otherwise, each call will have to wait for the context thread to finish the request.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
+	pub fn clear_window_overlays(&self, window_id: WindowId) -> Result<(), InvalidWindowId> {
+		self.run_function_wait(move |context| {
+			context.clear_window_overlays(window_id)
+		})
+	}
+
 	/// Add a global event handler to the context.
 	///
 	/// Events that are already queued with the event loop will not be passed to the handler.
@@ -351,6 +387,37 @@ impl WindowProxy {
 		image: impl Into<Image>,
 	) -> Result<(), SetImageError> {
 		self.context_proxy.set_window_image(self.window_id, name, image)
+	}
+
+	/// Add an overlay to the window.
+	///
+	/// Overlays are drawn on top of the image and remain active until they are cleared.
+	///
+	/// If you want to update the image and overlays at the same time,
+	/// you should use [`Self::run_function_wait()`] to perform all actions in one go.
+	/// Otherwise, each call will have to wait for the context thread to finish the request.
+	/// Set the image of the window.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
+	pub fn add_overlay(&self,
+		name: impl Into<String>,
+		image: impl Into<Image>,
+	) -> Result<(), SetImageError> {
+		self.context_proxy.add_window_overlay(self.window_id, name, image)
+	}
+
+	/// Clear the overlays of the window.
+	///
+	/// If you want to update the image and overlays at the same time,
+	/// you should use [`Self::run_function_wait()`] to perform all actions in one go.
+	/// Otherwise, each call will have to wait for the context thread to finish the request.
+	/// Set the image of the window.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
+	pub fn clear_overlays(&self) -> Result<(), InvalidWindowId> {
+		self.context_proxy.clear_window_overlays(self.window_id)
 	}
 
 	/// Add an event handler for the window.
