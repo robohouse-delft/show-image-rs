@@ -404,6 +404,11 @@ impl Context {
 		}
 
 		render_pass(&mut encoder, &self.window_pipeline, &window.uniforms, image, Some(window.options.background_color), &frame.output.view);
+		if window.options.show_overlays {
+			for overlay in &window.overlays {
+				render_pass(&mut encoder, &self.window_pipeline, &window.uniforms, overlay, None, &frame.output.view);
+			}
+		}
 		self.queue.submit(std::iter::once(encoder.finish()));
 		Ok(())
 	}
