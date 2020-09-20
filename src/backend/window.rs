@@ -86,6 +86,14 @@ impl<'a> WindowHandle<'a> {
 		self.context_handle.set_window_visible(self.window_id, visible)
 	}
 
+	/// Change the options of the window.
+	pub fn set_options<F>(&mut self, make_options: F) -> Result<(), InvalidWindowId>
+	where
+		F: FnOnce(&WindowOptions) -> WindowOptions
+	{
+		self.context_handle.set_window_options(self.window_id, make_options)
+	}
+
 	/// Set the image to display on the window.
 	pub fn set_image(&mut self, name: impl Into<String>, image: &impl AsImageView) -> Result<(), SetImageError> {
 		self.context_handle.set_window_image(self.window_id, name, image)

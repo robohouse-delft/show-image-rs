@@ -234,6 +234,26 @@ impl<'a> ContextHandle<'a> {
 		self.context.set_window_visible(window_id, visible)
 	}
 
+	/// Change the options of a window.
+	pub fn set_window_options<F>(&mut self, window_id: WindowId, make_options: F) -> Result<(), InvalidWindowId>
+	where
+		F: FnOnce(&WindowOptions) -> WindowOptions
+	{
+		let window = self.context.windows.iter_mut().find(|w| w.id() == window_id).ok_or_else(|| InvalidWindowId { window_id })?;
+		let options = (make_options)(&window.options);
+
+		window.window.set_resizable(options.resizable);
+		if options.size != window.options.size {
+			if let Some(size) = options.size {
+				window.window.set_inner_size(winit::dpi::LogicalSize::<u32>::from(size));
+			}
+		}
+
+		window.options = options;
+		window.window.request_redraw();
+		Ok(())
+	}
+
 	/// Set the image to be displayed on a window.
 	pub fn set_window_image(&mut self, window_id: WindowId, name: impl Into<String>, image: &impl AsImageView) -> Result<(), SetImageError> {
 		self.context.set_window_image(window_id, name.into(), image)

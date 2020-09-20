@@ -110,6 +110,19 @@ impl ContextProxy {
 		})
 	}
 
+	/// Change the options of a window.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
+	pub fn set_window_options<F>(&self, window_id: WindowId, make_options: F) -> Result<(), InvalidWindowId>
+	where
+		F: FnOnce(&WindowOptions) -> WindowOptions + Send + 'static
+	{
+		self.run_function_wait(move |context| {
+			context.set_window_options(window_id, make_options)
+		})
+	}
+
 	/// Set the shown image for a window.
 	///
 	/// The real work is done in the context thread.
@@ -375,6 +388,17 @@ impl WindowProxy {
 		visible: bool,
 	) -> Result<(), InvalidWindowId> {
 		self.context_proxy.set_window_visible(self.window_id, visible)
+	}
+
+	/// Change the options of the window.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
+	pub fn set_options<F>(&self, make_options: F) -> Result<(), InvalidWindowId>
+	where
+		F: FnOnce(&WindowOptions) -> WindowOptions + Send + 'static
+	{
+		self.context_proxy.set_window_options(self.window_id, make_options)
 	}
 
 	/// Set the image of the window.
