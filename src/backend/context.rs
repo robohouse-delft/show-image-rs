@@ -118,7 +118,6 @@ impl Context {
 
 		let vertex_shader = device.create_shader_module(wgpu::include_spirv!("../../shaders/shader.vert.spv"));
 		let fragment_shader_unorm8 = device.create_shader_module(wgpu::include_spirv!("../../shaders/unorm8.frag.spv"));
-		let fragment_shader_uint8 = device.create_shader_module(wgpu::include_spirv!("../../shaders/uint8.frag.spv"));
 
 		let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			label: Some("show-image-pipeline-layout"),
@@ -127,7 +126,7 @@ impl Context {
 		});
 
 		let window_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader_unorm8, swap_chain_format);
-		let image_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader_uint8, wgpu::TextureFormat::Rgba8Uint);
+		let image_pipeline = create_render_pipeline(&device, &pipeline_layout, &vertex_shader, &fragment_shader_unorm8, wgpu::TextureFormat::Rgba8Unorm);
 
 		Ok(Self {
 			unsend: Default::default(),
@@ -438,7 +437,7 @@ impl Context {
 			usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
 			sample_count: 1,
 			mip_level_count: 1,
-			format: wgpu::TextureFormat::Rgba8Uint,
+			format: wgpu::TextureFormat::Rgba8Unorm,
 			dimension: wgpu::TextureDimension::D2,
 			size,
 		});
