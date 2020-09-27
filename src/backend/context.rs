@@ -15,6 +15,8 @@ use crate::event::EventHandlerControlFlow;
 use crate::event::WindowEvent;
 use crate::AsImageView;
 use crate::ContextProxy;
+use crate::ImageInfo;
+use crate::Rectangle;
 use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
@@ -246,6 +248,28 @@ impl<'a> ContextHandle<'a> {
 	/// Destroy a window.
 	pub fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
 		self.context.destroy_window(window_id)
+	}
+
+	/// Get the image info and the area where the image is drawn for a window.
+	pub fn window_image_info(&self, window_id: WindowId) -> Result<Option<(ImageInfo, Rectangle)>, InvalidWindowId> {
+		let window = self.context.windows.iter().find(|x| x.id() == window_id).ok_or_else(|| InvalidWindowId { window_id })?;
+		let image_info = match window.image.as_ref().map(|x| x.info().clone()) {
+			Some(x) => x,
+			None => return Ok(None),
+		};
+
+		let uniforms = window.calculate_uniforms();
+		let [x, y] = uniforms.offset;
+		let [width, height] = uniforms.relative_size;
+
+		let x = (x * image_info.width as f32) as i32;
+		let y = (y * image_info.height as f32) as i32;
+		let width = (width * image_info.width as f32) as u32;
+		let height = (height * image_info.height as f32) as u32;
+
+		let image_area = Rectangle::from_xywh(x, y, width, height);
+
+		Ok(Some((image_info, image_area)))
 	}
 
 	/// Make a window visible or invisible.
@@ -521,18 +545,18 @@ impl Context {
 			None => return Ok(None),
 		};
 
-		let bytes_per_row = align_next_u32(image.width() * 4, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
+		let bytes_per_row = align_next_u32(image.info().width * 4, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
 
 		let size = wgpu::Extent3d {
 			width: div_round_up(bytes_per_row, 4),
-			height: image.height(),
+			height: image.info().height,
 			depth: 1,
 		};
 
 		let window_uniforms = WindowUniforms {
 			offset: [0.0, 0.0],
-			relative_size: [image.width() as f32 / size.width as f32, 1.0],
-			pixel_size: [image.width() as f32, image.height() as f32],
+			relative_size: [image.info().width as f32 / size.width as f32, 1.0],
+			pixel_size: [image.info().width as f32, image.info().height as f32],
 		};
 		let window_uniforms = UniformsBuffer::from_value(&self.device, &window_uniforms, &self.window_bind_group_layout);
 
@@ -575,7 +599,7 @@ impl Context {
 
 		let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
 			label: None,
-			size: u64::from(bytes_per_row) * u64::from(image.height()),
+			size: u64::from(bytes_per_row) * u64::from(image.info().height),
 			usage: wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
 			mapped_at_creation: false,
 		});
@@ -590,7 +614,7 @@ impl Context {
 				buffer: &buffer,
 				layout: wgpu::TextureDataLayout {
 					bytes_per_row,
-					rows_per_image: image.height(),
+					rows_per_image: image.info().height,
 					offset: 0,
 				},
 			},
@@ -602,8 +626,8 @@ impl Context {
 		let view = super::util::map_buffer(&self.device, buffer.slice(..)).unwrap();
 		let info = crate::ImageInfo {
 			pixel_format: crate::PixelFormat::Rgba8(crate::Alpha::Unpremultiplied),
-			width: image.width(),
-			height: image.height(),
+			width: image.info().width,
+			height: image.info().height,
 			stride_x: 4,
 			stride_y: bytes_per_row,
 		};

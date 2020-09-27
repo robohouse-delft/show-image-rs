@@ -7,6 +7,8 @@ use crate::event::WindowEvent;
 use crate::AsImageView;
 use crate::Color;
 use crate::ContextHandle;
+use crate::ImageInfo;
+use crate::Rectangle;
 use crate::WindowId;
 use crate::WindowProxy;
 
@@ -82,6 +84,11 @@ impl<'a> WindowHandle<'a> {
 	/// Any subsequent operation on the window will return [`InvalidWindowId`].
 	pub fn destroy(&mut self) -> Result<(), InvalidWindowId> {
 		self.context_handle.destroy_window(self.window_id)
+	}
+
+	/// Get the image info and the area of the window where the image is drawn.
+	pub fn image_info(&self) -> Result<Option<(ImageInfo, Rectangle)>, InvalidWindowId> {
+		self.context_handle.window_image_info(self.window_id)
 	}
 
 	/// Make the window visible or invisible.
@@ -235,7 +242,7 @@ impl Window {
 	/// Recalculate the uniforms for the render pipeline from the window state.
 	pub fn calculate_uniforms(&self) -> WindowUniforms {
 		if let Some(image) = &self.image {
-			let image_size = [image.width() as f32, image.height() as f32];
+			let image_size = [image.info().width as f32, image.info().height as f32];
 			if !self.options.preserve_aspect_ratio {
 				WindowUniforms::stretch(image_size)
 			} else {

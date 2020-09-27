@@ -105,11 +105,13 @@ mod features;
 mod image;
 mod image_info;
 mod oneshot;
+mod rectangle;
 
 pub use self::backend::*;
 pub use self::features::*;
 pub use self::image::*;
 pub use self::image_info::*;
+pub use self::rectangle::Rectangle;
 
 pub use winit;
 pub use winit::window::WindowId;

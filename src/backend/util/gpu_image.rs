@@ -1,11 +1,12 @@
-use super::buffer::create_buffer_with_value;
+use crate::ImageInfo;
 use crate::ImageView;
 use crate::{Alpha, PixelFormat};
+use super::buffer::create_buffer_with_value;
 
 /// A GPU image buffer ready to be used with the rendering pipeline.
 pub struct GpuImage {
 	name: String,
-	size: [u32; 2],
+	info: ImageInfo,
 	bind_group: wgpu::BindGroup,
 	_uniforms: wgpu::Buffer,
 	_data: wgpu::Buffer,
@@ -24,7 +25,9 @@ pub struct GpuImageUniforms {
 impl GpuImage {
 	/// Create a [`GpuImage`] from an image buffer.
 	pub fn from_data(name: String, device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, image: ImageView) -> Self {
-		let format = match image.info().pixel_format {
+		let info = image.info();
+
+		let format = match info.pixel_format {
 			PixelFormat::Mono8 => 0,
 			PixelFormat::MonoAlpha8(Alpha::Unpremultiplied) => 1,
 			PixelFormat::MonoAlpha8(Alpha::Premultiplied) => 2,
@@ -38,10 +41,10 @@ impl GpuImage {
 
 		let uniforms = GpuImageUniforms {
 			format,
-			width: image.info().width,
-			height: image.info().height,
-			stride_x: image.info().stride_x,
-			stride_y: image.info().stride_y,
+			width: info.width,
+			height: info.height,
+			stride_x: info.stride_x,
+			stride_y: info.stride_y,
 		};
 
 		let uniforms = create_buffer_with_value(
@@ -75,7 +78,7 @@ impl GpuImage {
 
 		Self {
 			name,
-			size: [image.info().width, image.info().height],
+			info,
 			bind_group,
 			_uniforms: uniforms,
 			_data: data,
@@ -87,19 +90,9 @@ impl GpuImage {
 		&self.name
 	}
 
-	/// Get the dimensions of the image.
-	pub fn size(&self) -> [u32; 2] {
-		self.size
-	}
-
-	/// Get the width of the image.
-	pub fn width(&self) -> u32 {
-		self.size()[0]
-	}
-
-	/// Get the height of the image.
-	pub fn height(&self) -> u32 {
-		self.size()[1]
+	/// Get the image info.
+	pub fn info(&self) -> &ImageInfo {
+		&self.info
 	}
 
 	/// Get the bind group that should be used to render the image with the rendering pipeline.
