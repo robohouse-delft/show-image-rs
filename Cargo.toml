@@ -37,17 +37,17 @@ log               = { version="0.4.11", optional=true }
 png               = { version="0.16.7", optional=true }
 raqote            = { version="0.8.0", optional=true }
 show-image-macros = { version="0.7.0", optional=true, path="show-image-macros" }
-tch               = { version=">=0.1.6, <0.3.0",  optional=true }
+tch               = { version=">=0.1.6, <0.4.0",  optional=true }
 tinyfiledialogs   = { version="3.3.9", optional=true }
 wgpu              = "0.6.0"
-winit             = "0.22.2"
+winit             = "0.23.0"
 
 [dev-dependencies]
 show-image = { path = ".", features=["full"] }
 assert2    = "0.3.1"
 
 [build-dependencies]
-rustc_version = "0.2.3"
+rustc_version = "0.3.0"
 
 [package.metadata.docs.rs]
 features = ["doc-only", "full", "nightly"]
