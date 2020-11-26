@@ -260,13 +260,15 @@ impl<'a> ContextHandle<'a> {
 		};
 
 		let uniforms = window.calculate_uniforms();
+		let window_size = window.window.inner_size();
+
 		let [x, y] = uniforms.offset;
 		let [width, height] = uniforms.relative_size;
 
-		let x = (x * image_info.width as f32) as i32;
-		let y = (y * image_info.height as f32) as i32;
-		let width = (width * image_info.width as f32) as u32;
-		let height = (height * image_info.height as f32) as u32;
+		let x = (x * window_size.width as f32) as i32;
+		let y = (y * window_size.height as f32) as i32;
+		let width = (width * window_size.width as f32) as u32;
+		let height = (height * window_size.height as f32) as u32;
 
 		let image_area = Rectangle::from_xywh(x, y, width, height);
 
