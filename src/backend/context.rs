@@ -9,10 +9,7 @@ use crate::error::GetDeviceError;
 use crate::error::InvalidWindowId;
 use crate::error::NoSuitableAdapterFound;
 use crate::error::SetImageError;
-use crate::event;
-use crate::event::Event;
-use crate::event::EventHandlerControlFlow;
-use crate::event::WindowEvent;
+use crate::event::{self, Event, EventHandlerControlFlow, WindowEvent};
 use crate::AsImageView;
 use crate::ContextProxy;
 use crate::ImageInfo;
@@ -86,6 +83,9 @@ pub struct Context {
 	/// The windows.
 	pub windows: Vec<Window>,
 
+	/// Cache for mouse state.
+	pub mouse_cache: super::mouse_cache::MouseCache,
+
 	/// If true, exit the program when the last window closes.
 	pub exit_with_last_window: bool,
 
@@ -158,6 +158,7 @@ impl Context {
 			window_pipeline,
 			image_pipeline,
 			windows: Vec::new(),
+			mouse_cache: Default::default(),
 			exit_with_last_window: false,
 			event_handlers: Vec::new(),
 			background_tasks: Vec::new(),
@@ -653,8 +654,10 @@ impl Context {
 			},
 		};
 
+		self.mouse_cache.handle_event(&event);
+
 		// Convert to own event type.
-		let mut event = match super::event::convert_winit_event(event) {
+		let mut event = match super::event::convert_winit_event(event, &self.mouse_cache) {
 			Some(x) => x,
 			None => return,
 		};

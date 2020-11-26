@@ -4,6 +4,7 @@ use super::ElementState;
 use super::KeyboardInput;
 use super::ModifiersState;
 use super::MouseButton;
+use super::MouseButtonState;
 use super::MouseScrollDelta;
 use super::PhysicalPosition;
 use super::PhysicalSize;
@@ -53,17 +54,17 @@ pub enum WindowEvent {
 	/// A window received text input.
 	TextInput(WindowTextInputEvent),
 
-	/// The cursor entered a window.
-	CursorEntered(WindowCursorEnteredEvent),
+	/// The mouse cursor entered a window.
+	MouseEnter(WindowMouseEnterEvent),
 
-	/// The cursor left a window.
-	CursorLeft(WindowCursorLeftEvent),
+	/// The mouse cursor left a window.
+	MouseLeave(WindowMouseLeaveEvent),
 
-	/// The cursor was moved on a window.
-	CursorMoved(WindowCursorMovedEvent),
+	/// The mouse cursor was moved on a window.
+	MouseMove(WindowMouseMoveEvent),
 
-	/// A window received mouse input.
-	MouseInput(WindowMouseInputEvent),
+	/// A mouse button was pressed or released on a window.
+	MouseButton(WindowMouseButtonEvent),
 
 	/// A window received mouse wheel input.
 	MouseWheel(WindowMouseWheelEvent),
@@ -100,10 +101,10 @@ impl WindowEvent {
 			Self::FocusLost(x) => x.window_id,
 			Self::KeyboardInput(x) => x.window_id,
 			Self::TextInput(x) => x.window_id,
-			Self::CursorEntered(x) => x.window_id,
-			Self::CursorLeft(x) => x.window_id,
-			Self::CursorMoved(x) => x.window_id,
-			Self::MouseInput(x) => x.window_id,
+			Self::MouseEnter(x) => x.window_id,
+			Self::MouseLeave(x) => x.window_id,
+			Self::MouseMove(x) => x.window_id,
+			Self::MouseButton(x) => x.window_id,
 			Self::MouseWheel(x) => x.window_id,
 			Self::AxisMotion(x) => x.window_id,
 			Self::TouchpadPressure(x) => x.window_id,
@@ -227,27 +228,33 @@ pub struct WindowTextInputEvent {
 
 /// The mouse cursor entered the window area.
 #[derive(Debug, Clone)]
-pub struct WindowCursorEnteredEvent {
+pub struct WindowMouseEnterEvent {
 	/// The ID of the window.
 	pub window_id: WindowId,
 
 	/// The device that generated the input.
 	pub device_id: DeviceId,
+
+	/// The pressed state of all mouse buttons.
+	pub buttons: MouseButtonState,
 }
 
 /// The mouse cursor left the window area.
 #[derive(Debug, Clone)]
-pub struct WindowCursorLeftEvent {
+pub struct WindowMouseLeaveEvent {
 	/// The ID of the window.
 	pub window_id: WindowId,
 
 	/// The device that generated the input.
 	pub device_id: DeviceId,
+
+	/// The pressed state of all mouse buttons.
+	pub buttons: MouseButtonState,
 }
 
-/// The cursor was moved on a window.
+/// The mouse cursor was moved on a window.
 #[derive(Debug, Clone)]
-pub struct WindowCursorMovedEvent {
+pub struct WindowMouseMoveEvent {
 	/// The ID of the window.
 	pub window_id: WindowId,
 
@@ -257,13 +264,16 @@ pub struct WindowCursorMovedEvent {
 	/// The new position of the cursor in physical pixels, relative to the top-left corner of the window.
 	pub position: PhysicalPosition<f64>,
 
+	/// The pressed state of all mouse buttons.
+	pub buttons: MouseButtonState,
+
 	/// The state of the keyboard modifiers at the time of the event.
 	pub modifiers: ModifiersState,
 }
 
 /// A window received mouse input.
 #[derive(Debug, Clone)]
-pub struct WindowMouseInputEvent {
+pub struct WindowMouseButtonEvent {
 	/// The ID of the window.
 	pub window_id: WindowId,
 
@@ -275,6 +285,12 @@ pub struct WindowMouseInputEvent {
 
 	/// The new state of the mouse button.
 	pub state: ElementState,
+
+	/// The position of the mouse cursor inside the window.
+	pub position: PhysicalPosition<f64>,
+
+	/// The pressed state of all mouse buttons.
+	pub buttons: MouseButtonState,
 
 	/// The state of the keyboard modifiers at the time of the event.
 	pub modifiers: ModifiersState,
@@ -294,6 +310,12 @@ pub struct WindowMouseWheelEvent {
 
 	/// The touch-screen input state.
 	pub phase: TouchPhase,
+
+	/// The position of the mouse cursor inside the window.
+	pub position: Option<PhysicalPosition<f64>>,
+
+	/// The pressed state of all mouse buttons.
+	pub buttons: MouseButtonState,
 
 	/// The state of the keyboard modifiers at the time of the event.
 	pub modifiers: ModifiersState,
@@ -373,10 +395,10 @@ impl_from_variant!(WindowEvent::FocusGained(WindowFocusGainedEvent));
 impl_from_variant!(WindowEvent::FocusLost(WindowFocusLostEvent));
 impl_from_variant!(WindowEvent::KeyboardInput(WindowKeyboardInputEvent));
 impl_from_variant!(WindowEvent::TextInput(WindowTextInputEvent));
-impl_from_variant!(WindowEvent::CursorEntered(WindowCursorEnteredEvent));
-impl_from_variant!(WindowEvent::CursorLeft(WindowCursorLeftEvent));
-impl_from_variant!(WindowEvent::CursorMoved(WindowCursorMovedEvent));
-impl_from_variant!(WindowEvent::MouseInput(WindowMouseInputEvent));
+impl_from_variant!(WindowEvent::MouseEnter(WindowMouseEnterEvent));
+impl_from_variant!(WindowEvent::MouseLeave(WindowMouseLeaveEvent));
+impl_from_variant!(WindowEvent::MouseMove(WindowMouseMoveEvent));
+impl_from_variant!(WindowEvent::MouseButton(WindowMouseButtonEvent));
 impl_from_variant!(WindowEvent::MouseWheel(WindowMouseWheelEvent));
 impl_from_variant!(WindowEvent::AxisMotion(WindowAxisMotionEvent));
 impl_from_variant!(WindowEvent::TouchpadPressure(WindowTouchpadPressureEvent));

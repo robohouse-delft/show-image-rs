@@ -1,5 +1,6 @@
 mod context;
 mod event;
+mod mouse_cache;
 mod proxy;
 mod util;
 mod window;

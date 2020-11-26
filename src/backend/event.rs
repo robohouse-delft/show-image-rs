@@ -1,10 +1,15 @@
-pub fn convert_winit_event(event: winit::event::Event<()>) -> Option<crate::event::Event> {
+use super::mouse_cache::MouseCache;
+
+pub fn convert_winit_event(
+	event: winit::event::Event<()>,
+	mouse_cache: &MouseCache,
+) -> Option<crate::event::Event> {
 	use crate::event::Event as C;
 	use winit::event::Event as W;
 
 	match event {
 		W::UserEvent(_) => None,
-		W::WindowEvent { window_id, event } => Some(convert_winit_window_event(window_id, event)?.into()),
+		W::WindowEvent { window_id, event } => Some(convert_winit_window_event(window_id, event, mouse_cache)?.into()),
 		W::DeviceEvent { device_id, event } => Some(convert_winit_device_event(device_id, event).into()),
 		W::NewEvents(_) => Some(C::NewEvents),
 		W::MainEventsCleared => Some(C::MainEventsCleared),
@@ -17,7 +22,10 @@ pub fn convert_winit_event(event: winit::event::Event<()>) -> Option<crate::even
 	}
 }
 
-pub fn convert_winit_device_event(device_id: winit::event::DeviceId, event: winit::event::DeviceEvent) -> crate::event::DeviceEvent {
+pub fn convert_winit_device_event(
+	device_id: winit::event::DeviceId,
+	event: winit::event::DeviceEvent,
+) -> crate::event::DeviceEvent {
 	use crate::event;
 	use winit::event::DeviceEvent as W;
 	match event {
@@ -33,7 +41,7 @@ pub fn convert_winit_device_event(device_id: winit::event::DeviceId, event: wini
 		W::Button { button, state } => event::DeviceButtonEvent {
 			device_id,
 			button,
-			state: convert_winit_element_state(state),
+			state: state.into(),
 		}
 		.into(),
 		W::Key(input) => event::DeviceKeyboardInputEvent {
@@ -48,6 +56,7 @@ pub fn convert_winit_device_event(device_id: winit::event::DeviceId, event: wini
 pub fn convert_winit_window_event(
 	window_id: winit::window::WindowId,
 	event: winit::event::WindowEvent,
+	mouse_cache: &MouseCache,
 ) -> Option<crate::event::WindowEvent> {
 	use crate::event;
 	use winit::event::WindowEvent as W;
@@ -83,16 +92,25 @@ pub fn convert_winit_window_event(
 			position,
 			modifiers,
 		} => Some(
-			event::WindowCursorMovedEvent {
+			event::WindowMouseMoveEvent {
 				window_id,
 				device_id,
 				position,
 				modifiers,
+				buttons: mouse_cache.get_buttons(device_id).map(|x| x.clone()).unwrap_or_default(),
 			}
 			.into(),
 		),
-		W::CursorEntered { device_id } => Some(event::WindowCursorEnteredEvent { window_id, device_id }.into()),
-		W::CursorLeft { device_id } => Some(event::WindowCursorLeftEvent { window_id, device_id }.into()),
+		W::CursorEntered { device_id } => Some(event::WindowMouseEnterEvent {
+			window_id,
+			device_id,
+			buttons: mouse_cache.get_buttons(device_id).map(|x| x.clone()).unwrap_or_default(),
+		}.into()),
+		W::CursorLeft { device_id } => Some(event::WindowMouseLeaveEvent {
+			window_id,
+			device_id,
+			buttons: mouse_cache.get_buttons(device_id).map(|x| x.clone()).unwrap_or_default(),
+		}.into()),
 		W::MouseWheel {
 			device_id,
 			delta,
@@ -104,6 +122,8 @@ pub fn convert_winit_window_event(
 				device_id,
 				delta,
 				phase,
+				position: mouse_cache.get_position(window_id, device_id).map(|x| x.clone()),
+				buttons: mouse_cache.get_buttons(device_id).map(|x| x.clone()).unwrap_or_default(),
 				modifiers,
 			}
 			.into(),
@@ -114,11 +134,13 @@ pub fn convert_winit_window_event(
 			button,
 			modifiers,
 		} => Some(
-			event::WindowMouseInputEvent {
+			event::WindowMouseButtonEvent {
 				window_id,
 				device_id,
-				button,
-				state: convert_winit_element_state(state),
+				button: button.into(),
+				state: state.into(),
+				position: mouse_cache.get_position(window_id, device_id).unwrap_or_else(|| [-1.0, -1.0].into()),
+				buttons: mouse_cache.get_buttons(device_id).map(|x| x.clone()).unwrap_or_default(),
 				modifiers,
 			}
 			.into(),
@@ -149,7 +171,7 @@ pub fn convert_winit_window_event(
 		W::ThemeChanged(theme) => Some(
 			event::WindowThemeChangedEvent {
 				window_id,
-				theme: convert_winit_theme(theme),
+				theme: theme.into(),
 			}
 			.into(),
 		),
@@ -163,21 +185,7 @@ pub fn convert_winit_keyboard_input(input: winit::event::KeyboardInput) -> crate
 		scan_code: input.scancode,
 		key_code: input.virtual_keycode,
 		modifiers: input.modifiers,
-		state: convert_winit_element_state(input.state),
-	}
-}
-
-fn convert_winit_element_state(state: winit::event::ElementState) -> crate::event::ElementState {
-	match state {
-		winit::event::ElementState::Pressed => crate::event::ElementState::Pressed,
-		winit::event::ElementState::Released => crate::event::ElementState::Released,
-	}
-}
-
-fn convert_winit_theme(theme: winit::window::Theme) -> crate::event::Theme {
-	match theme {
-		winit::window::Theme::Light => crate::event::Theme::Light,
-		winit::window::Theme::Dark => crate::event::Theme::Dark,
+		state: input.state.into(),
 	}
 }
 
@@ -197,5 +205,34 @@ pub fn map_nonuser_event<T, U>(event: winit::event::Event<T>) -> Result<winit::e
 		LoopDestroyed => Ok(LoopDestroyed),
 		Suspended => Ok(Suspended),
 		Resumed => Ok(Resumed),
+	}
+}
+
+impl From<winit::event::ElementState> for crate::event::ElementState {
+	fn from(other: winit::event::ElementState) -> Self {
+		match other {
+			winit::event::ElementState::Pressed => Self::Pressed,
+			winit::event::ElementState::Released => Self::Released,
+		}
+	}
+}
+
+impl From<winit::event::MouseButton> for crate::event::MouseButton {
+	fn from(other: winit::event::MouseButton) -> Self {
+		match other {
+			winit::event::MouseButton::Left => Self::Left,
+			winit::event::MouseButton::Right => Self::Right,
+			winit::event::MouseButton::Middle => Self::Middle,
+			winit::event::MouseButton::Other(x) => Self::Other(x),
+		}
+	}
+}
+
+impl From<winit::window::Theme> for crate::event::Theme {
+	fn from(other: winit::window::Theme) -> Self {
+		match other {
+			winit::window::Theme::Light => Self::Light,
+			winit::window::Theme::Dark => Self::Dark,
+		}
 	}
 }

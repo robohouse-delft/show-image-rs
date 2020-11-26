@@ -12,7 +12,6 @@ pub use winit::event::ButtonId;
 pub use winit::event::DeviceId;
 pub use winit::event::Force;
 pub use winit::event::ModifiersState;
-pub use winit::event::MouseButton;
 pub use winit::event::MouseScrollDelta;
 pub use winit::event::ScanCode;
 pub use winit::event::StartCause;
@@ -145,5 +144,71 @@ impl ElementState {
 	/// Check if the button or key is released.
 	pub fn is_released(self) -> bool {
 		self == Self::Released
+	}
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+/// A mouse button.
+pub enum MouseButton {
+	/// The left mouse button.
+	Left,
+
+	/// The right mouse button.
+	Right,
+
+	/// The middle mouse button (usually triggered by pressing the scroll wheel).
+	Middle,
+
+	/// An other mouse button identified by index.
+	Other(u8),
+}
+
+impl MouseButton {
+	/// Check if the button is the left mouse button.
+	pub fn is_left(self) -> bool {
+		self == Self::Left
+	}
+
+	/// Check if the button is the right mouse button.
+	pub fn is_right(self) -> bool {
+		self == Self::Right
+	}
+
+	/// Check if the button is the middle mouse button.
+	pub fn is_middle(self) -> bool {
+		self == Self::Middle
+	}
+
+	/// Check if the button is a specific other button.
+	pub fn is_other(self, other: u8) -> bool {
+		self == Self::Other(other)
+	}
+}
+
+/// The state of all mouse buttons.
+#[derive(Debug, Clone, Default)]
+pub struct MouseButtonState {
+	/// The set of pressed buttons.
+	buttons: std::collections::BTreeSet<MouseButton>,
+}
+
+impl MouseButtonState {
+	/// Check if a button is pressed.
+	pub fn is_pressed(&self, button: MouseButton) -> bool {
+		self.buttons.get(&button).is_some()
+	}
+
+	/// Iterate over all pressed buttons.
+	pub fn iter_pressed<'a>(&'a self) -> impl Iterator<Item = MouseButton> + 'a {
+		self.buttons.iter().map(|&button| button)
+	}
+
+	/// Mark a button as pressed or unpressed.
+	pub fn set_pressed(&mut self, button: MouseButton, pressed: bool) {
+		if pressed {
+			self.buttons.insert(button);
+		} else {
+			self.buttons.remove(&button);
+		}
 	}
 }
