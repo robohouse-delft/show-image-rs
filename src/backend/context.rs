@@ -219,7 +219,7 @@ impl<'a> ContextHandle<'a> {
 	}
 
 	/// Reborrow self with a shorter lifetime.
-	fn reborrow(&mut self) -> ContextHandle {
+	pub(crate) fn reborrow(&mut self) -> ContextHandle {
 		ContextHandle {
 			context: self.context,
 			event_loop: self.event_loop,

@@ -450,4 +450,51 @@ impl WindowProxy {
 		let _ = rx.recv();
 		Ok(())
 	}
+
+	/// Post a function for execution in the context thread without waiting for it to execute.
+	///
+	/// This function returns immediately, without waiting for the posted function to start or complete.
+	/// If you want to get a return value back from the function, use [`Self::run_function_wait`] instead.
+	///
+	/// *Note:*
+	/// You should not post functions to the context thread that block for a long time.
+	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
+	/// Consider using [`Self::run_background_task`] for long blocking tasks instead.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
+	pub fn run_function<F>(&self, function: F)
+	where
+		F: 'static + FnOnce(&mut WindowHandle) + Send,
+	{
+		let window_id = self.window_id;
+		self.context_proxy.run_function(move |context| {
+			let mut window = WindowHandle::new(context.reborrow(), window_id);
+			function(&mut window)
+		})
+	}
+
+	/// Post a function for execution in the context thread and wait for the return value.
+	///
+	/// If you do not need a return value from the posted function,
+	/// you can use [`Self::run_function`] to avoid blocking the calling thread until it completes.
+	///
+	/// *Note:*
+	/// You should not post functions to the context thread that block for a long time.
+	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
+	/// Consider using [`Self::run_background_task`] for long blocking tasks instead.
+	///
+	/// # Panics
+	/// This function will panic if called from within the context thread.
+	pub fn run_function_wait<F, T>(&self, function: F) -> T
+	where
+		F: FnOnce(&mut WindowHandle) -> T + Send + 'static,
+		T: Send + 'static,
+	{
+		let window_id = self.window_id;
+		self.context_proxy.run_function_wait(move |context| {
+			let mut window = WindowHandle::new(context.reborrow(), window_id);
+			function(&mut window)
+		})
+	}
 }
