@@ -1,5 +1,9 @@
+v0.6.5
+  * Support `tch` versions 0.1.6 through 0.3.x.
+  * Support `raqote` versions 0.7.14 through 0.8.x.
+
 v0.6.4
-  * Accept `tch` versions 0.1.6 through 0.2.x.
+  * Support `tch` versions 0.1.6 through 0.2.x.
 
 v0.6.3
   * Increase timeout on communication with background thread to 1 second.
