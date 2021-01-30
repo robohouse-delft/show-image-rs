@@ -160,7 +160,7 @@ pub enum MouseButton {
 	Middle,
 
 	/// An other mouse button identified by index.
-	Other(u8),
+	Other(u16),
 }
 
 impl MouseButton {
@@ -180,7 +180,7 @@ impl MouseButton {
 	}
 
 	/// Check if the button is a specific other button.
-	pub fn is_other(self, other: u8) -> bool {
+	pub fn is_other(self, other: u16) -> bool {
 		self == Self::Other(other)
 	}
 }
