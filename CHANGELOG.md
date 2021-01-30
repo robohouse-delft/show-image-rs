@@ -1,5 +1,7 @@
 v0.7.0
-  * Complete rewrite using `wgpu` as backend.
+  * Complete rewrite with new API using `wgpu` as backend.
+  * Ensure macOS compatibility by running the event loop in the main thread.
+  * Add support for overlays drawn on top of the main image.
 
 v0.6.4
   * Accept `tch` versions 0.1.6 through 0.2.x.
