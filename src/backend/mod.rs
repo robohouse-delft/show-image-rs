@@ -197,7 +197,11 @@ pub fn context() -> ContextProxy {
 /// # Panics
 /// This panics if the global context is not yet fully initialized.
 pub fn create_window(title: impl Into<String>, options: WindowOptions) -> Result<WindowProxy, error::CreateWindowError> {
-	context().create_window(title, options)
+	let title = title.into();
+	context().run_function_wait(move |context| {
+		let window = context.create_window(title, options)?;
+		Ok(window.proxy())
+	})
 }
 
 /// Join all background tasks and then exit the process.

@@ -1,15 +1,12 @@
-use crate::error::CreateWindowError;
-use crate::error::InvalidWindowId;
-use crate::error::SetImageError;
-use crate::event::Event;
-use crate::event::EventHandlerControlFlow;
-use crate::event::WindowEvent;
-use crate::oneshot;
 use crate::ContextHandle;
 use crate::Image;
 use crate::WindowHandle;
 use crate::WindowId;
-use crate::WindowOptions;
+use crate::error::{InvalidWindowId, SetImageError};
+use crate::event::Event;
+use crate::event::EventHandlerControlFlow;
+use crate::event::WindowEvent;
+use crate::oneshot;
 
 use std::sync::mpsc;
 
@@ -50,101 +47,6 @@ impl ContextProxy {
 			event_loop,
 			context_thread,
 		}
-	}
-
-	/// Exit the program when the last window closes.
-	pub fn set_exit_with_last_window(&self, exit_with_last_window: bool) {
-		self.run_function(move |context| {
-			context.set_exit_with_last_window(exit_with_last_window);
-		})
-	}
-
-	/// Create a new window.
-	///
-	/// The real work is done in the context thread.
-	/// This function blocks until the context thread has performed the action.
-	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn create_window(&self, title: impl Into<String>, options: WindowOptions) -> Result<WindowProxy, CreateWindowError> {
-		let title = title.into();
-		let window_id = self.run_function_wait(move |context| context.create_window(title, options).map(|window| window.id()))?;
-
-		Ok(WindowProxy::new(window_id, self.clone()))
-	}
-
-	/// Destroy a window.
-	///
-	/// The real work is done in the context thread.
-	/// This function blocks until the context thread has performed the action.
-	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn destroy_window(&self, window_id: WindowId) -> Result<(), InvalidWindowId> {
-		self.run_function_wait(move |context| context.destroy_window(window_id))
-	}
-
-	/// Make a window visible or invisible.
-	///
-	/// The real work is done in the context thread.
-	/// This function blocks until the context thread has performed the action.
-	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn set_window_visible(&self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowId> {
-		self.run_function_wait(move |context| context.set_window_visible(window_id, visible))
-	}
-
-	/// Change the options of a window.
-	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn set_window_options<F>(&self, window_id: WindowId, make_options: F) -> Result<(), InvalidWindowId>
-	where
-		F: FnOnce(&WindowOptions) -> WindowOptions + Send + 'static,
-	{
-		self.run_function_wait(move |context| context.set_window_options(window_id, make_options))
-	}
-
-	/// Set the shown image for a window.
-	///
-	/// The real work is done in the context thread.
-	/// This function blocks until the context thread has performed the action.
-	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn set_window_image(&self, window_id: WindowId, name: impl Into<String>, image: impl Into<Image>) -> Result<(), SetImageError> {
-		let name = name.into();
-		let image = image.into();
-		self.run_function_wait(move |context| context.set_window_image(window_id, name, &image))
-	}
-
-	/// Add an overlay to a window.
-	///
-	/// Overlays are drawn on top of the image and remain active until they are cleared.
-	///
-	/// If you want to update the image and overlays at the same time,
-	/// you should use [`Self::run_function_wait()`] to perform all actions in one go.
-	/// Otherwise, each call will have to wait for the context thread to finish the request.
-	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn add_window_overlay(&self, window_id: WindowId, name: impl Into<String>, image: impl Into<Image>) -> Result<(), SetImageError> {
-		let name = name.into();
-		let image = image.into();
-		self.run_function_wait(move |context| context.add_window_overlay(window_id, name, &image))
-	}
-
-	/// Clear the overlays of a window.
-	///
-	/// If you want to update the image and overlays at the same time,
-	/// you should use [`Self::run_function_wait()`] to perform all actions in one go.
-	/// Otherwise, each call will have to wait for the context thread to finish the request.
-	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn clear_window_overlays(&self, window_id: WindowId) -> Result<(), InvalidWindowId> {
-		self.run_function_wait(move |context| context.clear_window_overlays(window_id))
 	}
 
 	/// Add a global event handler to the context.
@@ -333,68 +235,23 @@ impl WindowProxy {
 		&self.context_proxy
 	}
 
-	/// Destroy the window.
+	/// Set the displayed image of the window.
 	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn destroy(&self) -> Result<(), InvalidWindowId> {
-		self.context_proxy.destroy_window(self.window_id)
-	}
-
-	/// Set the image of the window.
+	/// The real work is done in the context thread.
+	/// This function blocks until the context thread has performed the action.
 	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn set_visible(&self, visible: bool) -> Result<(), InvalidWindowId> {
-		self.context_proxy.set_window_visible(self.window_id, visible)
-	}
-
-	/// Change the options of the window.
-	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn set_options<F>(&self, make_options: F) -> Result<(), InvalidWindowId>
-	where
-		F: FnOnce(&WindowOptions) -> WindowOptions + Send + 'static,
-	{
-		self.context_proxy.set_window_options(self.window_id, make_options)
-	}
-
-	/// Set the image of the window.
+	/// Note that you can not change the overlays with this function.
+	/// To modify those, you can use [`Self::run_function`] or [`Self::run_function_wait`]
+	/// to get access to the [`WindowHandle`].
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
 	pub fn set_image(&self, name: impl Into<String>, image: impl Into<Image>) -> Result<(), SetImageError> {
-		self.context_proxy.set_window_image(self.window_id, name, image)
+		let name = name.into();
+		let image = image.into();
+		self.run_function_wait(move |window| window.set_image(name, &image))
 	}
 
-	/// Add an overlay to the window.
-	///
-	/// Overlays are drawn on top of the image and remain active until they are cleared.
-	///
-	/// If you want to update the image and overlays at the same time,
-	/// you should use [`ContextProxy::run_function_wait()`] to perform all actions in one go.
-	/// Otherwise, each call will have to wait for the context thread to finish the request.
-	/// Set the image of the window.
-	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn add_overlay(&self, name: impl Into<String>, image: impl Into<Image>) -> Result<(), SetImageError> {
-		self.context_proxy.add_window_overlay(self.window_id, name, image)
-	}
-
-	/// Clear the overlays of the window.
-	///
-	/// If you want to update the image and overlays at the same time,
-	/// you should use [`ContextProxy::run_function_wait()`] to perform all actions in one go.
-	/// Otherwise, each call will have to wait for the context thread to finish the request.
-	/// Set the image of the window.
-	///
-	/// # Panics
-	/// This function will panic if called from within the context thread.
-	pub fn clear_overlays(&self) -> Result<(), InvalidWindowId> {
-		self.context_proxy.clear_window_overlays(self.window_id)
-	}
 
 	/// Add an event handler for the window.
 	///
