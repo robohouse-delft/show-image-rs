@@ -56,7 +56,7 @@ pub struct DeviceRemovedEvent {
 /// The physical position of a pointing device was moved.
 ///
 /// This represents raw, unfiltered physical motion.
-/// Not to be confused with [`WindowCursorMovedEvent`][super::WindowCursorMovedEvent].
+/// Not to be confused with [`WindowMouseMoveEvent`][super::WindowMouseMoveEvent].
 #[derive(Debug, Clone)]
 pub struct DeviceMouseMotionEvent {
 	/// The ID of the device.

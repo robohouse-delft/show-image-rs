@@ -41,7 +41,7 @@ pub enum PixelFormat {
 
 /// Possible alpha representations.
 ///
-/// See also: https://en.wikipedia.org/wiki/Alpha_compositing#Straight_versus_premultiplied
+/// See also: <https://en.wikipedia.org/wiki/Alpha_compositing#Straight_versus_premultiplied>
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Alpha {
 	/// The alpha channel is encoded only in the alpha component of the pixel.

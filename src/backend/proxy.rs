@@ -314,9 +314,9 @@ impl WindowProxy {
 	/// If you want to get a return value back from the function, use [`Self::run_function_wait`] instead.
 	///
 	/// *Note:*
-	/// You should not post functions to the context thread that block for a long time.
+	/// You should not use this to post functions that block for a long time.
 	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
-	/// Consider using [`Self::run_background_task`] for long blocking tasks instead.
+	/// Consider using [`self.context_proxy().run_background_task(...)`][ContextProxy::run_background_task] for long blocking tasks instead.
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
@@ -337,9 +337,9 @@ impl WindowProxy {
 	/// you can use [`Self::run_function`] to avoid blocking the calling thread until it completes.
 	///
 	/// *Note:*
-	/// You should not post functions to the context thread that block for a long time.
+	/// You should not use this to post functions that block for a long time.
 	/// Doing so will block the event loop and will make the windows unresponsive until the event loop can continue.
-	/// Consider using [`Self::run_background_task`] for long blocking tasks instead.
+	/// Consider using [`self.context_proxy().run_background_task(...)`][ContextProxy::run_background_task] for long blocking tasks instead.
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
