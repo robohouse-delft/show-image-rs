@@ -66,7 +66,7 @@ impl<T> Sender<T> {
 
 impl<T> Drop for Sender<T> {
 	fn drop(&mut self) {
-		self.inner.state.compare_and_swap(NOT_READY, DISCONNECTED, Ordering::AcqRel);
+		let _ = self.inner.state.compare_exchange(NOT_READY, DISCONNECTED, Ordering::Release, Ordering::Relaxed);
 		self.inner.condvar.notify_all();
 	}
 }
