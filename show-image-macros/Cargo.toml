@@ -1,6 +1,6 @@
 [package]
 name = "show-image-macros"
-version = "0.7.0"
+version = "0.8.0"
 license = "BSD-2-Clause"
 description  = "macros for the show-image crate"
 edition = "2018"
