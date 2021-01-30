@@ -1,3 +1,6 @@
+v0.8.1
+  * Add links in README.
+
 v0.8.0
   * Complete rewrite with new API using `winit` and `wgpu` as backend.
   * Ensure macOS compatibility by running the event loop in the main thread.
