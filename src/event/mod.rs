@@ -199,8 +199,8 @@ impl MouseButtonState {
 	}
 
 	/// Iterate over all pressed buttons.
-	pub fn iter_pressed<'a>(&'a self) -> impl Iterator<Item = MouseButton> + 'a {
-		self.buttons.iter().map(|&button| button)
+	pub fn iter_pressed(&self) -> impl Iterator<Item = MouseButton> + '_ {
+		self.buttons.iter().copied()
 	}
 
 	/// Mark a button as pressed or unpressed.

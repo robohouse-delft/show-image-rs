@@ -182,7 +182,7 @@ impl Context {
 			.windows
 			.iter_mut()
 			.find(|x| x.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or(InvalidWindowId { window_id })?;
 
 		window.event_handlers.push(Box::new(handler));
 		Ok(())
@@ -253,8 +253,8 @@ impl<'a> ContextHandle<'a> {
 
 	/// Get the image info and the area where the image is drawn for a window.
 	pub fn window_image_info(&self, window_id: WindowId) -> Result<Option<(ImageInfo, Rectangle)>, InvalidWindowId> {
-		let window = self.context.windows.iter().find(|x| x.id() == window_id).ok_or_else(|| InvalidWindowId { window_id })?;
-		let image_info = match window.image.as_ref().map(|x| x.info().clone()) {
+		let window = self.context.windows.iter().find(|x| x.id() == window_id).ok_or(InvalidWindowId { window_id })?;
+		let image_info = match window.image.as_ref().map(|x| *x.info()) {
 			Some(x) => x,
 			None => return Ok(None),
 		};
@@ -290,7 +290,7 @@ impl<'a> ContextHandle<'a> {
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or(InvalidWindowId { window_id })?;
 		let options = (make_options)(&window.options);
 
 		window.window.set_resizable(options.resizable);
@@ -331,7 +331,7 @@ impl<'a> ContextHandle<'a> {
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or(InvalidWindowId { window_id })?;
 		let image = GpuImage::from_data(
 			name.into(),
 			&self.context.device,
@@ -350,7 +350,7 @@ impl<'a> ContextHandle<'a> {
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or(InvalidWindowId { window_id })?;
 		window.overlays.clear();
 		window.window.request_redraw();
 		Ok(())
@@ -444,7 +444,7 @@ impl Context {
 			.windows
 			.iter()
 			.position(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or(InvalidWindowId { window_id })?;
 		self.windows.remove(index);
 		Ok(())
 	}
@@ -455,7 +455,7 @@ impl Context {
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or(InvalidWindowId { window_id })?;
 		window.set_visible(visible);
 		Ok(())
 	}
@@ -466,7 +466,7 @@ impl Context {
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or(InvalidWindowId { window_id })?;
 
 		let image = GpuImage::from_data(name, &self.device, &self.image_bind_group_layout, image.as_image_view()?);
 		window.image = Some(image);
@@ -481,7 +481,7 @@ impl Context {
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or(InvalidWindowId { window_id })?;
 
 		window.swap_chain = create_swap_chain(new_size, &window.surface, self.swap_chain_format, &self.device);
 		window.uniforms.mark_dirty(true);
@@ -494,7 +494,7 @@ impl Context {
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or(InvalidWindowId { window_id })?;
 
 		let image = match &window.image {
 			Some(x) => x,
@@ -543,7 +543,7 @@ impl Context {
 			.windows
 			.iter()
 			.find(|w| w.id() == window_id)
-			.ok_or_else(|| InvalidWindowId { window_id })?;
+			.ok_or(InvalidWindowId { window_id })?;
 
 		let image = match &window.image {
 			Some(x) => x,

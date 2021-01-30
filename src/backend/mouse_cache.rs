@@ -13,7 +13,7 @@ pub struct MouseCache {
 
 impl MouseCache {
 	pub fn get_position(&self, window_id: WindowId, device_id: DeviceId) -> Option<PhysicalPosition<f64>> {
-		self.mouse_position.get(&(window_id, device_id)).map(|&x| x)
+		self.mouse_position.get(&(window_id, device_id)).copied()
 	}
 
 	pub fn get_buttons(&self, device_id: DeviceId) -> Option<&MouseButtonState> {
@@ -35,7 +35,7 @@ impl MouseCache {
 				buttons.set_pressed((*button).into(), *state == ElementState::Pressed);
 			},
 			WindowEvent::CursorMoved { device_id, position, .. } => {
-				let cached = self.mouse_position.entry((window_id, *device_id)).or_insert([0.0, 0.0].into());
+				let cached = self.mouse_position.entry((window_id, *device_id)).or_insert_with(|| [0.0, 0.0].into());
 				*cached = *position;
 			},
 			WindowEvent::CursorLeft { device_id } => {
@@ -53,7 +53,7 @@ impl MouseCache {
 
 	fn remove_device(&mut self, device_id: DeviceId) {
 		self.mouse_buttons.remove(&device_id);
-		let keys: Vec<_> = self.mouse_position.keys().filter(|(_, x)| *x == device_id).map(|x| *x).collect();
+		let keys: Vec<_> = self.mouse_position.keys().filter(|(_, x)| *x == device_id).copied().collect();
 		for key in &keys {
 			self.mouse_position.remove(&key);
 		}

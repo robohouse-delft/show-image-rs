@@ -97,19 +97,19 @@ pub fn convert_winit_window_event(
 				device_id,
 				position,
 				modifiers,
-				buttons: mouse_cache.get_buttons(device_id).map(|x| x.clone()).unwrap_or_default(),
+				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 			}
 			.into(),
 		),
 		W::CursorEntered { device_id } => Some(event::WindowMouseEnterEvent {
 			window_id,
 			device_id,
-			buttons: mouse_cache.get_buttons(device_id).map(|x| x.clone()).unwrap_or_default(),
+			buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 		}.into()),
 		W::CursorLeft { device_id } => Some(event::WindowMouseLeaveEvent {
 			window_id,
 			device_id,
-			buttons: mouse_cache.get_buttons(device_id).map(|x| x.clone()).unwrap_or_default(),
+			buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 		}.into()),
 		W::MouseWheel {
 			device_id,
@@ -122,8 +122,8 @@ pub fn convert_winit_window_event(
 				device_id,
 				delta,
 				phase,
-				position: mouse_cache.get_position(window_id, device_id).map(|x| x.clone()),
-				buttons: mouse_cache.get_buttons(device_id).map(|x| x.clone()).unwrap_or_default(),
+				position: mouse_cache.get_position(window_id, device_id),
+				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 				modifiers,
 			}
 			.into(),
@@ -140,7 +140,7 @@ pub fn convert_winit_window_event(
 				button: button.into(),
 				state: state.into(),
 				position: mouse_cache.get_position(window_id, device_id).unwrap_or_else(|| [-1.0, -1.0].into()),
-				buttons: mouse_cache.get_buttons(device_id).map(|x| x.clone()).unwrap_or_default(),
+				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 				modifiers,
 			}
 			.into(),

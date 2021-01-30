@@ -26,9 +26,9 @@ fn null_waker() -> Waker {
 }
 
 /// Synchronously wait for a buffer to be mappable.
-fn wait_for_buffer<'a>(
+fn wait_for_buffer(
 	device: &wgpu::Device,
-	buffer: wgpu::BufferSlice<'a>,
+	buffer: wgpu::BufferSlice<'_>,
 	map_mode: wgpu::MapMode,
 ) -> Result<(), wgpu::BufferAsyncError> {
 	let mut future = buffer.map_async(map_mode);
