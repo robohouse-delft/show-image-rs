@@ -1,5 +1,5 @@
 v0.8.0
-  * Complete rewrite with new API using `wgpu` as backend.
+  * Complete rewrite with new API using `winit` and `wgpu` as backend.
   * Ensure macOS compatibility by running the event loop in the main thread.
   * Add support for overlays drawn on top of the main image.
 
