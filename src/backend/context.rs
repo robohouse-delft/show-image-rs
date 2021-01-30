@@ -294,6 +294,7 @@ impl<'a> ContextHandle<'a> {
 		let options = (make_options)(&window.options);
 
 		window.window.set_resizable(options.resizable);
+		window.window.set_decorations(!options.borderless);
 		if options.size != window.options.size {
 			if let Some(size) = options.size {
 				window.window.set_inner_size(winit::dpi::LogicalSize::<u32>::from(size));
@@ -407,7 +408,8 @@ impl Context {
 		let mut window = winit::window::WindowBuilder::new()
 			.with_title(title)
 			.with_visible(!options.start_hidden)
-			.with_resizable(options.resizable);
+			.with_resizable(options.resizable)
+			.with_decorations(!options.borderless);
 
 		if let Some(size) = options.size {
 			let size = winit::dpi::LogicalSize::new(size[0], size[1]);

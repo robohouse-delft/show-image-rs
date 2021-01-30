@@ -157,6 +157,9 @@ pub struct WindowOptions {
 	/// This may be ignored by a window manager.
 	pub resizable: bool,
 
+	/// Make the window borderless.
+	pub borderless: bool,
+
 	/// If true, draw overlays on the image.
 	///
 	/// Defaults to true.
@@ -171,6 +174,7 @@ impl Default for WindowOptions {
 			start_hidden: false,
 			size: None,
 			resizable: true,
+			borderless: false,
 			show_overlays: true,
 		}
 	}
@@ -218,6 +222,14 @@ impl WindowOptions {
 	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_resizable(mut self, resizable: bool) -> Self {
 		self.resizable = resizable;
+		self
+	}
+
+	/// Make the window borderless or not.
+	///
+	/// This function consumes and returns `self` to allow daisy chaining.
+	pub fn set_borderless(mut self, borderless: bool) -> Self {
+		self.borderless = borderless;
 		self
 	}
 
