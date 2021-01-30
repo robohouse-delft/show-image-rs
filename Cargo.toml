@@ -24,6 +24,7 @@ categories = [
 ]
 
 [features]
+default  = ["macros"]
 doc-only = ["tch/doc-only"]
 full     = ["save", "image", "tch", "raqote", "macros"]
 macros   = ["show-image-macros"]

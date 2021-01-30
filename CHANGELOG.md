@@ -1,4 +1,5 @@
 v0.8.1
+  * Enable `macros` feature by default.
   * Add links in README.
 
 v0.8.0
