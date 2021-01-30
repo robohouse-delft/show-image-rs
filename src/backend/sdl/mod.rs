@@ -534,9 +534,17 @@ impl ContextInner {
 
 	/// Create a new window.
 	fn make_window(&mut self, options: WindowOptions, command_tx: mpsc::SyncSender<ContextCommand>) -> Result<Window, String> {
-		let window = self.video.window(&options.name, options.size[0], options.size[1])
-			.borderless()
-			.resizable()
+		let mut window_builder = &mut self.video.window(&options.name, options.size[0], options.size[1]);
+
+		if options.borderless{
+			window_builder = window_builder.borderless();
+		}
+
+		if options.resizable{
+			window_builder = window_builder.resizable();
+		}
+
+		let window =  window_builder
 			.build()
 			.map_err(|e| format!("failed to create window {:?}: {}", options.name, e))?;
 
