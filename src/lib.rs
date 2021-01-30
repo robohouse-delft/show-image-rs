@@ -95,6 +95,7 @@
 //! ```
 
 #![cfg_attr(feature = "nightly", feature(doc_cfg))]
+#![cfg_attr(feature = "nightly", feature(termination_trait_lib))]
 #![warn(missing_docs)]
 
 mod backend;
