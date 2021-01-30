@@ -202,6 +202,9 @@ pub struct WindowOptions {
 
 	/// Preserve the aspect ratio
 	pub preserve_aspect_ratio: bool,
+
+	/// Borderless window
+	pub borderless: bool,
 }
 
 impl std::error::Error for WaitKeyError {}
@@ -221,6 +224,7 @@ impl Default for WindowOptions {
 			size: [800, 600],
 			resizable: true,
 			preserve_aspect_ratio: true,
+			borderless: false
 		}
 	}
 }
@@ -279,6 +283,14 @@ impl WindowOptions {
 	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_preserve_aspect_ratio(mut self, preserve_aspect_ratio: bool) -> Self {
 		self.preserve_aspect_ratio = preserve_aspect_ratio;
+		self
+	}
+
+	/// Make the window borderless or not.
+	///
+	/// This function consumes and returns `self` to allow daisy chaining.
+	pub fn set_borderless(mut self, borderless: bool) -> Self {
+		self.borderless = borderless;
 		self
 	}
 }
