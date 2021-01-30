@@ -4,6 +4,8 @@ v0.7.0
   * Allow registered event handlers to remove themselves.
   * Remove implicit event channel of window handles.
   * Make window handles Clone.
+  * Fix the `resizable` window option.
+  * Add option to make borderless windows.
 
 v0.6.5
   * Support `tch` versions 0.1.6 through 0.3.x.
