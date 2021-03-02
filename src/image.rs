@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::error::ImageDataError;
 use crate::ImageInfo;
 
-/// Trait for borriwing image data from a struct.
+/// Trait for borrowing image data from a struct.
 pub trait AsImageView {
 	/// Get an image view for the object.
 	fn as_image_view(&self) -> Result<ImageView, ImageDataError>;
