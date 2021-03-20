@@ -15,6 +15,7 @@ use crate::error;
 use context::Context;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 static CONTEXT_PROXY_VALID: AtomicBool = AtomicBool::new(false);
 static mut CONTEXT_PROXY: Option<ContextProxy> = None;
@@ -61,8 +62,15 @@ where
 
 	// Spawn the user task.
 	std::thread::spawn(move || {
-		let termination = (user_task)();
-		exit(termination.report());
+		match catch_unwind(AssertUnwindSafe(user_task)) {
+			Ok(termination) => exit(termination.report()),
+			Err(_) => {
+				// Make sure the main thread panics too.
+				crate::context().run_function(move |_| {
+					panic!("show-image: main user task panicked");
+				});
+			},
+		}
 	});
 
 	context.run();
@@ -101,8 +109,15 @@ where
 
 	// Spawn the user task.
 	std::thread::spawn(move || {
-		let termination = (user_task)(Ok(()));
-		exit(termination.report());
+		match catch_unwind(AssertUnwindSafe(move || user_task(Ok(())))) {
+			Ok(termination) => exit(termination.report()),
+			Err(_) => {
+				// Make sure the main thread panics too.
+				crate::context().run_function(move |_| {
+					panic!("show-image: main user task panicked");
+				});
+			},
+		}
 	});
 
 	context.run();
