@@ -1,3 +1,6 @@
+v0.8.2
+  * Disable some default features of dependencies to reduce dependency tree.
+
 v0.8.1
   * Enable `macros` feature by default.
   * Add links in README.
