@@ -67,11 +67,19 @@ impl GpuImage {
 			entries: &[
 				wgpu::BindGroupEntry {
 					binding: 0,
-					resource: wgpu::BindingResource::Buffer(uniforms.slice(..)),
+					resource: wgpu::BindingResource::Buffer {
+						buffer: &uniforms,
+						offset: 0,
+						size: None, // Use entire buffer.
+					},
 				},
 				wgpu::BindGroupEntry {
 					binding: 1,
-					resource: wgpu::BindingResource::Buffer(data.slice(..)),
+					resource: wgpu::BindingResource::Buffer {
+						buffer: &data,
+						offset: 0,
+						size: None, // Use entire buffer.
+					},
 				},
 			],
 		});

@@ -1,6 +1,7 @@
 v0.8.2
   * Disable some default features of dependencies to reduce dependency tree.
   * Support `tch` versions 0.1.6 through 0.4.0.
+  * Update to `wgpu` 0.7.
 
 v0.8.1
   * Enable `macros` feature by default.

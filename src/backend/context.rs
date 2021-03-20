@@ -121,8 +121,8 @@ impl Context {
 		let window_bind_group_layout = create_window_bind_group_layout(&device);
 		let image_bind_group_layout = create_image_bind_group_layout(&device);
 
-		let vertex_shader = device.create_shader_module(wgpu::include_spirv!("../../shaders/shader.vert.spv"));
-		let fragment_shader_unorm8 = device.create_shader_module(wgpu::include_spirv!("../../shaders/unorm8.frag.spv"));
+		let vertex_shader = device.create_shader_module(&wgpu::include_spirv!("../../shaders/shader.vert.spv"));
+		let fragment_shader_unorm8 = device.create_shader_module(&wgpu::include_spirv!("../../shaders/unorm8.frag.spv"));
 
 		let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			label: Some("show-image-pipeline-layout"),
@@ -567,7 +567,7 @@ impl Context {
 
 		let target = self.device.create_texture(&wgpu::TextureDescriptor {
 			label: Some(&format!("{}_render", image.name())),
-			usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+			usage: wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
 			sample_count: 1,
 			mip_level_count: 1,
 			format: wgpu::TextureFormat::Rgba8Unorm,
@@ -840,7 +840,7 @@ impl Context {
 async fn get_device(instance: &wgpu::Instance) -> Result<(wgpu::Device, wgpu::Queue), GetDeviceError> {
 	// Find a suitable display adapter.
 	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-		power_preference: wgpu::PowerPreference::Default,
+		power_preference: wgpu::PowerPreference::default(),
 		compatible_surface: None, // TODO: can we use a hidden window or something?
 	});
 
@@ -849,9 +849,9 @@ async fn get_device(instance: &wgpu::Instance) -> Result<(wgpu::Device, wgpu::Qu
 	// Create the logical device and command queue
 	let device = adapter.request_device(
 		&wgpu::DeviceDescriptor {
+			label: Some("show-image"),
 			limits: wgpu::Limits::default(),
 			features: wgpu::Features::default(),
-			shader_validation: true,
 		},
 		None,
 	);
@@ -869,8 +869,9 @@ fn create_window_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
 			binding: 0,
 			visibility: wgpu::ShaderStage::VERTEX,
 			count: None,
-			ty: wgpu::BindingType::UniformBuffer {
-				dynamic: false,
+			ty: wgpu::BindingType::Buffer {
+				ty: wgpu::BufferBindingType::Uniform,
+				has_dynamic_offset: false,
 				min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<WindowUniforms>() as u64).unwrap()),
 			},
 		}],
@@ -886,8 +887,9 @@ fn create_image_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 				binding: 0,
 				visibility: wgpu::ShaderStage::FRAGMENT,
 				count: None,
-				ty: wgpu::BindingType::UniformBuffer {
-					dynamic: false,
+				ty: wgpu::BindingType::Buffer {
+					ty: wgpu::BufferBindingType::Uniform,
+					has_dynamic_offset: false,
 					min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<super::util::GpuImageUniforms>() as u64).unwrap()),
 				},
 			},
@@ -895,9 +897,11 @@ fn create_image_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 				binding: 1,
 				visibility: wgpu::ShaderStage::FRAGMENT,
 				count: None,
-				ty: wgpu::BindingType::StorageBuffer {
-					readonly: true,
-					dynamic: false,
+				ty: wgpu::BindingType::Buffer {
+					ty: wgpu::BufferBindingType::Storage {
+						read_only: true,
+					},
+					has_dynamic_offset: false,
 					min_binding_size: None,
 				},
 			},
@@ -916,39 +920,42 @@ fn create_render_pipeline(
 	device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 		label: Some("show-image-pipeline"),
 		layout: Some(&layout),
-		vertex_stage: wgpu::ProgrammableStageDescriptor {
+		vertex: wgpu::VertexState {
 			module: &vertex_shader,
 			entry_point: "main",
+			buffers: &[],
 		},
-		fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+		fragment: Some(wgpu::FragmentState {
 			module: &fragment_shader,
 			entry_point: "main",
+			targets: &[wgpu::ColorTargetState {
+				format: swap_chain_format,
+				color_blend: wgpu::BlendState {
+					src_factor: wgpu::BlendFactor::SrcAlpha,
+					dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+					operation: wgpu::BlendOperation::Add,
+				},
+				alpha_blend: wgpu::BlendState {
+					src_factor: wgpu::BlendFactor::One,
+					dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+					operation: wgpu::BlendOperation::Add,
+				},
+				write_mask: wgpu::ColorWrite::ALL,
+			}],
 		}),
-
-		rasterization_state: None,
-		primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-		color_states: &[wgpu::ColorStateDescriptor {
-			format: swap_chain_format,
-			color_blend: wgpu::BlendDescriptor {
-				src_factor: wgpu::BlendFactor::SrcAlpha,
-				dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-				operation: wgpu::BlendOperation::Add,
-			},
-			alpha_blend: wgpu::BlendDescriptor {
-				src_factor: wgpu::BlendFactor::One,
-				dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-				operation: wgpu::BlendOperation::Add,
-			},
-			write_mask: wgpu::ColorWrite::ALL,
-		}],
-		depth_stencil_state: None,
-		vertex_state: wgpu::VertexStateDescriptor {
-			index_format: wgpu::IndexFormat::Uint16,
-			vertex_buffers: &[],
+		primitive: wgpu::PrimitiveState {
+			topology: wgpu::PrimitiveTopology::TriangleList,
+			strip_index_format: None,
+			front_face: wgpu::FrontFace::Cw,
+			cull_mode: wgpu::CullMode::Back,
+			polygon_mode: wgpu::PolygonMode::Fill,
 		},
-		sample_count: 1,
-		sample_mask: !0,
-		alpha_to_coverage_enabled: false,
+		depth_stencil: None,
+		multisample: wgpu::MultisampleState {
+			count: 1,
+			mask: !0,
+			alpha_to_coverage_enabled: false,
+		},
 	})
 }
 
@@ -960,7 +967,7 @@ fn create_swap_chain(
 	device: &wgpu::Device,
 ) -> wgpu::SwapChain {
 	let swap_chain_desc = wgpu::SwapChainDescriptor {
-		usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+		usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
 		format,
 		width: size.width,
 		height: size.height,
@@ -985,6 +992,7 @@ fn render_pass(
 	};
 
 	let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+		label: Some("render-image"),
 		color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
 			ops: wgpu::Operations { load, store: true },
 			attachment: &target,
