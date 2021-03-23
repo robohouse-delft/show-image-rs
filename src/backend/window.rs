@@ -283,6 +283,12 @@ pub struct WindowUniforms {
 
 	/// The size of the image in pixels.
 	pub pixel_size: [f32; 2],
+
+	/// The zoom of the image.
+	pub zoom: [f32; 2],
+
+	/// The pan of the image.
+	pub pan: [f32; 2],
 }
 
 impl WindowUniforms {
@@ -295,6 +301,8 @@ impl WindowUniforms {
 			offset: [0.0; 2],
 			relative_size: [1.0; 2],
 			pixel_size,
+			zoom: [1.0; 2],
+			pan: [0.0; 2],
 		}
 	}
 
@@ -315,6 +323,8 @@ impl WindowUniforms {
 			offset: [0.5 - 0.5 * w, 0.5 - 0.5 * h],
 			relative_size: [w, h],
 			pixel_size: image_size,
+			zoom: [1.0; 2],
+			pan: [0.0; 2],
 		}
 	}
 }
