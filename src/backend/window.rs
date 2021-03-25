@@ -35,6 +35,12 @@ pub struct Window {
 	/// The image to display (if any).
 	pub image: Option<GpuImage>,
 
+	/// The zoom of the image.
+	pub zoom: Option<f32>,
+
+	/// The pan of the image.
+	pub pan: Option<[f32; 2]>,
+
 	/// Overlays to draw on top of images.
 	pub overlays: Vec<GpuImage>,
 
@@ -256,10 +262,10 @@ impl Window {
 		if let Some(image) = &self.image {
 			let image_size = [image.info().width as f32, image.info().height as f32];
 			if !self.options.preserve_aspect_ratio {
-				WindowUniforms::stretch(image_size)
+				WindowUniforms::stretch(image_size, self.zoom, self.pan)
 			} else {
 				let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
-				WindowUniforms::fit(window_size, image_size)
+				WindowUniforms::fit(window_size, image_size, self.zoom, self.pan)
 			}
 		} else {
 			WindowUniforms::no_image()
@@ -293,20 +299,35 @@ pub struct WindowUniforms {
 
 impl WindowUniforms {
 	pub fn no_image() -> Self {
-		Self::stretch([0.0; 2])
+		Self::stretch([0.0; 2], None, None)
 	}
 
-	pub fn stretch(pixel_size: [f32; 2]) -> Self {
+	pub fn stretch(pixel_size: [f32; 2], zoom: Option<f32>, pan: Option<[f32; 2]>) -> Self {
+		let zoom = match zoom {
+			Some(x) => [x; 2],
+			None => [1.0; 2]
+		};
+
+		let pan = match pan {
+			Some(x) => x,
+			None => [0.0; 2]
+		};
+
 		Self {
 			offset: [0.0; 2],
 			relative_size: [1.0; 2],
 			pixel_size,
-			zoom: [1.0; 2],
-			pan: [0.0; 2],
+			zoom,
+			pan,
 		}
 	}
 
-	pub fn fit(window_size: [f32; 2], image_size: [f32; 2]) -> Self {
+	pub fn fit(
+		window_size: [f32; 2],
+		image_size: [f32; 2],
+		zoom: Option<f32>,
+		pan: Option<[f32; 2]>
+	) -> Self {
 		let ratios = [image_size[0] / window_size[0], image_size[1] / window_size[1]];
 
 		let w;
@@ -319,12 +340,22 @@ impl WindowUniforms {
 			h = 1.0;
 		}
 
+		let zoom = match zoom {
+			Some(x) => [x; 2],
+			None => [1.0; 2]
+		};
+
+		let pan = match pan {
+			Some(x) => x,
+			None => [0.0; 2]
+		};
+
 		Self {
 			offset: [0.5 - 0.5 * w, 0.5 - 0.5 * h],
 			relative_size: [w, h],
 			pixel_size: image_size,
-			zoom: [1.0; 2],
-			pan: [0.0; 2],
+			zoom,
+			pan,
 		}
 	}
 }
