@@ -431,6 +431,8 @@ impl Context {
 			swap_chain,
 			uniforms,
 			image: None,
+			zoom: None,
+			pan: None,
 			overlays: Vec::new(),
 			event_handlers: Vec::new(),
 		};
@@ -487,6 +489,34 @@ impl Context {
 
 		window.swap_chain = create_swap_chain(new_size, &window.surface, self.swap_chain_format, &self.device);
 		window.uniforms.mark_dirty(true);
+		Ok(())
+	}
+
+	/// Zoom a window.
+	fn zoom_window(&mut self, window_id: WindowId, zoom: f32) -> Result<(), InvalidWindowId> {
+		let window = self
+			.windows
+			.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or(InvalidWindowId { window_id })?;
+
+		window.zoom = Some(zoom);
+		window.uniforms.mark_dirty(true);
+		window.window.request_redraw();
+		Ok(())
+	}
+
+	/// Pan a window.
+	fn pan_window(&mut self, window_id: WindowId, pan: [f32; 2]) -> Result<(), InvalidWindowId> {
+		let window = self
+			.windows
+			.iter_mut()
+			.find(|w| w.id() == window_id)
+			.ok_or(InvalidWindowId { window_id })?;
+
+		window.pan = Some(pan);
+		window.uniforms.mark_dirty(true);
+		window.window.request_redraw();
 		Ok(())
 	}
 
