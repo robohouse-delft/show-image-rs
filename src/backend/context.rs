@@ -431,7 +431,7 @@ impl Context {
 			swap_chain,
 			uniforms,
 			image: None,
-			zoom: None,
+			zoom: 1.0,
 			pan: None,
 			overlays: Vec::new(),
 			event_handlers: Vec::new(),
@@ -493,14 +493,14 @@ impl Context {
 	}
 
 	/// Zoom a window.
-	fn zoom_window(&mut self, window_id: WindowId, zoom: f32) -> Result<(), InvalidWindowId> {
+	fn zoom_window(&mut self, window_id: WindowId, zoom_delta: f32) -> Result<(), InvalidWindowId> {
 		let window = self
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or(InvalidWindowId { window_id })?;
 
-		window.zoom = Some(zoom);
+		window.zoom += zoom_delta;
 		window.uniforms.mark_dirty(true);
 		window.window.request_redraw();
 		Ok(())
@@ -594,7 +594,7 @@ impl Context {
 			offset: [0.0, 0.0],
 			relative_size: [image.info().width as f32 / size.width as f32, 1.0],
 			pixel_size: [image.info().width as f32, image.info().height as f32],
-			zoom: [1.0, 1.0],
+			zoom: 1.0,
 			pan: [0.0, 0.0],
 		};
 		let window_uniforms = UniformsBuffer::from_value(&self.device, &window_uniforms, &self.window_bind_group_layout);

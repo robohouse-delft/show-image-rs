@@ -36,7 +36,7 @@ pub struct Window {
 	pub image: Option<GpuImage>,
 
 	/// The zoom of the image.
-	pub zoom: Option<f32>,
+	pub zoom: f32,
 
 	/// The pan of the image.
 	pub pan: Option<[f32; 2]>,
@@ -291,7 +291,7 @@ pub struct WindowUniforms {
 	pub pixel_size: [f32; 2],
 
 	/// The zoom of the image.
-	pub zoom: [f32; 2],
+	pub zoom: f32,
 
 	/// The pan of the image.
 	pub pan: [f32; 2],
@@ -299,15 +299,10 @@ pub struct WindowUniforms {
 
 impl WindowUniforms {
 	pub fn no_image() -> Self {
-		Self::stretch([0.0; 2], None, None)
+		Self::stretch([0.0; 2], 1.0, None)
 	}
 
-	pub fn stretch(pixel_size: [f32; 2], zoom: Option<f32>, pan: Option<[f32; 2]>) -> Self {
-		let zoom = match zoom {
-			Some(x) => [x; 2],
-			None => [1.0; 2]
-		};
-
+	pub fn stretch(pixel_size: [f32; 2], zoom: f32, pan: Option<[f32; 2]>) -> Self {
 		let pan = match pan {
 			Some(x) => x,
 			None => [0.0; 2]
@@ -325,7 +320,7 @@ impl WindowUniforms {
 	pub fn fit(
 		window_size: [f32; 2],
 		image_size: [f32; 2],
-		zoom: Option<f32>,
+		zoom: f32,
 		pan: Option<[f32; 2]>
 	) -> Self {
 		let ratios = [image_size[0] / window_size[0], image_size[1] / window_size[1]];
@@ -339,11 +334,6 @@ impl WindowUniforms {
 			w = ratios[0] / ratios[1];
 			h = 1.0;
 		}
-
-		let zoom = match zoom {
-			Some(x) => [x; 2],
-			None => [1.0; 2]
-		};
 
 		let pan = match pan {
 			Some(x) => x,
