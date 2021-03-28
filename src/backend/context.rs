@@ -432,7 +432,7 @@ impl Context {
 			uniforms,
 			image: None,
 			zoom: 1.0,
-			pan: None,
+			pan: [0.0, 0.0],
 			overlays: Vec::new(),
 			event_handlers: Vec::new(),
 		};
@@ -507,14 +507,15 @@ impl Context {
 	}
 
 	/// Pan a window.
-	fn pan_window(&mut self, window_id: WindowId, pan: [f32; 2]) -> Result<(), InvalidWindowId> {
+	fn pan_window(&mut self, window_id: WindowId, pan_x: f32, pan_y: f32) -> Result<(), InvalidWindowId> {
 		let window = self
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or(InvalidWindowId { window_id })?;
 
-		window.pan = Some(pan);
+		window.pan[0] += pan_x;
+		window.pan[1] -= pan_y;
 		window.uniforms.mark_dirty(true);
 		window.window.request_redraw();
 		Ok(())

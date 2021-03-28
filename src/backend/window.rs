@@ -39,7 +39,7 @@ pub struct Window {
 	pub zoom: f32,
 
 	/// The pan of the image.
-	pub pan: Option<[f32; 2]>,
+	pub pan: [f32; 2],
 
 	/// Overlays to draw on top of images.
 	pub overlays: Vec<GpuImage>,
