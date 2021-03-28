@@ -737,6 +737,19 @@ impl Context {
 					let _ = self.resize_window(event.window_id, event.size);
 				}
 			},
+			Event::WindowEvent(WindowEvent::MouseWheel(event)) => {
+				let delta = match event.delta {
+					winit::event::MouseScrollDelta::LineDelta(_, y) => y,
+					_ => 0.0
+				};
+				let _ = self.zoom_window(event.window_id, delta * 0.01);
+			},
+			Event::WindowEvent(WindowEvent::MouseMove(event)) => {
+				if event.buttons.is_pressed(event::MouseButton::Left) {
+					let direction = self.mouse_cache.get_direction(event.window_id, event.device_id).unwrap_or_else(|| [0.0, 0.0].into());
+					let _ = self.pan_window(event.window_id, (direction.x * 0.01) as f32, (direction.y * 0.01) as f32);
+				}
+			},
 			Event::WindowEvent(WindowEvent::RedrawRequested(event)) => {
 				let _ = self.render_window(event.window_id);
 			},
