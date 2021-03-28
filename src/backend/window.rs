@@ -262,10 +262,10 @@ impl Window {
 		if let Some(image) = &self.image {
 			let image_size = [image.info().width as f32, image.info().height as f32];
 			if !self.options.preserve_aspect_ratio {
-				WindowUniforms::stretch(image_size, self.zoom, self.pan)
+				WindowUniforms::stretch(image_size, [self.zoom; 2], self.pan)
 			} else {
 				let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
-				WindowUniforms::fit(window_size, image_size, self.zoom, self.pan)
+				WindowUniforms::fit(window_size, image_size, [self.zoom; 2], self.pan)
 			}
 		} else {
 			WindowUniforms::no_image()
@@ -291,7 +291,7 @@ pub struct WindowUniforms {
 	pub pixel_size: [f32; 2],
 
 	/// The zoom of the image.
-	pub zoom: f32,
+	pub zoom: [f32; 2],
 
 	/// The pan of the image.
 	pub pan: [f32; 2],
@@ -299,15 +299,10 @@ pub struct WindowUniforms {
 
 impl WindowUniforms {
 	pub fn no_image() -> Self {
-		Self::stretch([0.0; 2], 1.0, None)
+		Self::stretch([0.0; 2], [1.0, 1.0], [0.0; 2])
 	}
 
-	pub fn stretch(pixel_size: [f32; 2], zoom: f32, pan: Option<[f32; 2]>) -> Self {
-		let pan = match pan {
-			Some(x) => x,
-			None => [0.0; 2]
-		};
-
+	pub fn stretch(pixel_size: [f32; 2], zoom: [f32; 2], pan: [f32; 2]) -> Self {
 		Self {
 			offset: [0.0; 2],
 			relative_size: [1.0; 2],
@@ -320,8 +315,8 @@ impl WindowUniforms {
 	pub fn fit(
 		window_size: [f32; 2],
 		image_size: [f32; 2],
-		zoom: f32,
-		pan: Option<[f32; 2]>
+		zoom: [f32; 2],
+		pan: [f32; 2]
 	) -> Self {
 		let ratios = [image_size[0] / window_size[0], image_size[1] / window_size[1]];
 
@@ -334,11 +329,6 @@ impl WindowUniforms {
 			w = ratios[0] / ratios[1];
 			h = 1.0;
 		}
-
-		let pan = match pan {
-			Some(x) => x,
-			None => [0.0; 2]
-		};
 
 		Self {
 			offset: [0.5 - 0.5 * w, 0.5 - 0.5 * h],

@@ -594,7 +594,7 @@ impl Context {
 			offset: [0.0, 0.0],
 			relative_size: [image.info().width as f32 / size.width as f32, 1.0],
 			pixel_size: [image.info().width as f32, image.info().height as f32],
-			zoom: 1.0,
+			zoom: [1.0, 1.0],
 			pan: [0.0, 0.0],
 		};
 		let window_uniforms = UniformsBuffer::from_value(&self.device, &window_uniforms, &self.window_bind_group_layout);

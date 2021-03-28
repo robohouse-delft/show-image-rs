@@ -11,7 +11,7 @@ layout(set = 0, binding = 0) uniform WindowUniforms {
 	vec2 offset;
 	vec2 relative_size;
 	vec2 pixel_size;
-	float zoom;
+	vec2 zoom;
 	vec2 pan;
 };
 
