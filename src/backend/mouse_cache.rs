@@ -8,21 +8,16 @@ use crate::event::MouseButtonState;
 #[derive(Default)]
 pub struct MouseCache {
 	mouse_buttons: BTreeMap<DeviceId, MouseButtonState>,
-	mouse_position: BTreeMap<(WindowId, DeviceId), PhysicalPosition<f64>>,
-	cursor_direction: BTreeMap<(WindowId, DeviceId), PhysicalPosition<f64>>,
+	mouse_positions: BTreeMap<(WindowId, DeviceId), (PhysicalPosition<f64>, PhysicalPosition<f64>)>,
 }
 
 impl MouseCache {
-	pub fn get_position(&self, window_id: WindowId, device_id: DeviceId) -> Option<PhysicalPosition<f64>> {
-		self.mouse_position.get(&(window_id, device_id)).copied()
+	pub fn get_positions(&self, window_id: WindowId, device_id: DeviceId) -> Option<(PhysicalPosition<f64>, PhysicalPosition<f64>)> {
+		self.mouse_positions.get(&(window_id, device_id)).copied()
 	}
 
 	pub fn get_buttons(&self, device_id: DeviceId) -> Option<&MouseButtonState> {
 		self.mouse_buttons.get(&device_id)
-	}
-
-	pub fn get_direction(&self, window_id: WindowId, device_id: DeviceId) -> Option<PhysicalPosition<f64>> {
-		self.cursor_direction.get(&(window_id, device_id)).copied()
 	}
 
 	pub fn handle_event(&mut self, event: &Event<()>) {
@@ -40,21 +35,17 @@ impl MouseCache {
 				buttons.set_pressed((*button).into(), *state == ElementState::Pressed);
 			},
 			WindowEvent::CursorMoved { device_id, position, .. } => {
-				let cached = self.mouse_position.entry((window_id, *device_id)).or_insert_with(|| [0.0, 0.0].into());
-				let direction = self.cursor_direction.entry((window_id, *device_id)).or_insert_with(|| [0.0, 0.0].into());
-				let mut x_direction = 0.0;
-				let mut y_direction = 0.0;
-				if (*position).x != (*cached).x {
-					x_direction = ((*position).x - (*cached).x) / ((*position).x - (*cached).x).abs();
-				}
-				if (*position).y != (*cached).y {
-					y_direction = ((*position).y - (*cached).y) / ((*position).y - (*cached).y).abs();
-				}
-				*direction = [x_direction, y_direction].into();
-				*cached = *position;
+				let (cached_prev_position, cached_current_position) = self.mouse_positions.entry(
+					(window_id, *device_id)).or_insert_with(|| (
+						[0.0, 0.0].into(),
+						[0.0, 0.0].into()
+					)
+				);
+				*cached_prev_position = *cached_current_position;
+				*cached_current_position = *position;
 			},
 			WindowEvent::CursorLeft { device_id } => {
-				self.mouse_position.remove(&(window_id, *device_id));
+				self.mouse_positions.remove(&(window_id, *device_id));
 			},
 			_ => {},
 		}
@@ -68,9 +59,9 @@ impl MouseCache {
 
 	fn remove_device(&mut self, device_id: DeviceId) {
 		self.mouse_buttons.remove(&device_id);
-		let keys: Vec<_> = self.mouse_position.keys().filter(|(_, x)| *x == device_id).copied().collect();
+		let keys: Vec<_> = self.mouse_positions.keys().filter(|(_, x)| *x == device_id).copied().collect();
 		for key in &keys {
-			self.mouse_position.remove(&key);
+			self.mouse_positions.remove(&key);
 		}
 	}
 }
