@@ -39,6 +39,8 @@ pub struct Window {
 	pub zoom: f32,
 
 	/// The pan of the image.
+	/// This determines how much the image is translated along each axis.
+	/// A positive X value moves the image to the right and positive Y value moves it down.
 	pub pan: [f32; 2],
 
 	/// Overlays to draw on top of images.
@@ -239,7 +241,7 @@ impl WindowOptions {
 		self
 	}
 
-	/// Set wether or not overlays should be drawn on the window.
+	/// Set whether or not overlays should be drawn on the window.
 	pub fn set_show_overlays(mut self, show_overlays: bool) -> Self {
 		self.show_overlays = show_overlays;
 		self
@@ -260,13 +262,16 @@ impl Window {
 	/// Recalculate the uniforms for the render pipeline from the window state.
 	pub fn calculate_uniforms(&self) -> WindowUniforms {
 		if let Some(image) = &self.image {
+			let uniforms : WindowUniforms;
 			let image_size = [image.info().width as f32, image.info().height as f32];
 			if !self.options.preserve_aspect_ratio {
-				WindowUniforms::stretch(image_size, [self.zoom; 2], self.pan)
+				uniforms = WindowUniforms::stretch(image_size);
 			} else {
 				let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
-				WindowUniforms::fit(window_size, image_size, [self.zoom; 2], self.pan)
+				uniforms = WindowUniforms::fit(window_size, image_size);
 			}
+			let uniforms = uniforms.set_zoom([self.zoom, self.zoom]);
+			uniforms.set_pan(self.pan)
 		} else {
 			WindowUniforms::no_image()
 		}
@@ -299,25 +304,20 @@ pub struct WindowUniforms {
 
 impl WindowUniforms {
 	pub fn no_image() -> Self {
-		Self::stretch([0.0; 2], [1.0, 1.0], [0.0; 2])
+		Self::stretch([0.0; 2])
 	}
 
-	pub fn stretch(pixel_size: [f32; 2], zoom: [f32; 2], pan: [f32; 2]) -> Self {
+	pub fn stretch(pixel_size: [f32; 2]) -> Self {
 		Self {
 			offset: [0.0; 2],
 			relative_size: [1.0; 2],
 			pixel_size,
-			zoom,
-			pan,
+			zoom: [1.0; 2],
+			pan: [0.0; 2],
 		}
 	}
 
-	pub fn fit(
-		window_size: [f32; 2],
-		image_size: [f32; 2],
-		zoom: [f32; 2],
-		pan: [f32; 2]
-	) -> Self {
+	pub fn fit(window_size: [f32; 2], image_size: [f32; 2]) -> Self {
 		let ratios = [image_size[0] / window_size[0], image_size[1] / window_size[1]];
 
 		let w;
@@ -330,12 +330,28 @@ impl WindowUniforms {
 			h = 1.0;
 		}
 
+		//let pan = [zoom[0] * 2.0 * (pan[0] / window_size[0] - 0.5), zoom[0] * 2.0 * (pan[1] / window_size[1] - 0.5)];
+
 		Self {
 			offset: [0.5 - 0.5 * w, 0.5 - 0.5 * h],
 			relative_size: [w, h],
 			pixel_size: image_size,
-			zoom,
-			pan,
+			zoom: [1.0; 2],
+			pan: [0.0; 2],
 		}
+	}
+
+	/// Set the zoom of the image.
+	pub fn set_zoom(mut self, zoom: [f32; 2]) -> Self {
+		self.zoom = zoom;
+		self
+	}
+
+	/// Set the pan of the image.
+	/// This determines how much the image is translated along each axis.
+	/// A positive X value moves the image to the right and positive Y value moves it down.
+	pub fn set_pan(mut self, pan: [f32; 2]) -> Self {
+		self.pan = pan;
+		self
 	}
 }
