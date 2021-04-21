@@ -698,7 +698,9 @@ impl Context {
 				}
 			},
 			Event::WindowEvent(WindowEvent::Resized(event)) => {
-				let _ = self.resize_window(event.window_id, event.size);
+				if event.size.width > 0 && event.size.height > 0 {
+					let _ = self.resize_window(event.window_id, event.size);
+				}
 			},
 			Event::WindowEvent(WindowEvent::RedrawRequested(event)) => {
 				let _ = self.render_window(event.window_id);
