@@ -758,18 +758,13 @@ impl Context {
 					winit::event::MouseScrollDelta::LineDelta(_, y) => y,
 					_ => 0.0
 				};
-				let (_, current_position) = self.mouse_cache.get_positions(event.window_id, event.device_id).unwrap_or_else(|| (
-					[0.0, 0.0].into(),
-					[0.0, 0.0].into()
-				));
+				let current_position = self.mouse_cache.get_position(event.window_id, event.device_id).unwrap_or_else(|| [0.0, 0.0].into());
 				let _ = self.zoom_window(event.window_id, delta, current_position.x as f32, current_position.y as f32);
 			},
 			Event::WindowEvent(WindowEvent::MouseMove(event)) => {
 				if event.buttons.is_pressed(event::MouseButton::Left) {
-					let (prev_position, current_position) = self.mouse_cache.get_positions(event.window_id, event.device_id).unwrap_or_else(|| (
-						[0.0, 0.0].into(),
-						[0.0, 0.0].into()
-					));
+					let current_position = self.mouse_cache.get_position(event.window_id, event.device_id).unwrap_or_else(|| [0.0, 0.0].into());
+					let prev_position = self.mouse_cache.get_previous_position(event.window_id, event.device_id).unwrap_or_else(|| [0.0, 0.0].into());
 
 					let _ = self.pan_window(
 						event.window_id,
