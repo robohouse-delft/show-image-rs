@@ -45,10 +45,6 @@ impl MouseCache {
 				*cached_previous_position = *cached_position;
 				*cached_position = *position;
 			},
-			WindowEvent::CursorLeft { device_id } => {
-				self.mouse_position.remove(&(window_id, *device_id));
-				self.mouse_previous_position.remove(&(window_id, *device_id));
-			},
 			_ => {},
 		}
 	}
