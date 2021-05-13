@@ -93,6 +93,24 @@
 //!
 //! # Result::<(), Box<dyn std::error::Error>>::Ok(())
 //! ```
+//!
+//! # Back-end and GPU selection
+//!
+//! This crate uses [`wgpu`] for rendering.
+//! You can force the selection of a specfic WGPU backend by setting the `WGPU_BACKEND` environment variable to one of the supported values:
+//!
+//! * `primary`: Use the primary backend for the platform (the default).
+//! * `vulkan`: Use the vulkan back-end.
+//! * `metal`: Use the metal back-end.
+//! * `dx12`: Use the DirectX 12 back-end.
+//! * `dx11`: Use the DirectX 11 back-end.
+//! * `gl`: Use the OpenGL back-end.
+//! * `webgpu`: Use the browser WebGPU back-end.
+//!
+//! You can also influence the GPU selection by setting the `WGPU_POWER_PREF` environment variable:
+//!
+//! * `low`: Prefer a low power GPU (the default).
+//! * `high`: Prefer a high performance GPU.
 
 #![cfg_attr(feature = "nightly", feature(doc_cfg))]
 #![cfg_attr(feature = "nightly", feature(termination_trait_lib))]

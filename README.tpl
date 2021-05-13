@@ -19,3 +19,4 @@
 [`ContextProxy::event_channel()`]: https://docs.rs/show-image/latest/show_image/struct.ContextProxy.html#method.event_channel
 [`exit()`]: https://docs.rs/show-image/latest/show_image/fn.exit.html
 [`std::process::exit()`]: https://doc.rust-lang.org/nightly/std/process/fn.exit.html
+[`wgpu`]: https://docs.rs/wgpu

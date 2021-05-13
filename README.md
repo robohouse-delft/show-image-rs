@@ -94,6 +94,24 @@ for event in window.event_channel()? {
 
 ```
 
+## Back-end and GPU selection
+
+This crate uses [`wgpu`] for rendering.
+You can force the selection of a specfic WGPU backend by setting the `WGPU_BACKEND` environment variable to one of the supported values:
+
+* `primary`: Use the primary backend for the platform (the default).
+* `vulkan`: Use the vulkan back-end.
+* `metal`: Use the metal back-end.
+* `dx12`: Use the DirectX 12 back-end.
+* `dx11`: Use the DirectX 11 back-end.
+* `gl`: Use the OpenGL back-end.
+* `webgpu`: Use the browser WebGPU back-end.
+
+You can also influence the GPU selection by setting the `WGPU_POWER_PREF` environment variable:
+
+* `low`: Prefer a low power GPU (the default).
+* `high`: Prefer a high performance GPU.
+
 [`Image`]: https://docs.rs/show-image/latest/show_image/enum.Image.html
 [`ImageView`]: https://docs.rs/show-image/latest/show_image/struct.ImageView.html
 [::image::DynamicImage]: https://docs.rs/image/latest/image/dynimage/enum.DynamicImage.html
@@ -108,3 +126,4 @@ for event in window.event_channel()? {
 [`ContextProxy::event_channel()`]: https://docs.rs/show-image/latest/show_image/struct.ContextProxy.html#method.event_channel
 [`exit()`]: https://docs.rs/show-image/latest/show_image/fn.exit.html
 [`std::process::exit()`]: https://doc.rust-lang.org/nightly/std/process/fn.exit.html
+[`wgpu`]: https://docs.rs/wgpu

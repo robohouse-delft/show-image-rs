@@ -112,7 +112,7 @@ impl Context {
 	/// but they must be run from the main thread and the [`run`](Self::run) function never returns.
 	/// So it is not possible to *run* more than one context.
 	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
-		let instance = wgpu::Instance::new(wgpu::BackendBit::all());
+		let instance = wgpu::Instance::new(select_backend());
 		let event_loop = EventLoop::with_user_event();
 		let proxy = ContextProxy::new(event_loop.create_proxy(), std::thread::current().id());
 
@@ -838,11 +838,45 @@ impl Context {
 	}
 }
 
+fn select_backend() -> wgpu::BackendBit {
+	let backend = std::env::var_os("WGPU_BACKEND").unwrap_or_else(|| "primary".into());
+	if backend.eq_ignore_ascii_case("primary") {
+		wgpu::BackendBit::PRIMARY
+	} else if backend.eq_ignore_ascii_case("vulkan") {
+		wgpu::BackendBit::VULKAN
+	} else if backend.eq_ignore_ascii_case("metal") {
+		wgpu::BackendBit::METAL
+	} else if backend.eq_ignore_ascii_case("dx12") {
+		wgpu::BackendBit::DX12
+	} else if backend.eq_ignore_ascii_case("dx11") {
+		wgpu::BackendBit::DX11
+	} else if backend.eq_ignore_ascii_case("gl") {
+		wgpu::BackendBit::GL
+	} else if backend.eq_ignore_ascii_case("webgpu") {
+		wgpu::BackendBit::BROWSER_WEBGPU
+	} else {
+		eprintln!("Unknown WGPU_BACKEND: {:?}", backend);
+		std::process::exit(1);
+	}
+}
+
+fn select_power_preference() -> wgpu::PowerPreference {
+	let power_pref = std::env::var_os("WGPU_POWER_PREF").unwrap_or_else(|| "low".into());
+	if power_pref.eq_ignore_ascii_case("low") {
+		wgpu::PowerPreference::LowPower
+	} else if power_pref.eq_ignore_ascii_case("high") {
+		wgpu::PowerPreference::HighPerformance
+	} else {
+		eprintln!("Unknown WGPU_POWER_PREF: {:?}", power_pref);
+		std::process::exit(1);
+	}
+}
+
 /// Get a wgpu device to use.
 async fn get_device(instance: &wgpu::Instance) -> Result<(wgpu::Device, wgpu::Queue), GetDeviceError> {
 	// Find a suitable display adapter.
 	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-		power_preference: wgpu::PowerPreference::default(),
+		power_preference: select_power_preference(),
 		compatible_surface: None, // TODO: can we use a hidden window or something?
 	});
 

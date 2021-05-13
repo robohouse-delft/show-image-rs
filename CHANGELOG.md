@@ -1,4 +1,6 @@
 v0.8.3
+  * Allow manual rendering back-end selection with the `WGPU_BACKEND` environment variables.
+  * Allow manual GPU selection with the `WGPU_POWER_PREF` environment variables.
   * Fix panic when minimizing a window on Windows.
 
 v0.8.2
