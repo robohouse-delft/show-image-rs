@@ -840,6 +840,14 @@ impl Context {
 
 fn select_backend() -> wgpu::BackendBit {
 	let backend = std::env::var_os("WGPU_BACKEND").unwrap_or_else(|| "primary".into());
+	let backend = match backend.to_str() {
+		Some(backend) => backend,
+		None => {
+			eprintln!("Unknown WGPU_BACKEND: {:?}", backend);
+			std::process::exit(1);
+		}
+	};
+
 	if backend.eq_ignore_ascii_case("primary") {
 		wgpu::BackendBit::PRIMARY
 	} else if backend.eq_ignore_ascii_case("vulkan") {
@@ -862,6 +870,14 @@ fn select_backend() -> wgpu::BackendBit {
 
 fn select_power_preference() -> wgpu::PowerPreference {
 	let power_pref = std::env::var_os("WGPU_POWER_PREF").unwrap_or_else(|| "low".into());
+	let power_pref = match power_pref.to_str() {
+		Some(power_pref) => power_pref,
+		None => {
+			eprintln!("Unknown WGPU_POWER_PREF: {:?}", power_pref);
+			std::process::exit(1);
+		}
+	};
+
 	if power_pref.eq_ignore_ascii_case("low") {
 		wgpu::PowerPreference::LowPower
 	} else if power_pref.eq_ignore_ascii_case("high") {
