@@ -518,15 +518,22 @@ impl Context {
 	}
 
 	/// Pan a window.
-	fn pan_window(&mut self, window_id: WindowId, pan_x: f32, pan_y: f32) -> Result<(), InvalidWindowId> {
+	fn pan_window(
+		&mut self,
+		window_id: WindowId,
+		delta_position_x: f32,
+		delta_position_y: f32,
+	) -> Result<(), InvalidWindowId> {
 		let window = self
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or(InvalidWindowId { window_id })?;
 
-		window.translate[0] += pan_x;
-		window.translate[1] -= pan_y;
+		let size = window.window.inner_size();
+		window.translate[0] += delta_position_x / size.width as f32;
+		// positive image y-axis is equivalent to negative y-axis of the mouse cursor, hence subtract.
+		window.translate[1] -= delta_position_y / size.height as f32;
 		window.uniforms.mark_dirty(true);
 		window.window.request_redraw();
 		Ok(())
@@ -759,8 +766,16 @@ impl Context {
 			},
 			Event::WindowEvent(WindowEvent::MouseMove(event)) => {
 				if event.buttons.is_pressed(event::MouseButton::Left) {
-					let direction = self.mouse_cache.get_direction(event.window_id, event.device_id).unwrap_or_else(|| [0.0, 0.0].into());
-					let _ = self.pan_window(event.window_id, (direction.x * 0.01) as f32, (direction.y * 0.01) as f32);
+					let (prev_position, current_position) = self.mouse_cache.get_positions(event.window_id, event.device_id).unwrap_or_else(|| (
+						[0.0, 0.0].into(),
+						[0.0, 0.0].into()
+					));
+
+					let _ = self.pan_window(
+						event.window_id,
+						(current_position.x - prev_position.x) as f32,
+						(current_position.y - prev_position.y) as f32,
+					);
 				}
 			},
 			Event::WindowEvent(WindowEvent::RedrawRequested(event)) => {
