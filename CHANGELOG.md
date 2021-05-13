@@ -1,3 +1,6 @@
+v0.8.3
+  * Fix panic when minimizing a window on Windows.
+
 v0.8.2
   * Disable some default features of dependencies to reduce dependency tree.
   * Support `tch` versions 0.1.6 through 0.4.0.
