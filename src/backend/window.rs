@@ -38,10 +38,10 @@ pub struct Window {
 	/// The zoom of the image.
 	pub zoom: f32,
 
-	/// The pan of the image.
+	/// The translation of the image.
 	/// This determines how much the image is translated along each axis.
 	/// A positive X value moves the image to the right and positive Y value moves it down.
-	pub pan: [f32; 2],
+	pub translate: [f32; 2],
 
 	/// Overlays to draw on top of images.
 	pub overlays: Vec<GpuImage>,
@@ -270,8 +270,8 @@ impl Window {
 				let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
 				uniforms = WindowUniforms::fit(window_size, image_size);
 			}
-			let uniforms = uniforms.set_zoom([self.zoom, self.zoom]);
-			uniforms.set_pan(self.pan)
+			let uniforms = uniforms.set_zoom(self.zoom);
+			uniforms.set_translation(self.translate)
 		} else {
 			WindowUniforms::no_image()
 		}
@@ -294,12 +294,6 @@ pub struct WindowUniforms {
 
 	/// The size of the image in pixels.
 	pub pixel_size: [f32; 2],
-
-	/// The zoom of the image.
-	pub zoom: [f32; 2],
-
-	/// The pan of the image.
-	pub pan: [f32; 2],
 }
 
 impl WindowUniforms {
@@ -312,8 +306,6 @@ impl WindowUniforms {
 			offset: [0.0; 2],
 			relative_size: [1.0; 2],
 			pixel_size,
-			zoom: [1.0; 2],
-			pan: [0.0; 2],
 		}
 	}
 
@@ -330,28 +322,24 @@ impl WindowUniforms {
 			h = 1.0;
 		}
 
-		//let pan = [zoom[0] * 2.0 * (pan[0] / window_size[0] - 0.5), zoom[0] * 2.0 * (pan[1] / window_size[1] - 0.5)];
-
 		Self {
 			offset: [0.5 - 0.5 * w, 0.5 - 0.5 * h],
 			relative_size: [w, h],
 			pixel_size: image_size,
-			zoom: [1.0; 2],
-			pan: [0.0; 2],
 		}
 	}
 
 	/// Set the zoom of the image.
-	pub fn set_zoom(mut self, zoom: [f32; 2]) -> Self {
-		self.zoom = zoom;
+	pub fn set_zoom(mut self, zoom: f32) -> Self {
+		self.relative_size = [zoom * self.relative_size[0], zoom * self.relative_size[1]] ;
 		self
 	}
 
 	/// Set the pan of the image.
 	/// This determines how much the image is translated along each axis.
 	/// A positive X value moves the image to the right and positive Y value moves it down.
-	pub fn set_pan(mut self, pan: [f32; 2]) -> Self {
-		self.pan = pan;
+	pub fn set_translation(mut self, translate: [f32; 2]) -> Self {
+		self.offset = [self.offset[0] + translate[0], self.offset[1] + translate[1]];
 		self
 	}
 }

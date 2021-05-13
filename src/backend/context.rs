@@ -432,7 +432,7 @@ impl Context {
 			uniforms,
 			image: None,
 			zoom: 1.0,
-			pan: [0.0, 0.0],
+			translate: [0.0, 0.0],
 			overlays: Vec::new(),
 			event_handlers: Vec::new(),
 		};
@@ -493,14 +493,25 @@ impl Context {
 	}
 
 	/// Zoom a window.
-	fn zoom_window(&mut self, window_id: WindowId, zoom_delta: f32) -> Result<(), InvalidWindowId> {
+	fn zoom_window(
+		&mut self,
+		window_id: WindowId,
+		delta: f32,
+		mouse_position_x: f32,
+		mouse_position_y: f32
+	) -> Result<(), InvalidWindowId> {
 		let window = self
 			.windows
 			.iter_mut()
 			.find(|w| w.id() == window_id)
 			.ok_or(InvalidWindowId { window_id })?;
 
-		window.zoom += zoom_delta;
+		let uniforms = window.calculate_uniforms();
+		let size = window.window.inner_size();
+		let zoom_factor = if delta > 0.0 { 1.1 } else { 1.0 / 1.1 };
+		window.translate[0] += ((mouse_position_x / size.width as f32) - uniforms.offset[0]) * (1.0 - zoom_factor);
+		window.translate[1] += (1.0 - (mouse_position_y / size.height as f32) - uniforms.offset[1]) * (1.0 - zoom_factor);
+		window.zoom *= zoom_factor;
 		window.uniforms.mark_dirty(true);
 		window.window.request_redraw();
 		Ok(())
@@ -514,8 +525,8 @@ impl Context {
 			.find(|w| w.id() == window_id)
 			.ok_or(InvalidWindowId { window_id })?;
 
-		window.pan[0] += pan_x;
-		window.pan[1] -= pan_y;
+		window.translate[0] += pan_x;
+		window.translate[1] -= pan_y;
 		window.uniforms.mark_dirty(true);
 		window.window.request_redraw();
 		Ok(())
@@ -595,8 +606,6 @@ impl Context {
 			offset: [0.0, 0.0],
 			relative_size: [image.info().width as f32 / size.width as f32, 1.0],
 			pixel_size: [image.info().width as f32, image.info().height as f32],
-			zoom: [1.0, 1.0],
-			pan: [0.0, 0.0],
 		};
 		let window_uniforms = UniformsBuffer::from_value(&self.device, &window_uniforms, &self.window_bind_group_layout);
 
@@ -742,7 +751,11 @@ impl Context {
 					winit::event::MouseScrollDelta::LineDelta(_, y) => y,
 					_ => 0.0
 				};
-				let _ = self.zoom_window(event.window_id, delta * 0.01);
+				let (_, current_position) = self.mouse_cache.get_positions(event.window_id, event.device_id).unwrap_or_else(|| (
+					[0.0, 0.0].into(),
+					[0.0, 0.0].into()
+				));
+				let _ = self.zoom_window(event.window_id, delta, current_position.x as f32, current_position.y as f32);
 			},
 			Event::WindowEvent(WindowEvent::MouseMove(event)) => {
 				if event.buttons.is_pressed(event::MouseButton::Left) {
