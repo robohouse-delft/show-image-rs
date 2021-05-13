@@ -21,16 +21,21 @@
 ///
 /// ```no_run
 /// use show_image::{ContextProxy, WindowOptions};
-/// use image::Image;
 /// # use std::error::Error;
+/// # mod image {
+/// #   pub fn open(_path: impl AsRef<std::path::Path>) -> Result<show_image::ImageView<'static>, std::io::Error> {
+/// #     Ok(show_image::ImageView::new(show_image::ImageInfo::rgb8(1, 1), &[255, 0, 0]))
+/// #   }
+/// # }
 ///
 /// #[show_image::main]
 /// fn main() -> Result<(), Box<dyn Error>> {
 ///   let window = show_image::create_window("My Awesome Window", WindowOptions::default())?;
-///   let image = Image::load("/path/to/image.png")?;
+///   let image = image::open("/path/to/image.png")?;
 ///
 ///   window.set_image("image", image)?;
 ///   window.wait_until_destroyed()?;
+///   Ok(())
 /// }
 /// ```
 #[proc_macro_attribute]

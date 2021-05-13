@@ -16,3 +16,6 @@ proc_macro = true
 quote = "1.0.7"
 proc-macro2 = "1.0.19"
 syn = { version = "1.0.39", features = ["full"] }
+
+[dev-dependencies]
+show-image = { version = "0.8.0", path = ".." }
