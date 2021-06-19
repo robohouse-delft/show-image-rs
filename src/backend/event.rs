@@ -123,6 +123,7 @@ pub fn convert_winit_window_event(
 				delta,
 				phase,
 				position: mouse_cache.get_position(window_id, device_id),
+				previous_position: mouse_cache.get_previous_position(window_id, device_id),
 				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 				modifiers,
 			}
@@ -140,6 +141,7 @@ pub fn convert_winit_window_event(
 				button: button.into(),
 				state: state.into(),
 				position: mouse_cache.get_position(window_id, device_id).unwrap_or_else(|| [-1.0, -1.0].into()),
+				previous_position: mouse_cache.get_previous_position(window_id, device_id),
 				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 				modifiers,
 			}

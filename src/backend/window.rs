@@ -35,6 +35,14 @@ pub struct Window {
 	/// The image to display (if any).
 	pub image: Option<GpuImage>,
 
+	/// The zoom of the image.
+	pub zoom: f32,
+
+	/// The translation of the image.
+	/// This determines how much the image is translated along each axis.
+	/// A positive X value moves the image to the right and positive Y value moves it down.
+	pub translate: [f32; 2],
+
 	/// Overlays to draw on top of images.
 	pub overlays: Vec<GpuImage>,
 
@@ -233,7 +241,7 @@ impl WindowOptions {
 		self
 	}
 
-	/// Set wether or not overlays should be drawn on the window.
+	/// Set whether or not overlays should be drawn on the window.
 	pub fn set_show_overlays(mut self, show_overlays: bool) -> Self {
 		self.show_overlays = show_overlays;
 		self
@@ -254,13 +262,16 @@ impl Window {
 	/// Recalculate the uniforms for the render pipeline from the window state.
 	pub fn calculate_uniforms(&self) -> WindowUniforms {
 		if let Some(image) = &self.image {
+			let uniforms : WindowUniforms;
 			let image_size = [image.info().width as f32, image.info().height as f32];
 			if !self.options.preserve_aspect_ratio {
-				WindowUniforms::stretch(image_size)
+				uniforms = WindowUniforms::stretch(image_size);
 			} else {
 				let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
-				WindowUniforms::fit(window_size, image_size)
+				uniforms = WindowUniforms::fit(window_size, image_size);
 			}
+			let uniforms = uniforms.set_zoom(self.zoom);
+			uniforms.set_translation(self.translate)
 		} else {
 			WindowUniforms::no_image()
 		}
@@ -316,5 +327,19 @@ impl WindowUniforms {
 			relative_size: [w, h],
 			pixel_size: image_size,
 		}
+	}
+
+	/// Set the zoom of the image.
+	pub fn set_zoom(mut self, zoom: f32) -> Self {
+		self.relative_size = [zoom * self.relative_size[0], zoom * self.relative_size[1]] ;
+		self
+	}
+
+	/// Set the pan of the image.
+	/// This determines how much the image is translated along each axis.
+	/// A positive X value moves the image to the right and positive Y value moves it down.
+	pub fn set_translation(mut self, translate: [f32; 2]) -> Self {
+		self.offset = [self.offset[0] + translate[0], self.offset[1] + translate[1]];
+		self
 	}
 }

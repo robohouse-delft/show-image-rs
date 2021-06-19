@@ -286,8 +286,11 @@ pub struct WindowMouseButtonEvent {
 	/// The new state of the mouse button.
 	pub state: ElementState,
 
-	/// The position of the mouse cursor inside the window.
+	/// The current position of the mouse cursor inside the window.
 	pub position: PhysicalPosition<f64>,
+
+	/// The position of the mouse cursor before it was moved.
+	pub previous_position: Option<PhysicalPosition<f64>>,
 
 	/// The pressed state of all mouse buttons.
 	pub buttons: MouseButtonState,
@@ -311,8 +314,11 @@ pub struct WindowMouseWheelEvent {
 	/// The touch-screen input state.
 	pub phase: TouchPhase,
 
-	/// The position of the mouse cursor inside the window.
+	/// The current position of the mouse cursor inside the window.
 	pub position: Option<PhysicalPosition<f64>>,
+
+	/// The position of the mouse cursor before it was moved.
+	pub previous_position: Option<PhysicalPosition<f64>>,
 
 	/// The pressed state of all mouse buttons.
 	pub buttons: MouseButtonState,

@@ -1,4 +1,4 @@
-//! Local version of [`std::process::Termination`] untill it is stabalized.
+//! Local version of [`std::process::Termination`] until it is stabilized.
 //!
 //! On `nightly`, this module just re-exports the real [`std::process::Termination`] trait.
 
