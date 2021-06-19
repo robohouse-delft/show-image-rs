@@ -10,12 +10,9 @@ use crate::error::CreateWindowError;
 use crate::error::GetDeviceError;
 use crate::error::InvalidWindowId;
 use crate::error::NoSuitableAdapterFound;
-use crate::error::SetImageError;
 use crate::event::{self, Event, EventHandlerControlFlow, WindowEvent};
-use crate::AsImageView;
 use crate::ContextProxy;
-use crate::ImageInfo;
-use crate::Rectangle;
+use crate::ImageView;
 use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
@@ -26,6 +23,8 @@ use crate::WindowOptions;
 type EventLoop = winit::event_loop::EventLoop<ContextFunction>;
 
 /// Internal shorthand for context event handlers.
+///
+/// Not for use in public APIs.
 type DynContextEventHandler = dyn FnMut(&mut ContextHandle, &mut Event, &mut event::EventHandlerControlFlow);
 
 /// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoopWindowTarget`].
@@ -103,8 +102,8 @@ pub struct Context {
 /// You can interact with the global context through a [`ContextHandle`] only from the global context thread.
 /// To interact with the context from a different thread, use a [`ContextProxy`].
 pub struct ContextHandle<'a> {
-	context: &'a mut Context,
-	event_loop: &'a EventLoopWindowTarget,
+	pub(crate) context: &'a mut Context,
+	pub(crate) event_loop: &'a EventLoopWindowTarget,
 }
 
 impl Context {
@@ -175,21 +174,6 @@ impl Context {
 		self.event_handlers.push(Box::new(handler))
 	}
 
-	/// Add a window-specific event handler.
-	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowId>
-	where
-		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
-	{
-		let window = self
-			.windows
-			.iter_mut()
-			.find(|x| x.id() == window_id)
-			.ok_or(InvalidWindowId { window_id })?;
-
-		window.event_handlers.push(Box::new(handler));
-		Ok(())
-	}
-
 	/// Run the event loop of the context.
 	///
 	/// This function must be run from the main thread and never returns.
@@ -242,120 +226,16 @@ impl<'a> ContextHandle<'a> {
 		self.context.exit_with_last_window = exit_with_last_window;
 	}
 
+	/// Get a window handle for the given window ID.
+	pub fn window(&mut self, window_id: WindowId) -> Result<WindowHandle, InvalidWindowId> {
+		let index = self.context.windows.iter().position(|x| x.id() == window_id).ok_or(InvalidWindowId { window_id })?;
+		Ok(WindowHandle::new(self.reborrow(), index))
+	}
+
 	/// Create a new window.
 	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowHandle, CreateWindowError> {
-		let window_id = self.context.create_window(self.event_loop, title, options)?;
-		Ok(WindowHandle::new(self.reborrow(), window_id))
-	}
-
-	/// Destroy a window.
-	pub fn destroy_window(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
-		self.context.destroy_window(window_id)
-	}
-
-	/// Get the image info and the area where the image is drawn for a window.
-	pub fn window_image_info(&self, window_id: WindowId) -> Result<Option<(ImageInfo, Rectangle)>, InvalidWindowId> {
-		let window = self.context.windows.iter().find(|x| x.id() == window_id).ok_or(InvalidWindowId { window_id })?;
-		let image_info = match window.image.as_ref().map(|x| *x.info()) {
-			Some(x) => x,
-			None => return Ok(None),
-		};
-
-		let uniforms = window.calculate_uniforms();
-		let window_size = window.window.inner_size();
-
-		let [x, y] = uniforms.offset;
-		let [width, height] = uniforms.relative_size;
-
-		let x = (x * window_size.width as f32) as i32;
-		let y = (y * window_size.height as f32) as i32;
-		let width = (width * window_size.width as f32) as u32;
-		let height = (height * window_size.height as f32) as u32;
-
-		let image_area = Rectangle::from_xywh(x, y, width, height);
-
-		Ok(Some((image_info, image_area)))
-	}
-
-	/// Make a window visible or invisible.
-	pub fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowId> {
-		self.context.set_window_visible(window_id, visible)
-	}
-
-	/// Change the options of a window.
-	pub fn set_window_options<F>(&mut self, window_id: WindowId, make_options: F) -> Result<(), InvalidWindowId>
-	where
-		F: FnOnce(&WindowOptions) -> WindowOptions,
-	{
-		let window = self
-			.context
-			.windows
-			.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or(InvalidWindowId { window_id })?;
-		let options = (make_options)(&window.options);
-
-		window.window.set_resizable(options.resizable);
-		window.window.set_decorations(!options.borderless);
-		if options.size != window.options.size {
-			if let Some(size) = options.size {
-				window.window.set_inner_size(winit::dpi::LogicalSize::<u32>::from(size));
-			}
-		}
-
-		window.options = options;
-		window.window.request_redraw();
-		Ok(())
-	}
-
-	/// Set the image to be displayed on a window.
-	pub fn set_window_image(
-		&mut self,
-		window_id: WindowId,
-		name: impl Into<String>,
-		image: &impl AsImageView,
-	) -> Result<(), SetImageError> {
-		self.context.set_window_image(window_id, name.into(), image)
-	}
-
-	/// Add an overlay to a window.
-	///
-	/// Overlays are drawn on top of the image.
-	/// Overlays remain active until you call they are cleared.
-	pub fn add_window_overlay(
-		&mut self,
-		window_id: WindowId,
-		name: impl Into<String>,
-		image: &impl AsImageView,
-	) -> Result<(), SetImageError> {
-		let window = self
-			.context
-			.windows
-			.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or(InvalidWindowId { window_id })?;
-		let image = GpuImage::from_data(
-			name.into(),
-			&self.context.device,
-			&self.context.image_bind_group_layout,
-			image.as_image_view()?,
-		);
-		window.overlays.push(image);
-		window.window.request_redraw();
-		Ok(())
-	}
-
-	/// Clear the overlays of a window.
-	pub fn clear_window_overlays(&mut self, window_id: WindowId) -> Result<(), InvalidWindowId> {
-		let window = self
-			.context
-			.windows
-			.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or(InvalidWindowId { window_id })?;
-		window.overlays.clear();
-		window.window.request_redraw();
-		Ok(())
+		let index = self.context.create_window(self.event_loop, title, options)?;
+		Ok(WindowHandle::new(self.reborrow(), index))
 	}
 
 	/// Add a global event handler.
@@ -364,14 +244,6 @@ impl<'a> ContextHandle<'a> {
 		F: 'static + FnMut(&mut ContextHandle, &mut Event, &mut EventHandlerControlFlow),
 	{
 		self.context.add_event_handler(handler);
-	}
-
-	/// Add a window-specific event handler.
-	pub fn add_window_event_handler<F>(&mut self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowId>
-	where
-		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
-	{
-		self.context.add_window_event_handler(window_id, handler)
 	}
 
 	/// Run a task in a background thread and register it with the context.
@@ -406,7 +278,7 @@ impl Context {
 		event_loop: &EventLoopWindowTarget,
 		title: impl Into<String>,
 		options: WindowOptions,
-	) -> Result<WindowId, CreateWindowError> {
+	) -> Result<usize, CreateWindowError> {
 		let mut window = winit::window::WindowBuilder::new()
 			.with_title(title)
 			.with_visible(!options.start_hidden)
@@ -414,7 +286,7 @@ impl Context {
 			.with_decorations(!options.borderless);
 
 		if let Some(size) = options.size {
-			let size = winit::dpi::LogicalSize::new(size[0], size[1]);
+			let size = winit::dpi::PhysicalSize::new(size[0], size[1]);
 			window = window.with_inner_size(size);
 		}
 
@@ -426,7 +298,8 @@ impl Context {
 
 		let window = Window {
 			window,
-			options,
+			preserve_aspect_ratio: options.preserve_aspect_ratio,
+			background_color: options.background_color,
 			surface,
 			swap_chain,
 			uniforms,
@@ -434,12 +307,12 @@ impl Context {
 			zoom: 1.0,
 			translate: [0.0, 0.0],
 			overlays: Vec::new(),
+			overlays_visible: options.overlays_visible,
 			event_handlers: Vec::new(),
 		};
 
-		let window_id = window.id();
 		self.windows.push(window);
-		Ok(window_id)
+		Ok(self.windows.len() - 1)
 	}
 
 	/// Destroy a window.
@@ -453,30 +326,9 @@ impl Context {
 		Ok(())
 	}
 
-	/// Make a window visible or invisible.
-	fn set_window_visible(&mut self, window_id: WindowId, visible: bool) -> Result<(), InvalidWindowId> {
-		let window = self
-			.windows
-			.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or(InvalidWindowId { window_id })?;
-		window.set_visible(visible);
-		Ok(())
-	}
-
-	/// Set the image to be displayed on a window.
-	fn set_window_image(&mut self, window_id: WindowId, name: String, image: &impl AsImageView) -> Result<(), SetImageError> {
-		let window = self
-			.windows
-			.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or(InvalidWindowId { window_id })?;
-
-		let image = GpuImage::from_data(name, &self.device, &self.image_bind_group_layout, image.as_image_view()?);
-		window.image = Some(image);
-		window.uniforms.mark_dirty(true);
-		window.window.request_redraw();
-		Ok(())
+	/// Upload an image to the GPU.
+	pub fn make_gpu_image(&self, name: impl Into<String>, image: &ImageView) -> GpuImage {
+		GpuImage::from_data(name.into(), &self.device, &self.image_bind_group_layout, image)
 	}
 
 	/// Resize a window.
@@ -570,10 +422,10 @@ impl Context {
 			&self.window_pipeline,
 			&window.uniforms,
 			image,
-			Some(window.options.background_color),
+			Some(window.background_color),
 			&frame.output.view,
 		);
-		if window.options.show_overlays {
+		if window.overlays_visible {
 			for overlay in &window.overlays {
 				render_pass(
 					&mut encoder,
@@ -792,7 +644,7 @@ impl Context {
 		// That's not allowed, of course, so temporarily swap the event handlers with a new vector.
 		// When we've run all handlers, we add the new handlers to the original vector and place it back.
 		// https://newfastuff.com/wp-content/uploads/2019/05/dVIkgAf.png
-		let mut event_handlers = std::mem::replace(&mut self.event_handlers, Vec::new());
+		let mut event_handlers = std::mem::take(&mut self.event_handlers);
 
 		let mut stop_propagation = false;
 		event_handlers.retain_mut(|handler| {
@@ -807,7 +659,7 @@ impl Context {
 			}
 		});
 
-		let new_event_handlers = std::mem::replace(&mut self.event_handlers, Vec::new());
+		let new_event_handlers = std::mem::take(&mut self.event_handlers);
 		event_handlers.extend(new_event_handlers);
 		self.event_handlers = event_handlers;
 	}
@@ -821,7 +673,7 @@ impl Context {
 			None => return true,
 		};
 
-		let mut event_handlers = std::mem::replace(&mut self.windows[window_index].event_handlers, Vec::new());
+		let mut event_handlers = std::mem::take(&mut self.windows[window_index].event_handlers);
 
 		let mut stop_propagation = false;
 		event_handlers.retain_mut(|handler| {
@@ -829,7 +681,7 @@ impl Context {
 				false
 			} else {
 				let context_handle = ContextHandle::new(self, event_loop);
-				let mut window_handle = WindowHandle::new(context_handle, event.window_id());
+				let mut window_handle = WindowHandle::new(context_handle, window_index);
 				let mut control = EventHandlerControlFlow::default();
 				(handler)(&mut window_handle, event, &mut control);
 				stop_propagation = control.stop_propagation;
@@ -837,7 +689,7 @@ impl Context {
 			}
 		});
 
-		let new_event_handlers = std::mem::replace(&mut self.windows[window_index].event_handlers, Vec::new());
+		let new_event_handlers = std::mem::take(&mut self.windows[window_index].event_handlers);
 		event_handlers.extend(new_event_handlers);
 		self.windows[window_index].event_handlers = event_handlers;
 
@@ -859,7 +711,7 @@ impl Context {
 
 	/// Join all background tasks.
 	fn join_background_tasks(&mut self) {
-		for task in std::mem::replace(&mut self.background_tasks, Vec::new()) {
+		for task in std::mem::take(&mut self.background_tasks) {
 			task.join().unwrap();
 		}
 	}
@@ -1042,14 +894,14 @@ fn create_render_pipeline(
 ) -> wgpu::RenderPipeline {
 	device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 		label: Some("show-image-pipeline"),
-		layout: Some(&layout),
+		layout: Some(layout),
 		vertex: wgpu::VertexState {
-			module: &vertex_shader,
+			module: vertex_shader,
 			entry_point: "main",
 			buffers: &[],
 		},
 		fragment: Some(wgpu::FragmentState {
-			module: &fragment_shader,
+			module: fragment_shader,
 			entry_point: "main",
 			targets: &[wgpu::ColorTargetState {
 				format: swap_chain_format,
@@ -1101,7 +953,7 @@ fn create_swap_chain(
 		present_mode: wgpu::PresentMode::Mailbox,
 	};
 
-	device.create_swap_chain(&surface, &swap_chain_desc)
+	device.create_swap_chain(surface, &swap_chain_desc)
 }
 
 /// Perform a render pass of an image.
@@ -1121,7 +973,7 @@ fn render_pass(
 	let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 		label: Some("render-image"),
 		color_attachments: &[wgpu::RenderPassColorAttachment {
-			view: &target,
+			view: target,
 			resolve_target: None,
 			ops: wgpu::Operations { load, store: true },
 		}],

@@ -24,7 +24,7 @@ pub struct GpuImageUniforms {
 
 impl GpuImage {
 	/// Create a [`GpuImage`] from an image buffer.
-	pub fn from_data(name: String, device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, image: ImageView) -> Self {
+	pub fn from_data(name: String, device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, image: &ImageView) -> Self {
 		let info = image.info();
 
 		let format = match info.pixel_format {
@@ -63,7 +63,7 @@ impl GpuImage {
 
 		let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 			label: Some(&format!("{}_bind_group", name)),
-			layout: &bind_group_layout,
+			layout: bind_group_layout,
 			entries: &[
 				wgpu::BindGroupEntry {
 					binding: 0,

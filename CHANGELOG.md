@@ -1,3 +1,9 @@
+v0.9.0:
+  * Change `WindowHandle` API to provide more efficient access to window properties.
+  * `WindowHandle` now guarantees that the referenced window is valid.
+  * Prohibit access to `&mut ContextHandle` as long as a `WindowHandle` exists.
+  * Rename `show_overlays` property to `overlays_visible`.
+
 v0.8.5:
   * Update to wgpu `0.9` and winit `0.25`.
 

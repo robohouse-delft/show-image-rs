@@ -1,13 +1,12 @@
+use crate::backend::Context;
 use crate::backend::util::GpuImage;
 use crate::backend::util::UniformsBuffer;
-use crate::error::InvalidWindowId;
-use crate::error::SetImageError;
 use crate::event::EventHandlerControlFlow;
 use crate::event::WindowEvent;
-use crate::AsImageView;
 use crate::Color;
 use crate::ContextHandle;
 use crate::ImageInfo;
+use crate::ImageView;
 use crate::Rectangle;
 use crate::WindowId;
 use crate::WindowProxy;
@@ -20,8 +19,14 @@ pub struct Window {
 	/// The winit window.
 	pub window: winit::window::Window,
 
-	/// The window options.
-	pub options: WindowOptions,
+	/// If true, preserve the aspect ratio of images.
+	pub preserve_aspect_ratio: bool,
+
+	/// The background color of the window.
+	pub background_color: Color,
+
+	/// If true, draw overlays on top of the main image.
+	pub overlays_visible: bool,
 
 	/// The wgpu surface to render to.
 	pub surface: wgpu::Surface,
@@ -58,19 +63,44 @@ pub struct WindowHandle<'a> {
 	/// The context handle to use.
 	context_handle: ContextHandle<'a>,
 
-	/// The window ID of the managed window.
-	window_id: WindowId,
+	/// The index of the window in [`Context::windows`].
+	index: usize,
 }
 
 impl<'a> WindowHandle<'a> {
 	/// Create a new window handle from a context handle and a window ID.
-	pub fn new(context_handle: ContextHandle<'a>, window_id: WindowId) -> Self {
-		Self { context_handle, window_id }
+	pub fn new(context_handle: ContextHandle<'a>, index: usize) -> Self {
+		Self { context_handle, index }
+	}
+
+	/// Get a reference to the context.
+	fn context(&self) -> &Context {
+		self.context_handle().context
+	}
+
+	/// Get a mutable reference to the context.
+	///
+	/// # Safety
+	/// The current window may not be moved or removed through the returned reference.
+	/// In practise, this means that you may not create or destroy any windows.
+	unsafe fn context_mut(&mut self) -> &mut Context {
+		&mut self.context_handle.context
+	}
+
+	/// Get a reference to the window.
+	fn window(&self) -> &Window {
+		&self.context().windows[self.index]
+	}
+
+	/// Get a mutable reference to the window.
+	fn window_mut(&mut self) -> &mut Window {
+		let index = self.index;
+		unsafe { &mut self.context_mut().windows[index] }
 	}
 
 	/// Get the window ID.
 	pub fn id(&self) -> WindowId {
-		self.window_id
+		self.window().id()
 	}
 
 	/// Get a proxy object for the window to interact with it from a different thread.
@@ -79,63 +109,161 @@ impl<'a> WindowHandle<'a> {
 	/// The proxy objects often wait for the global context to perform some action.
 	/// Doing so from within the global context thread would cause a deadlock.
 	pub fn proxy(&self) -> WindowProxy {
-		WindowProxy::new(self.window_id, self.context_handle.proxy())
+		WindowProxy::new(self.id(), self.context_handle.proxy())
 	}
 
-	/// Get the context handle as mutable reference.
-	pub fn context_handle(&mut self) -> &mut ContextHandle<'a> {
-		&mut self.context_handle
+	/// Release the window handle to get a [`ContextHandle`].
+	///
+	/// This can be used inside a window event handler to gain access to the [`ContextHandle`].
+	/// If you do not need mutable access to the context, you can also use [`context_handle()`](Self::context_handle).
+	pub fn release(self) -> ContextHandle<'a> {
+		self.context_handle
+	}
+
+	/// Get a reference to the context handle.
+	///
+	/// If you need mutable access to the context, use [`release()`](Self::release) instead.
+	pub fn context_handle(&self) -> &ContextHandle<'a> {
+		&self.context_handle
 	}
 
 	/// Destroy the window.
 	///
-	/// Any subsequent operation on the window will return [`InvalidWindowId`].
-	pub fn destroy(&mut self) -> Result<(), InvalidWindowId> {
-		self.context_handle.destroy_window(self.window_id)
+	/// Any subsequent operation on the window throuw an existing [`WindowProxy`] will return [`InvalidWindowId`](crate::error::InvalidWindowId).
+	pub fn destroy(self) -> ContextHandle<'a> {
+		let WindowHandle { context_handle, index } = self;
+		context_handle.context.windows.remove(index);
+		context_handle
 	}
 
 	/// Get the image info and the area of the window where the image is drawn.
-	pub fn image_info(&self) -> Result<Option<(ImageInfo, Rectangle)>, InvalidWindowId> {
-		self.context_handle.window_image_info(self.window_id)
+	pub fn image_info(&self) -> Option<&ImageInfo> {
+		Some(self.window().image.as_ref()?.info())
+	}
+
+	/// Get the area of the window where the image is drawn.
+	pub fn image_area(&self) -> Rectangle {
+		let uniforms = self.window().calculate_uniforms();
+		let window_size = self.window().window.inner_size();
+
+		let [x, y] = uniforms.offset;
+		let [width, height] = uniforms.relative_size;
+
+		let x = (x * window_size.width as f32) as i32;
+		let y = (y * window_size.height as f32) as i32;
+		let width = (width * window_size.width as f32) as u32;
+		let height = (height * window_size.height as f32) as u32;
+
+		Rectangle::from_xywh(x, y, width, height)
+	}
+
+	/// Check if the window will preserve the aspect ratio of images it displays.
+	pub fn preserve_aspect_ratio(&self) -> bool {
+		self.window().preserve_aspect_ratio
+	}
+
+	/// Set if the window will preserve the aspect ratio of images it displays.
+	pub fn set_preserve_aspect_ratio(&mut self, preserve_aspect_ratio: bool) {
+		self.window_mut().preserve_aspect_ratio = preserve_aspect_ratio;
+		self.window().window.request_redraw();
+	}
+
+	/// Get the background color of the window.
+	pub fn background_color(&self) -> Color {
+		self.window().background_color
+	}
+
+	/// Set the background color of the window.
+	pub fn set_background_color(&mut self, background_color: Color) {
+		self.window_mut().background_color = background_color;
+		self.window().window.request_redraw();
 	}
 
 	/// Make the window visible or invisible.
-	pub fn set_visible(&mut self, visible: bool) -> Result<(), InvalidWindowId> {
-		self.context_handle.set_window_visible(self.window_id, visible)
+	pub fn set_visible(&mut self, visible: bool) {
+		self.window_mut().set_visible(visible);
+		self.window().window.request_redraw();
 	}
 
-	/// Change the options of the window.
-	pub fn set_options<F>(&mut self, make_options: F) -> Result<(), InvalidWindowId>
-	where
-		F: FnOnce(&WindowOptions) -> WindowOptions,
-	{
-		self.context_handle.set_window_options(self.window_id, make_options)
+	/// Get the inner size of the window in pixels.
+	///
+	/// This returns the size of the window contents, excluding borders, the title bar and other decorations.
+	pub fn inner_size(&self) -> [u32; 2] {
+		self.window().window.inner_size().into()
+	}
+
+	/// Get the outer size of the window in pixel.
+	///
+	/// This returns the size of the entire window, including borders, the title bar and other decorations.
+	pub fn outer_size(&self) -> [u32; 2] {
+		self.window().window.outer_size().into()
+	}
+
+	/// Set the inner size of the window in pixels.
+	///
+	/// The size is excluding borders, the title bar and other decorations.
+	///
+	/// Some window managers may ignore this property.
+	pub fn set_inner_size(&mut self, size: [u32; 2]) {
+		self.window_mut().window.set_inner_size(winit::dpi::PhysicalSize::<u32>::from(size));
+		self.window().window.request_redraw();
+	}
+
+	/// Set if the window should be resizable for the user.
+	///
+	/// Some window managers may ignore this property.
+	pub fn set_resizable(&mut self, resizable: bool) {
+		self.window().window.set_resizable(resizable);
+	}
+
+	/// Set if the window should be drawn without borders.
+	///
+	/// Some window managers may ignore this property.
+	pub fn set_borderless(&mut self, borderless: bool) {
+		self.window().window.set_decorations(!borderless);
+	}
+
+	/// Check if the window is currently showing overlays.
+	pub fn overlays_visible(&self) -> bool {
+		self.window().overlays_visible
+	}
+
+	/// Enable or disable the overlays for this window.
+	pub fn set_overlays_visible(&mut self, overlays_visible: bool) {
+		self.window_mut().overlays_visible = overlays_visible;
+		self.window().window.request_redraw()
 	}
 
 	/// Set the image to display on the window.
-	pub fn set_image(&mut self, name: impl Into<String>, image: &impl AsImageView) -> Result<(), SetImageError> {
-		self.context_handle.set_window_image(self.window_id, name, image)
+	pub fn set_image(&mut self, name: impl Into<String>, image: &ImageView) {
+		let image = self.context().make_gpu_image(name, image);
+		self.window_mut().image = Some(image);
+		self.window_mut().uniforms.mark_dirty(true);
+		self.window_mut().window.request_redraw();
 	}
 
 	/// Add an overlay to the window.
 	///
 	/// Overlays are drawn on top of the image.
 	/// Overlays remain active until you call they are cleared.
-	pub fn add_overlay(&mut self, name: impl Into<String>, image: &impl AsImageView) -> Result<(), SetImageError> {
-		self.context_handle.add_window_overlay(self.window_id, name, image)
+	pub fn add_overlay(&mut self, name: impl Into<String>, image: &ImageView) {
+		let image = self.context().make_gpu_image(name, image);
+		self.window_mut().overlays.push(image);
+		self.window().window.request_redraw()
 	}
 
 	/// Clear the overlays of the window.
-	pub fn clear_overlays(&mut self) -> Result<(), InvalidWindowId> {
-		self.context_handle.clear_window_overlays(self.window_id)
+	pub fn clear_overlays(&mut self) {
+		self.window_mut().overlays.clear();
+		self.window().window.request_redraw()
 	}
 
 	/// Add an event handler to the window.
-	pub fn add_event_handler<F>(&mut self, handler: F) -> Result<(), InvalidWindowId>
+	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
 		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{
-		self.context_handle.add_window_event_handler(self.window_id, handler)
+		self.window_mut().event_handlers.push(Box::new(handler))
 	}
 }
 
@@ -157,12 +285,12 @@ pub struct WindowOptions {
 
 	/// The initial size of the window in pixel.
 	///
-	/// This may be ignored by a window manager.
+	/// This may be ignored by some window managers.
 	pub size: Option<[u32; 2]>,
 
 	/// If true allow the window to be resized.
 	///
-	/// This may be ignored by a window manager.
+	/// This may be ignored by some window managers.
 	pub resizable: bool,
 
 	/// Make the window borderless.
@@ -171,11 +299,18 @@ pub struct WindowOptions {
 	/// If true, draw overlays on the image.
 	///
 	/// Defaults to true.
-	pub show_overlays: bool,
+	pub overlays_visible: bool,
 }
 
 impl Default for WindowOptions {
 	fn default() -> Self {
+		Self::new()
+	}
+}
+
+impl WindowOptions {
+	/// Create new window options with default values.
+	pub fn new() -> Self {
 		Self {
 			preserve_aspect_ratio: true,
 			background_color: Color::black(),
@@ -183,12 +318,10 @@ impl Default for WindowOptions {
 			size: None,
 			resizable: true,
 			borderless: false,
-			show_overlays: true,
+			overlays_visible: true,
 		}
 	}
-}
 
-impl WindowOptions {
 	/// Preserve the aspect ratio of displayed images, or not.
 	///
 	/// This function consumes and returns `self` to allow daisy chaining.
@@ -215,17 +348,20 @@ impl WindowOptions {
 
 	/// Set the initial size of the window.
 	///
-	/// This property may be ignored by a window manager.
+	/// Pass [`None`] to clear a previously set value,
+	/// which will let the window manager choose the initial size.
+	///
+	/// This property may be ignored by some window managers.
 	///
 	/// This function consumes and returns `self` to allow daisy chaining.
-	pub fn set_size(mut self, size: [u32; 2]) -> Self {
-		self.size = Some(size);
+	pub fn set_size(mut self, size: impl Into<Option<[u32; 2]>>) -> Self {
+		self.size = size.into();
 		self
 	}
 
 	/// Make the window resizable or not.
 	///
-	/// This property may be ignored by a window manager.
+	/// This property may be ignored by some window managers.
 	///
 	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_resizable(mut self, resizable: bool) -> Self {
@@ -242,8 +378,8 @@ impl WindowOptions {
 	}
 
 	/// Set whether or not overlays should be drawn on the window.
-	pub fn set_show_overlays(mut self, show_overlays: bool) -> Self {
-		self.show_overlays = show_overlays;
+	pub fn set_show_overlays(mut self, overlays_visible: bool) -> Self {
+		self.overlays_visible = overlays_visible;
 		self
 	}
 }
@@ -262,16 +398,17 @@ impl Window {
 	/// Recalculate the uniforms for the render pipeline from the window state.
 	pub fn calculate_uniforms(&self) -> WindowUniforms {
 		if let Some(image) = &self.image {
-			let uniforms : WindowUniforms;
 			let image_size = [image.info().width as f32, image.info().height as f32];
-			if !self.options.preserve_aspect_ratio {
-				uniforms = WindowUniforms::stretch(image_size);
+			if !self.preserve_aspect_ratio {
+				WindowUniforms::stretch(image_size)
+					.set_zoom(self.zoom)
+					.set_translation(self.translate)
 			} else {
 				let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
-				uniforms = WindowUniforms::fit(window_size, image_size);
+				WindowUniforms::fit(window_size, image_size)
+					.set_zoom(self.zoom)
+					.set_translation(self.translate)
 			}
-			let uniforms = uniforms.set_zoom(self.zoom);
-			uniforms.set_translation(self.translate)
 		} else {
 			WindowUniforms::no_image()
 		}

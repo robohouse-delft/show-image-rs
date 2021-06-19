@@ -78,7 +78,11 @@ impl ContextProxy {
 	where
 		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
-		self.run_function_wait(move |context| context.add_window_event_handler(window_id, handler))
+		self.run_function_wait(move |context| {
+			let mut window = context.window(window_id)?;
+			window.add_event_handler(handler);
+			Ok(())
+		})
 	}
 
 	/// Post a function for execution in the context thread without waiting for it to execute.
@@ -249,9 +253,11 @@ impl WindowProxy {
 	pub fn set_image(&self, name: impl Into<String>, image: impl Into<Image>) -> Result<(), SetImageError> {
 		let name = name.into();
 		let image = image.into();
-		self.run_function_wait(move |window| window.set_image(name, &image))
+		self.run_function_wait(move |mut window| -> Result<(), SetImageError> {
+			window.set_image(name, &image.as_image_view()?);
+			Ok(())
+		})?
 	}
-
 
 	/// Add an event handler for the window.
 	///
@@ -322,12 +328,13 @@ impl WindowProxy {
 	/// This function will panic if called from within the context thread.
 	pub fn run_function<F>(&self, function: F)
 	where
-		F: 'static + FnOnce(&mut WindowHandle) + Send,
+		F: 'static + FnOnce(WindowHandle) + Send,
 	{
 		let window_id = self.window_id;
 		self.context_proxy.run_function(move |context| {
-			let mut window = WindowHandle::new(context.reborrow(), window_id);
-			function(&mut window)
+			if let Ok(window) = context.window(window_id) {
+				function(window);
+			}
 		})
 	}
 
@@ -343,15 +350,15 @@ impl WindowProxy {
 	///
 	/// # Panics
 	/// This function will panic if called from within the context thread.
-	pub fn run_function_wait<F, T>(&self, function: F) -> T
+	pub fn run_function_wait<F, T>(&self, function: F) -> Result<T, InvalidWindowId>
 	where
-		F: FnOnce(&mut WindowHandle) -> T + Send + 'static,
+		F: FnOnce(WindowHandle) -> T + Send + 'static,
 		T: Send + 'static,
 	{
 		let window_id = self.window_id;
 		self.context_proxy.run_function_wait(move |context| {
-			let mut window = WindowHandle::new(context.reborrow(), window_id);
-			function(&mut window)
+			let window = context.window(window_id)?;
+			Ok(function(window))
 		})
 	}
 }

@@ -59,11 +59,11 @@ impl MouseCache {
 		self.mouse_buttons.remove(&device_id);
 		let keys: Vec<_> = self.mouse_position.keys().filter(|(_, x)| *x == device_id).copied().collect();
 		for key in &keys {
-			self.mouse_position.remove(&key);
+			self.mouse_position.remove(key);
 		}
 		let keys: Vec<_> = self.mouse_previous_position.keys().filter(|(_, x)| *x == device_id).copied().collect();
 		for key in &keys {
-			self.mouse_previous_position.remove(&key);
+			self.mouse_previous_position.remove(key);
 		}
 	}
 }
