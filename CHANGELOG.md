@@ -1,3 +1,6 @@
+v0.8.5:
+  * Update to wgpu `0.9` and winit `0.25`.
+
 v0.8.4:
   * Fix compatibility with Rust stable.
 

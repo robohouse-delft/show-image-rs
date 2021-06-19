@@ -1,3 +1,5 @@
+use core::num::{NonZeroU32, NonZeroU64};
+
 use crate::backend::proxy::ContextFunction;
 use crate::backend::util::GpuImage;
 use crate::backend::util::UniformsBuffer;
@@ -555,7 +557,7 @@ impl Context {
 		let size = wgpu::Extent3d {
 			width: div_round_up(bytes_per_row, 4),
 			height: image.info().height,
-			depth: 1,
+			depth_or_array_layers: 1,
 		};
 
 		let window_uniforms = WindowUniforms {
@@ -583,7 +585,7 @@ impl Context {
 			dimension: None,
 			aspect: wgpu::TextureAspect::All,
 			base_mip_level: 0,
-			level_count: None,
+			mip_level_count: None,
 			base_array_layer: 0,
 			array_layer_count: None,
 		});
@@ -610,17 +612,17 @@ impl Context {
 		});
 
 		encoder.copy_texture_to_buffer(
-			wgpu::TextureCopyView {
+			wgpu::ImageCopyTexture {
 				texture: &target,
 				mip_level: 0,
 				origin: wgpu::Origin3d::ZERO,
 			},
-			wgpu::BufferCopyView {
+			wgpu::ImageCopyBuffer {
 				buffer: &buffer,
-				layout: wgpu::TextureDataLayout {
-					bytes_per_row,
-					rows_per_image: image.info().height,
+				layout: wgpu::ImageDataLayout {
 					offset: 0,
+					bytes_per_row: NonZeroU32::new(bytes_per_row),
+					rows_per_image: NonZeroU32::new(image.info().height),
 				},
 			},
 			size,
@@ -924,7 +926,7 @@ fn create_window_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
 			ty: wgpu::BindingType::Buffer {
 				ty: wgpu::BufferBindingType::Uniform,
 				has_dynamic_offset: false,
-				min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<WindowUniforms>() as u64).unwrap()),
+				min_binding_size: Some(NonZeroU64::new(std::mem::size_of::<WindowUniforms>() as u64).unwrap()),
 			},
 		}],
 	})
@@ -942,7 +944,7 @@ fn create_image_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 				ty: wgpu::BindingType::Buffer {
 					ty: wgpu::BufferBindingType::Uniform,
 					has_dynamic_offset: false,
-					min_binding_size: Some(std::num::NonZeroU64::new(std::mem::size_of::<super::util::GpuImageUniforms>() as u64).unwrap()),
+					min_binding_size: Some(NonZeroU64::new(std::mem::size_of::<super::util::GpuImageUniforms>() as u64).unwrap()),
 				},
 			},
 			wgpu::BindGroupLayoutEntry {
@@ -982,16 +984,18 @@ fn create_render_pipeline(
 			entry_point: "main",
 			targets: &[wgpu::ColorTargetState {
 				format: swap_chain_format,
-				color_blend: wgpu::BlendState {
-					src_factor: wgpu::BlendFactor::SrcAlpha,
-					dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-					operation: wgpu::BlendOperation::Add,
-				},
-				alpha_blend: wgpu::BlendState {
-					src_factor: wgpu::BlendFactor::One,
-					dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-					operation: wgpu::BlendOperation::Add,
-				},
+				blend: Some(wgpu::BlendState {
+					color: wgpu::BlendComponent {
+						src_factor: wgpu::BlendFactor::SrcAlpha,
+						dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+						operation: wgpu::BlendOperation::Add,
+					},
+					alpha: wgpu::BlendComponent {
+						src_factor: wgpu::BlendFactor::One,
+						dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+						operation: wgpu::BlendOperation::Add,
+					},
+				}),
 				write_mask: wgpu::ColorWrite::ALL,
 			}],
 		}),
@@ -999,8 +1003,10 @@ fn create_render_pipeline(
 			topology: wgpu::PrimitiveTopology::TriangleList,
 			strip_index_format: None,
 			front_face: wgpu::FrontFace::Cw,
-			cull_mode: wgpu::CullMode::Back,
+			cull_mode: Some(wgpu::Face::Back),
+			clamp_depth: false,
 			polygon_mode: wgpu::PolygonMode::Fill,
+			conservative: false,
 		},
 		depth_stencil: None,
 		multisample: wgpu::MultisampleState {
@@ -1045,10 +1051,10 @@ fn render_pass(
 
 	let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 		label: Some("render-image"),
-		color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-			ops: wgpu::Operations { load, store: true },
-			attachment: &target,
+		color_attachments: &[wgpu::RenderPassColorAttachment {
+			view: &target,
 			resolve_target: None,
+			ops: wgpu::Operations { load, store: true },
 		}],
 		depth_stencil_attachment: None,
 	});
