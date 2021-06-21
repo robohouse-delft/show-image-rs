@@ -7,6 +7,7 @@ v0.9.0:
   * Add user configurable image transformation.
   * Add `prev_position` to `MouseMoveEvent`.
   * Add `position` and `prev_position` to `MouseButtonEvent`.
+  * Add enabled-by-default mouse controls to pan and zoom images.
 
 v0.8.5:
   * Update to wgpu `0.9` and winit `0.25`.

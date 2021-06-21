@@ -331,6 +331,11 @@ pub struct WindowOptions {
 	///
 	/// Defaults to true.
 	pub overlays_visible: bool,
+
+	/// If true, enable default mouse based controls for panning and zooming the image.
+	///
+	/// Defaults to true.
+	pub default_controls: bool,
 }
 
 impl Default for WindowOptions {
@@ -350,6 +355,7 @@ impl WindowOptions {
 			resizable: true,
 			borderless: false,
 			overlays_visible: true,
+			default_controls: true,
 		}
 	}
 
@@ -411,6 +417,12 @@ impl WindowOptions {
 	/// Set whether or not overlays should be drawn on the window.
 	pub fn set_show_overlays(mut self, overlays_visible: bool) -> Self {
 		self.overlays_visible = overlays_visible;
+		self
+	}
+
+	/// Set whether or not default mouse controls for panning and zooming the image should be added.
+	pub fn set_default_controls(mut self, default_controls: bool) -> Self {
+		self.default_controls = default_controls;
 		self
 	}
 }
@@ -574,5 +586,39 @@ unsafe impl crate::backend::util::ToStd140 for WindowUniforms {
 			transform: self.transform.into(),
 			image_size: self.image_size.into(),
 		}
+	}
+}
+
+/// Event handler that implements the default controls.
+pub(super) fn default_controls_handler(window: &mut WindowHandle, event: &mut crate::event::WindowEvent, _control_flow: &mut crate::event::EventHandlerControlFlow) {
+	match event {
+		WindowEvent::MouseWheel(event) => {
+			let delta = match event.delta {
+				winit::event::MouseScrollDelta::LineDelta(_x, y) => y,
+				winit::event::MouseScrollDelta::PixelDelta(delta) => delta.y as f32 / 20.0,
+			};
+			let scale = 1.1f32.powf(delta);
+
+			let size = glam::UVec2::from(window.inner_size()).as_f32();
+			let origin;
+			if let Some(position) = &event.position {
+				origin = glam::DVec2::new(position.x, position.y).as_f32() / size;
+			} else {
+				origin = glam::Vec2::new(0.5, 0.5);
+			}
+			let transform = glam::Affine2::from_scale_angle_translation(glam::Vec2::splat(scale), 0.0, origin - scale * origin);
+			window.pre_apply_transform(transform);
+		},
+		WindowEvent::MouseMove(event) => {
+			if event.buttons.is_pressed(crate::event::MouseButton::Left) {
+
+				let size = window.inner_size();
+				window.pre_apply_transform(Affine2::from_translation(Vec2::new(
+					(event.position.x - event.prev_position.x) as f32 / size[0] as f32,
+					(event.position.y - event.prev_position.y) as f32 / size[1] as f32,
+				)));
+			}
+		},
+		_ => (),
 	}
 }

@@ -16,7 +16,7 @@ use crate::ImageView;
 use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
-use glam::{Affine2, Vec2};
+use glam::Affine2;
 
 /// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
 ///
@@ -315,7 +315,11 @@ impl Context {
 		};
 
 		self.windows.push(window);
-		Ok(self.windows.len() - 1)
+		let index = self.windows.len() - 1;
+		if options.default_controls {
+			self.windows[index].event_handlers.push(Box::new(super::window::default_controls_handler));
+		}
+		Ok(index)
 	}
 
 	/// Destroy a window.
@@ -344,57 +348,6 @@ impl Context {
 
 		window.swap_chain = create_swap_chain(new_size, &window.surface, self.swap_chain_format, &self.device);
 		window.uniforms.mark_dirty(true);
-		Ok(())
-	}
-
-	/// Zoom a window.
-	fn zoom_window(
-		&mut self,
-		window_id: WindowId,
-		delta: f32,
-		mouse_position_x: f32,
-		mouse_position_y: f32
-	) -> Result<(), InvalidWindowId> {
-		let window = self
-			.windows
-			.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or(InvalidWindowId { window_id })?;
-
-		let size = window.window.inner_size();
-		let scale = if delta > 0.0 { 1.1 } else { 1.0 / 1.1 };
-		let origin = Vec2::new(
-			mouse_position_x / size.width as f32,
-			mouse_position_y / size.height as f32,
-		);
-		let transform = Affine2::from_scale_angle_translation(Vec2::splat(scale), 0.0, origin - scale * origin);
-		window.user_transform = transform * window.user_transform;
-		window.uniforms.mark_dirty(true);
-		window.window.request_redraw();
-		Ok(())
-	}
-
-	/// Pan a window.
-	fn pan_window(
-		&mut self,
-		window_id: WindowId,
-		delta_position_x: f32,
-		delta_position_y: f32,
-	) -> Result<(), InvalidWindowId> {
-		let window = self
-			.windows
-			.iter_mut()
-			.find(|w| w.id() == window_id)
-			.ok_or(InvalidWindowId { window_id })?;
-
-		let size = window.window.inner_size();
-		let translation = Vec2::new(
-			delta_position_x / size.width as f32,
-			delta_position_y / size.height as f32,
-		);
-		window.user_transform.translation += translation;
-		window.uniforms.mark_dirty(true);
-		window.window.request_redraw();
 		Ok(())
 	}
 
@@ -609,23 +562,6 @@ impl Context {
 			Event::WindowEvent(WindowEvent::Resized(event)) => {
 				if event.size.width > 0 && event.size.height > 0 {
 					let _ = self.resize_window(event.window_id, event.size);
-				}
-			},
-			Event::WindowEvent(WindowEvent::MouseWheel(event)) => {
-				let delta = match event.delta {
-					winit::event::MouseScrollDelta::LineDelta(_, y) => y,
-					_ => 0.0
-				};
-				let current_position = self.mouse_cache.get_position(event.window_id, event.device_id).unwrap_or_else(|| [0.0, 0.0].into());
-				let _ = self.zoom_window(event.window_id, delta, current_position.x as f32, current_position.y as f32);
-			},
-			Event::WindowEvent(WindowEvent::MouseMove(event)) => {
-				if event.buttons.is_pressed(event::MouseButton::Left) {
-					let _ = self.pan_window(
-						event.window_id,
-						(event.position.x - event.prev_position.x) as f32,
-						(event.position.y - event.prev_position.y) as f32,
-					);
 				}
 			},
 			Event::WindowEvent(WindowEvent::RedrawRequested(event)) => {
