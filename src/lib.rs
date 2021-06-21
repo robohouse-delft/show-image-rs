@@ -135,6 +135,8 @@ pub use self::rectangle::Rectangle;
 pub use winit;
 pub use winit::window::WindowId;
 
+pub use glam;
+
 /// An RGBA color.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Color {

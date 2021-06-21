@@ -2,7 +2,7 @@ use core::num::{NonZeroU32, NonZeroU64};
 
 use crate::backend::proxy::ContextFunction;
 use crate::backend::util::GpuImage;
-use crate::backend::util::UniformsBuffer;
+use crate::backend::util::{ToStd140, UniformsBuffer};
 use crate::backend::window::Window;
 use crate::backend::window::WindowUniforms;
 use crate::background_thread::BackgroundThread;
@@ -16,6 +16,7 @@ use crate::ImageView;
 use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
+use glam::{Affine2, Vec2};
 
 /// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
 ///
@@ -118,6 +119,9 @@ impl Context {
 		let proxy = ContextProxy::new(event_loop.create_proxy(), std::thread::current().id());
 
 		let (device, queue) = futures::executor::block_on(get_device(&instance))?;
+		device.on_uncaptured_error(|error| {
+			panic!("Unhandled WGPU error: {}", error);
+		});
 
 		let window_bind_group_layout = create_window_bind_group_layout(&device);
 		let image_bind_group_layout = create_image_bind_group_layout(&device);
@@ -304,8 +308,7 @@ impl Context {
 			swap_chain,
 			uniforms,
 			image: None,
-			zoom: 1.0,
-			translate: [0.0, 0.0],
+			user_transform: Affine2::IDENTITY,
 			overlays: Vec::new(),
 			overlays_visible: options.overlays_visible,
 			event_handlers: Vec::new(),
@@ -358,12 +361,14 @@ impl Context {
 			.find(|w| w.id() == window_id)
 			.ok_or(InvalidWindowId { window_id })?;
 
-		let uniforms = window.calculate_uniforms();
 		let size = window.window.inner_size();
-		let zoom_factor = if delta > 0.0 { 1.1 } else { 1.0 / 1.1 };
-		window.translate[0] += ((mouse_position_x / size.width as f32) - uniforms.offset[0]) * (1.0 - zoom_factor);
-		window.translate[1] += (1.0 - (mouse_position_y / size.height as f32) - uniforms.offset[1]) * (1.0 - zoom_factor);
-		window.zoom *= zoom_factor;
+		let scale = if delta > 0.0 { 1.1 } else { 1.0 / 1.1 };
+		let origin = Vec2::new(
+			mouse_position_x / size.width as f32,
+			mouse_position_y / size.height as f32,
+		);
+		let transform = Affine2::from_scale_angle_translation(Vec2::splat(scale), 0.0, origin - scale * origin);
+		window.user_transform = transform * window.user_transform;
 		window.uniforms.mark_dirty(true);
 		window.window.request_redraw();
 		Ok(())
@@ -383,9 +388,11 @@ impl Context {
 			.ok_or(InvalidWindowId { window_id })?;
 
 		let size = window.window.inner_size();
-		window.translate[0] += delta_position_x / size.width as f32;
-		// positive image y-axis is equivalent to negative y-axis of the mouse cursor, hence subtract.
-		window.translate[1] -= delta_position_y / size.height as f32;
+		let translation = Vec2::new(
+			delta_position_x / size.width as f32,
+			delta_position_y / size.height as f32,
+		);
+		window.user_transform.translation += translation;
 		window.uniforms.mark_dirty(true);
 		window.window.request_redraw();
 		Ok(())
@@ -462,9 +469,8 @@ impl Context {
 		};
 
 		let window_uniforms = WindowUniforms {
-			offset: [0.0, 0.0],
-			relative_size: [image.info().width as f32 / size.width as f32, 1.0],
-			pixel_size: [image.info().width as f32, image.info().height as f32],
+			transform: Affine2::IDENTITY,
+			image_size: glam::UVec2::new(image.info().width, image.info().height).as_f32(),
 		};
 		let window_uniforms = UniformsBuffer::from_value(&self.device, &window_uniforms, &self.window_bind_group_layout);
 
@@ -847,7 +853,7 @@ fn create_window_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
 			ty: wgpu::BindingType::Buffer {
 				ty: wgpu::BufferBindingType::Uniform,
 				has_dynamic_offset: false,
-				min_binding_size: Some(NonZeroU64::new(std::mem::size_of::<WindowUniforms>() as u64).unwrap()),
+				min_binding_size: Some(NonZeroU64::new(WindowUniforms::STD140_SIZE).unwrap()),
 			},
 		}],
 	})

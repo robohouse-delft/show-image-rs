@@ -4,6 +4,7 @@ v0.9.0:
   * Prohibit access to `&mut ContextHandle` as long as a `WindowHandle` exists.
   * Rename `show_overlays` property to `overlays_visible`.
   * Fix interpretation of `tch::Tensor` with planar data.
+  * Add user configurable image transformation.
 
 v0.8.5:
   * Update to wgpu `0.9` and winit `0.25`.

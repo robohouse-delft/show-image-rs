@@ -7,9 +7,9 @@ use crate::Color;
 use crate::ContextHandle;
 use crate::ImageInfo;
 use crate::ImageView;
-use crate::Rectangle;
 use crate::WindowId;
 use crate::WindowProxy;
+use glam::{Affine2, Vec2};
 
 /// Internal shorthand for window event handlers.
 type DynWindowEventHandler = dyn FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow);
@@ -40,13 +40,10 @@ pub struct Window {
 	/// The image to display (if any).
 	pub image: Option<GpuImage>,
 
-	/// The zoom of the image.
-	pub zoom: f32,
-
-	/// The translation of the image.
-	/// This determines how much the image is translated along each axis.
-	/// A positive X value moves the image to the right and positive Y value moves it down.
-	pub translate: [f32; 2],
+	/// Transformation to apply to the image, in virtual window space.
+	///
+	/// Virtual window space goes from (0, 0) in the top left to (1, 1) in the bottom right.
+	pub user_transform: Affine2,
 
 	/// Overlays to draw on top of images.
 	pub overlays: Vec<GpuImage>,
@@ -139,22 +136,6 @@ impl<'a> WindowHandle<'a> {
 	/// Get the image info and the area of the window where the image is drawn.
 	pub fn image_info(&self) -> Option<&ImageInfo> {
 		Some(self.window().image.as_ref()?.info())
-	}
-
-	/// Get the area of the window where the image is drawn.
-	pub fn image_area(&self) -> Rectangle {
-		let uniforms = self.window().calculate_uniforms();
-		let window_size = self.window().window.inner_size();
-
-		let [x, y] = uniforms.offset;
-		let [width, height] = uniforms.relative_size;
-
-		let x = (x * window_size.width as f32) as i32;
-		let y = (y * window_size.height as f32) as i32;
-		let width = (width * window_size.width as f32) as u32;
-		let height = (height * window_size.height as f32) as u32;
-
-		Rectangle::from_xywh(x, y, width, height)
 	}
 
 	/// Check if the window will preserve the aspect ratio of images it displays.
@@ -264,6 +245,56 @@ impl<'a> WindowHandle<'a> {
 		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{
 		self.window_mut().event_handlers.push(Box::new(handler))
+	}
+
+	/// Get the image transformation.
+	///
+	/// The image transformation is applied to the image and all overlays in virtual window space.
+	///
+	/// Virtual window space goes from `(0, 0)` in the top left corner of the window to `(1, 1)` in the bottom right corner.
+	pub fn transform(&self) -> Affine2 {
+		self.window().user_transform
+	}
+
+	/// Set the image transformation to a value.
+	///
+	/// The image transformation is applied to the image and all overlays in virtual window space.
+	///
+	/// Virtual window space goes from `(0, 0)` in the top left corner of the window to `(1, 1)` in the bottom right corner.
+	pub fn set_transform(&mut self, transform: Affine2) {
+		self.window_mut().user_transform = transform;
+		self.window_mut().uniforms.mark_dirty(true);
+		self.window().window.request_redraw();
+	}
+
+	/// Pre-apply a transformation to the existing image transformation.
+	///
+	/// This is equivalent to:
+	/// ```
+	/// # use show_image::{glam::Affine2, WindowHandle};
+	/// # fn foo(window: &mut WindowHandle, transform: Affine2) {
+	/// window.set_transform(transform * window.transform())
+	/// # }
+	/// ```
+	///
+	/// See [`Self::set_transform`] for more information about the image transformation.
+	pub fn pre_apply_transform(&mut self, transform: Affine2) {
+		self.set_transform(transform * self.transform());
+	}
+
+	/// Post-apply a transformation to the existing image transformation.
+	///
+	/// This is equivalent to:
+	/// ```
+	/// # use show_image::{glam::Affine2, WindowHandle};
+	/// # fn foo(window: &mut WindowHandle, transform: Affine2) {
+	/// window.set_transform(window.transform() * transform)
+	/// # }
+	/// ```
+	///
+	/// See [`Self::set_transform`] for more information about the image transformation.
+	pub fn post_apply_transform(&mut self, transform: Affine2) {
+		self.set_transform(self.transform() * transform)
 	}
 }
 
@@ -398,16 +429,14 @@ impl Window {
 	/// Recalculate the uniforms for the render pipeline from the window state.
 	pub fn calculate_uniforms(&self) -> WindowUniforms {
 		if let Some(image) = &self.image {
-			let image_size = [image.info().width as f32, image.info().height as f32];
+			let image_size = glam::UVec2::new(image.info().width, image.info().height).as_f32();
 			if !self.preserve_aspect_ratio {
 				WindowUniforms::stretch(image_size)
-					.set_zoom(self.zoom)
-					.set_translation(self.translate)
+					.pre_apply_transform(self.user_transform)
 			} else {
-				let window_size = [self.window.inner_size().width as f32, self.window.inner_size().height as f32];
+				let window_size = glam::UVec2::new(self.window.inner_size().width, self.window.inner_size().height).as_f32();
 				WindowUniforms::fit(window_size, image_size)
-					.set_zoom(self.zoom)
-					.set_translation(self.translate)
+					.pre_apply_transform(self.user_transform)
 			}
 		} else {
 			WindowUniforms::no_image()
@@ -416,38 +445,32 @@ impl Window {
 }
 
 /// The window specific uniforms for the render pipeline.
-#[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct WindowUniforms {
-	/// The offset of the image in normalized window coordinates.
+	/// The transformation applied to the image.
 	///
-	/// The normalized window coordinates go from (0, 0) to (1, 1).
-	pub offset: [f32; 2],
-
-	/// The size of the image in normalized window coordinates.
-	///
-	/// The normalized window coordinates go from (0, 0) to (1, 1).
-	pub relative_size: [f32; 2],
+	/// With the identity transform, the image is stretched to the inner window size,
+	/// without preserving the aspect ratio.
+	pub transform: Affine2,
 
 	/// The size of the image in pixels.
-	pub pixel_size: [f32; 2],
+	pub image_size: Vec2,
 }
 
 impl WindowUniforms {
 	pub fn no_image() -> Self {
-		Self::stretch([0.0; 2])
+		Self::stretch(Vec2::new(0.0, 0.0))
 	}
 
-	pub fn stretch(pixel_size: [f32; 2]) -> Self {
+	pub fn stretch(image_size: Vec2) -> Self {
 		Self {
-			offset: [0.0; 2],
-			relative_size: [1.0; 2],
-			pixel_size,
+			transform: Affine2::IDENTITY,
+			image_size,
 		}
 	}
 
-	pub fn fit(window_size: [f32; 2], image_size: [f32; 2]) -> Self {
-		let ratios = [image_size[0] / window_size[0], image_size[1] / window_size[1]];
+	pub fn fit(window_size: Vec2, image_size: Vec2) -> Self {
+		let ratios = image_size / window_size;
 
 		let w;
 		let h;
@@ -459,24 +482,97 @@ impl WindowUniforms {
 			h = 1.0;
 		}
 
+		let transform = Affine2::from_scale_angle_translation(Vec2::new(w, h), 0.0, 0.5 * Vec2::new(1.0 - w, 1.0 - h));
 		Self {
-			offset: [0.5 - 0.5 * w, 0.5 - 0.5 * h],
-			relative_size: [w, h],
-			pixel_size: image_size,
+			transform,
+			image_size,
 		}
 	}
 
-	/// Set the zoom of the image.
-	pub fn set_zoom(mut self, zoom: f32) -> Self {
-		self.relative_size = [zoom * self.relative_size[0], zoom * self.relative_size[1]] ;
+	/// Pre-apply a transformation.
+	pub fn pre_apply_transform(mut self, transform: Affine2) -> Self {
+		self.transform = transform * self.transform;
 		self
 	}
+}
 
-	/// Set the pan of the image.
-	/// This determines how much the image is translated along each axis.
-	/// A positive X value moves the image to the right and positive Y value moves it down.
-	pub fn set_translation(mut self, translate: [f32; 2]) -> Self {
-		self.offset = [self.offset[0] + translate[0], self.offset[1] + translate[1]];
-		self
+#[repr(C, align(8))]
+#[derive(Debug, Copy, Clone)]
+struct Vec2A8 {
+	pub x: f32,
+	pub y: f32,
+}
+
+#[repr(C, align(16))]
+#[derive(Debug, Copy, Clone)]
+struct Vec2A16 {
+	pub x: f32,
+	pub y: f32,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct Mat3x2 {
+	pub cols: [Vec2A16; 3]
+}
+
+impl Vec2A8 {
+	pub const fn new(x: f32, y: f32) -> Self {
+		Self { x, y }
+	}
+}
+
+impl Vec2A16 {
+	pub const fn new(x: f32, y: f32) -> Self {
+		Self { x, y }
+	}
+}
+
+impl Mat3x2 {
+	pub const fn new(col0: Vec2A16, col1: Vec2A16, col2: Vec2A16) -> Self {
+		Self {
+			cols: [col0, col1, col2],
+		}
+	}
+}
+
+impl From<Vec2> for Vec2A8 {
+	fn from(other: Vec2) -> Self {
+		Self::new(other.x, other.y)
+	}
+}
+
+impl From<Vec2> for Vec2A16 {
+	fn from(other: Vec2) -> Self {
+		Self::new(other.x, other.y)
+	}
+}
+
+impl From<Affine2> for Mat3x2 {
+	fn from(other: Affine2) -> Self {
+		Self::new(
+			other.matrix2.x_axis.into(),
+			other.matrix2.y_axis.into(),
+			other.translation.into(),
+		)
+	}
+}
+
+/// Window specific unfiforms, layout compatible with glsl std140.
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct WindowUniformsStd140 {
+	transform: Mat3x2,
+	image_size: Vec2A8,
+}
+
+unsafe impl crate::backend::util::ToStd140 for WindowUniforms {
+	type Output = WindowUniformsStd140;
+
+	fn to_std140(&self) -> Self::Output {
+		Self::Output {
+			transform: self.transform.into(),
+			image_size: self.image_size.into(),
+		}
 	}
 }
