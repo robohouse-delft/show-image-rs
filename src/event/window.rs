@@ -264,6 +264,9 @@ pub struct WindowMouseMoveEvent {
 	/// The new position of the cursor in physical pixels, relative to the top-left corner of the window.
 	pub position: PhysicalPosition<f64>,
 
+	/// The position of the mouse cursor before the last movement.
+	pub prev_position: PhysicalPosition<f64>,
+
 	/// The pressed state of all mouse buttons.
 	pub buttons: MouseButtonState,
 
@@ -289,8 +292,8 @@ pub struct WindowMouseButtonEvent {
 	/// The current position of the mouse cursor inside the window.
 	pub position: PhysicalPosition<f64>,
 
-	/// The position of the mouse cursor before it was moved.
-	pub previous_position: Option<PhysicalPosition<f64>>,
+	/// The position of the mouse cursor before the last movement.
+	pub prev_position: PhysicalPosition<f64>,
 
 	/// The pressed state of all mouse buttons.
 	pub buttons: MouseButtonState,
@@ -316,9 +319,6 @@ pub struct WindowMouseWheelEvent {
 
 	/// The current position of the mouse cursor inside the window.
 	pub position: Option<PhysicalPosition<f64>>,
-
-	/// The position of the mouse cursor before it was moved.
-	pub previous_position: Option<PhysicalPosition<f64>>,
 
 	/// The pressed state of all mouse buttons.
 	pub buttons: MouseButtonState,

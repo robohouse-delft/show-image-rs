@@ -5,6 +5,8 @@ v0.9.0:
   * Rename `show_overlays` property to `overlays_visible`.
   * Fix interpretation of `tch::Tensor` with planar data.
   * Add user configurable image transformation.
+  * Add `prev_position` to `MouseMoveEvent`.
+  * Add `position` and `prev_position` to `MouseButtonEvent`.
 
 v0.8.5:
   * Update to wgpu `0.9` and winit `0.25`.

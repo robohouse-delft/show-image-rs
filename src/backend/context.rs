@@ -621,13 +621,10 @@ impl Context {
 			},
 			Event::WindowEvent(WindowEvent::MouseMove(event)) => {
 				if event.buttons.is_pressed(event::MouseButton::Left) {
-					let current_position = self.mouse_cache.get_position(event.window_id, event.device_id).unwrap_or_else(|| [0.0, 0.0].into());
-					let prev_position = self.mouse_cache.get_previous_position(event.window_id, event.device_id).unwrap_or_else(|| [0.0, 0.0].into());
-
 					let _ = self.pan_window(
 						event.window_id,
-						(current_position.x - prev_position.x) as f32,
-						(current_position.y - prev_position.y) as f32,
+						(event.position.x - event.prev_position.x) as f32,
+						(event.position.y - event.prev_position.y) as f32,
 					);
 				}
 			},

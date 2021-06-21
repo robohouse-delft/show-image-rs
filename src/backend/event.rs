@@ -96,6 +96,7 @@ pub fn convert_winit_window_event(
 				window_id,
 				device_id,
 				position,
+				prev_position: mouse_cache.get_prev_position(window_id, device_id).unwrap_or(position),
 				modifiers,
 				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 			}
@@ -123,7 +124,6 @@ pub fn convert_winit_window_event(
 				delta,
 				phase,
 				position: mouse_cache.get_position(window_id, device_id),
-				previous_position: mouse_cache.get_previous_position(window_id, device_id),
 				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 				modifiers,
 			}
@@ -134,19 +134,20 @@ pub fn convert_winit_window_event(
 			state,
 			button,
 			modifiers,
-		} => Some(
-			event::WindowMouseButtonEvent {
+		} => {
+			let position = mouse_cache.get_position(window_id, device_id)?;
+			let prev_position = mouse_cache.get_prev_position(window_id, device_id).unwrap_or(position);
+			Some(event::WindowMouseButtonEvent {
 				window_id,
 				device_id,
 				button: button.into(),
 				state: state.into(),
-				position: mouse_cache.get_position(window_id, device_id).unwrap_or_else(|| [-1.0, -1.0].into()),
-				previous_position: mouse_cache.get_previous_position(window_id, device_id),
+				position,
+				prev_position,
 				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 				modifiers,
-			}
-			.into(),
-		),
+			}.into())
+		},
 		W::TouchpadPressure {
 			device_id,
 			pressure,
