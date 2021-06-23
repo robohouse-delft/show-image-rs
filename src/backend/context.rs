@@ -618,9 +618,9 @@ impl Context {
 				false
 			} else {
 				let context_handle = ContextHandle::new(self, event_loop);
-				let mut window_handle = WindowHandle::new(context_handle, window_index);
+				let window_handle = WindowHandle::new(context_handle, window_index);
 				let mut control = EventHandlerControlFlow::default();
-				(handler)(&mut window_handle, event, &mut control);
+				(handler)(window_handle, event, &mut control);
 				stop_propagation = control.stop_propagation;
 				!control.remove_handler
 			}

@@ -12,7 +12,7 @@ use crate::WindowProxy;
 use glam::{Affine2, Vec2};
 
 /// Internal shorthand for window event handlers.
-type DynWindowEventHandler = dyn FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow);
+type DynWindowEventHandler = dyn FnMut(WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow);
 
 /// Window capable of displaying images using wgpu.
 pub struct Window {
@@ -244,7 +244,7 @@ impl<'a> WindowHandle<'a> {
 	/// Add an event handler to the window.
 	pub fn add_event_handler<F>(&mut self, handler: F)
 	where
-		F: 'static + FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
+		F: 'static + FnMut(WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow),
 	{
 		self.window_mut().event_handlers.push(Box::new(handler))
 	}
@@ -592,7 +592,7 @@ unsafe impl crate::backend::util::ToStd140 for WindowUniforms {
 }
 
 /// Event handler that implements the default controls.
-pub(super) fn default_controls_handler(window: &mut WindowHandle, event: &mut crate::event::WindowEvent, _control_flow: &mut crate::event::EventHandlerControlFlow) {
+pub(super) fn default_controls_handler(mut window: WindowHandle, event: &mut crate::event::WindowEvent, _control_flow: &mut crate::event::EventHandlerControlFlow) {
 	match event {
 		WindowEvent::MouseWheel(event) => {
 			let delta = match event.delta {

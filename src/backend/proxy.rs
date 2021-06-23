@@ -76,7 +76,7 @@ impl ContextProxy {
 	/// This function will panic if called from within the context thread.
 	pub fn add_window_event_handler<F>(&self, window_id: WindowId, handler: F) -> Result<(), InvalidWindowId>
 	where
-		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
+		F: FnMut(WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
 		self.run_function_wait(move |context| {
 			let mut window = context.window(window_id)?;
@@ -270,7 +270,7 @@ impl WindowProxy {
 	/// This function will panic if called from within the context thread.
 	pub fn add_event_handler<F>(&self, handler: F) -> Result<(), InvalidWindowId>
 	where
-		F: FnMut(&mut WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
+		F: FnMut(WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow) + Send + 'static,
 	{
 		self.context_proxy.add_window_event_handler(self.window_id, handler)
 	}
