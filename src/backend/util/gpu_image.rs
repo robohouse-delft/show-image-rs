@@ -41,10 +41,10 @@ impl GpuImage {
 
 		let uniforms = GpuImageUniforms {
 			format,
-			width: info.width,
-			height: info.height,
-			stride_x: info.stride_x,
-			stride_y: info.stride_y,
+			width: info.size.x,
+			height: info.size.y,
+			stride_x: info.stride.x,
+			stride_y: info.stride.y,
 		};
 
 		let uniforms = create_buffer_with_value(

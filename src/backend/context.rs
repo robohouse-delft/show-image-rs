@@ -290,14 +290,14 @@ impl Context {
 			.with_decorations(!options.borderless);
 
 		if let Some(size) = options.size {
-			let size = winit::dpi::PhysicalSize::new(size[0], size[1]);
-			window = window.with_inner_size(size);
+			window = window.with_inner_size(winit::dpi::PhysicalSize::new(size[0], size[1]));
 		}
 
 		let window = window.build(event_loop)?;
 
 		let surface = unsafe { self.instance.create_surface(&window) };
-		let swap_chain = create_swap_chain(window.inner_size(), &surface, self.swap_chain_format, &self.device);
+		let size = glam::UVec2::new(window.inner_size().width, window.inner_size().height);
+		let swap_chain = create_swap_chain(size, &surface, self.swap_chain_format, &self.device);
 		let uniforms = UniformsBuffer::from_value(&self.device, &WindowUniforms::no_image(), &self.window_bind_group_layout);
 
 		let window = Window {
@@ -339,7 +339,7 @@ impl Context {
 	}
 
 	/// Resize a window.
-	fn resize_window(&mut self, window_id: WindowId, new_size: winit::dpi::PhysicalSize<u32>) -> Result<(), InvalidWindowId> {
+	fn resize_window(&mut self, window_id: WindowId, new_size: glam::UVec2) -> Result<(), InvalidWindowId> {
 		let window = self
 			.windows
 			.iter_mut()
@@ -413,17 +413,17 @@ impl Context {
 			None => return Ok(None),
 		};
 
-		let bytes_per_row = align_next_u32(image.info().width * 4, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
+		let bytes_per_row = align_next_u32(image.info().size.x * 4, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
 
 		let size = wgpu::Extent3d {
 			width: div_round_up(bytes_per_row, 4),
-			height: image.info().height,
+			height: image.info().size.y,
 			depth_or_array_layers: 1,
 		};
 
 		let window_uniforms = WindowUniforms {
 			transform: Affine2::IDENTITY,
-			image_size: glam::UVec2::new(image.info().width, image.info().height).as_f32(),
+			image_size: image.info().size.as_f32(),
 		};
 		let window_uniforms = UniformsBuffer::from_value(&self.device, &window_uniforms, &self.window_bind_group_layout);
 
@@ -466,7 +466,7 @@ impl Context {
 
 		let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
 			label: None,
-			size: u64::from(bytes_per_row) * u64::from(image.info().height),
+			size: u64::from(bytes_per_row) * u64::from(image.info().size.y),
 			usage: wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
 			mapped_at_creation: false,
 		});
@@ -482,7 +482,7 @@ impl Context {
 				layout: wgpu::ImageDataLayout {
 					offset: 0,
 					bytes_per_row: NonZeroU32::new(bytes_per_row),
-					rows_per_image: NonZeroU32::new(image.info().height),
+					rows_per_image: NonZeroU32::new(image.info().size.y),
 				},
 			},
 			size,
@@ -493,10 +493,8 @@ impl Context {
 		let view = super::util::map_buffer(&self.device, buffer.slice(..)).unwrap();
 		let info = crate::ImageInfo {
 			pixel_format: crate::PixelFormat::Rgba8(crate::Alpha::Unpremultiplied),
-			width: image.info().width,
-			height: image.info().height,
-			stride_x: 4,
-			stride_y: bytes_per_row,
+			size: image.info().size,
+			stride: glam::UVec2::new(4, bytes_per_row),
 		};
 		let data: Box<[u8]> = Box::from(&view[..]);
 		Ok(Some((image.name().to_string(), crate::BoxImage::new(info, data))))
@@ -560,7 +558,7 @@ impl Context {
 				}
 			},
 			Event::WindowEvent(WindowEvent::Resized(event)) => {
-				if event.size.width > 0 && event.size.height > 0 {
+				if event.size.x > 0 && event.size.y > 0 {
 					let _ = self.resize_window(event.window_id, event.size);
 				}
 			},
@@ -676,7 +674,7 @@ impl Context {
 				Some(x) => x,
 				_ => return,
 			};
-			if let Err(e) = crate::save_rgba8_image(&path, image.data(), info.width, info.height, info.stride_y) {
+			if let Err(e) = crate::save_rgba8_image(&path, image.data(), info.size, info.stride.y) {
 				log::error!("failed to save image to {}: {}", path, e);
 			}
 		});
@@ -693,7 +691,7 @@ impl Context {
 		let info = image.info();
 		let name = format!("{}.png", name);
 		self.run_background_task(move || {
-			if let Err(e) = crate::save_rgba8_image(&name, image.data(), info.width, info.height, info.stride_y) {
+			if let Err(e) = crate::save_rgba8_image(&name, image.data(), info.size, info.stride.y) {
 				log::error!("failed to save image to {}: {}", name, e);
 			}
 		});
@@ -879,7 +877,7 @@ fn create_render_pipeline(
 
 /// Create a swap chain for a surface.
 fn create_swap_chain(
-	size: winit::dpi::PhysicalSize<u32>,
+	size: glam::UVec2,
 	surface: &wgpu::Surface,
 	format: wgpu::TextureFormat,
 	device: &wgpu::Device,
@@ -887,8 +885,8 @@ fn create_swap_chain(
 	let swap_chain_desc = wgpu::SwapChainDescriptor {
 		usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
 		format,
-		width: size.width,
-		height: size.height,
+		width: size.x,
+		height: size.y,
 		present_mode: wgpu::PresentMode::Mailbox,
 	};
 

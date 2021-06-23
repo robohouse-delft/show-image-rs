@@ -166,18 +166,20 @@ impl<'a> WindowHandle<'a> {
 		self.window().window.request_redraw();
 	}
 
-	/// Get the inner size of the window in pixels.
+	/// Get the inner size of the window in physical pixels.
 	///
 	/// This returns the size of the window contents, excluding borders, the title bar and other decorations.
-	pub fn inner_size(&self) -> [u32; 2] {
-		self.window().window.inner_size().into()
+	pub fn inner_size(&self) -> glam::UVec2 {
+		let size = self.window().window.inner_size();
+		glam::UVec2::new(size.width, size.height)
 	}
 
-	/// Get the outer size of the window in pixel.
+	/// Get the outer size of the window in physical pixels.
 	///
 	/// This returns the size of the entire window, including borders, the title bar and other decorations.
-	pub fn outer_size(&self) -> [u32; 2] {
-		self.window().window.outer_size().into()
+	pub fn outer_size(&self) -> glam::UVec2 {
+		let size = self.window().window.outer_size();
+		glam::UVec2::new(size.width, size.height)
 	}
 
 	/// Set the inner size of the window in pixels.
@@ -441,7 +443,7 @@ impl Window {
 	/// Recalculate the uniforms for the render pipeline from the window state.
 	pub fn calculate_uniforms(&self) -> WindowUniforms {
 		if let Some(image) = &self.image {
-			let image_size = glam::UVec2::new(image.info().width, image.info().height).as_f32();
+			let image_size = image.info().size.as_f32();
 			if !self.preserve_aspect_ratio {
 				WindowUniforms::stretch(image_size)
 					.pre_apply_transform(self.user_transform)
@@ -599,24 +601,16 @@ pub(super) fn default_controls_handler(window: &mut WindowHandle, event: &mut cr
 			};
 			let scale = 1.1f32.powf(delta);
 
-			let size = glam::UVec2::from(window.inner_size()).as_f32();
-			let origin;
-			if let Some(position) = &event.position {
-				origin = glam::DVec2::new(position.x, position.y).as_f32() / size;
-			} else {
-				origin = glam::Vec2::new(0.5, 0.5);
-			}
+			let origin = event.position
+				.map(|pos| pos / window.inner_size().as_f32())
+				.unwrap_or_else(|| glam::Vec2::new(0.5, 0.5));
 			let transform = glam::Affine2::from_scale_angle_translation(glam::Vec2::splat(scale), 0.0, origin - scale * origin);
 			window.pre_apply_transform(transform);
 		},
 		WindowEvent::MouseMove(event) => {
 			if event.buttons.is_pressed(crate::event::MouseButton::Left) {
-
-				let size = window.inner_size();
-				window.pre_apply_transform(Affine2::from_translation(Vec2::new(
-					(event.position.x - event.prev_position.x) as f32 / size[0] as f32,
-					(event.position.y - event.prev_position.y) as f32 / size[1] as f32,
-				)));
+				let translation = (event.position - event.prev_position) / window.inner_size().as_f32();
+				window.pre_apply_transform(Affine2::from_translation(translation));
 			}
 		},
 		_ => (),

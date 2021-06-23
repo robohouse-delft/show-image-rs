@@ -1,5 +1,4 @@
 use winit::event::{ElementState, Event, WindowEvent, DeviceEvent, DeviceId};
-use winit::dpi::PhysicalPosition;
 use std::collections::BTreeMap;
 
 use crate::WindowId;
@@ -8,16 +7,16 @@ use crate::event::MouseButtonState;
 #[derive(Default)]
 pub struct MouseCache {
 	mouse_buttons: BTreeMap<DeviceId, MouseButtonState>,
-	mouse_position: BTreeMap<(WindowId, DeviceId), PhysicalPosition<f64>>,
-	mouse_prev_position: BTreeMap<(WindowId, DeviceId), PhysicalPosition<f64>>,
+	mouse_position: BTreeMap<(WindowId, DeviceId), glam::Vec2>,
+	mouse_prev_position: BTreeMap<(WindowId, DeviceId), glam::Vec2>,
 }
 
 impl MouseCache {
-	pub fn get_position(&self, window_id: WindowId, device_id: DeviceId) -> Option<PhysicalPosition<f64>> {
+	pub fn get_position(&self, window_id: WindowId, device_id: DeviceId) -> Option<glam::Vec2> {
 		self.mouse_position.get(&(window_id, device_id)).copied()
 	}
 
-	pub fn get_prev_position(&self, window_id: WindowId, device_id: DeviceId) -> Option<PhysicalPosition<f64>> {
+	pub fn get_prev_position(&self, window_id: WindowId, device_id: DeviceId) -> Option<glam::Vec2> {
 		self.mouse_prev_position.get(&(window_id, device_id)).copied()
 	}
 
@@ -43,7 +42,7 @@ impl MouseCache {
 				let cached_position = self.mouse_position.entry((window_id, *device_id)).or_insert_with(|| [0.0, 0.0].into());
 				let cached_prev_position = self.mouse_prev_position.entry((window_id, *device_id)).or_insert_with(|| [0.0, 0.0].into());
 				*cached_prev_position = *cached_position;
-				*cached_position = *position;
+				*cached_position = glam::DVec2::new(position.x, position.y).as_f32();
 			},
 			_ => {},
 		}

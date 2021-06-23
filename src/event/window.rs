@@ -6,8 +6,6 @@ use super::ModifiersState;
 use super::MouseButton;
 use super::MouseButtonState;
 use super::MouseScrollDelta;
-use super::PhysicalPosition;
-use super::PhysicalSize;
 use super::Theme;
 use super::Touch;
 use super::TouchPhase;
@@ -129,7 +127,7 @@ pub struct WindowResizedEvent {
 	pub window_id: WindowId,
 
 	/// The new size of the window in physical pixels.
-	pub size: PhysicalSize<u32>,
+	pub size: glam::UVec2,
 }
 
 /// A window was moved.
@@ -139,7 +137,7 @@ pub struct WindowMovedEvent {
 	pub window_id: WindowId,
 
 	/// The new position of the window in physical pixels.
-	pub position: PhysicalPosition<i32>,
+	pub position: glam::IVec2,
 }
 
 /// A window was closed.
@@ -262,10 +260,10 @@ pub struct WindowMouseMoveEvent {
 	pub device_id: DeviceId,
 
 	/// The new position of the cursor in physical pixels, relative to the top-left corner of the window.
-	pub position: PhysicalPosition<f64>,
+	pub position: glam::Vec2,
 
 	/// The position of the mouse cursor before the last movement.
-	pub prev_position: PhysicalPosition<f64>,
+	pub prev_position: glam::Vec2,
 
 	/// The pressed state of all mouse buttons.
 	pub buttons: MouseButtonState,
@@ -290,10 +288,10 @@ pub struct WindowMouseButtonEvent {
 	pub state: ElementState,
 
 	/// The current position of the mouse cursor inside the window.
-	pub position: PhysicalPosition<f64>,
+	pub position: glam::Vec2,
 
 	/// The position of the mouse cursor before the last movement.
-	pub prev_position: PhysicalPosition<f64>,
+	pub prev_position: glam::Vec2,
 
 	/// The pressed state of all mouse buttons.
 	pub buttons: MouseButtonState,
@@ -318,7 +316,7 @@ pub struct WindowMouseWheelEvent {
 	pub phase: TouchPhase,
 
 	/// The current position of the mouse cursor inside the window.
-	pub position: Option<PhysicalPosition<f64>>,
+	pub position: Option<glam::Vec2>,
 
 	/// The pressed state of all mouse buttons.
 	pub buttons: MouseButtonState,

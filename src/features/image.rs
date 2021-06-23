@@ -116,10 +116,11 @@ where
 {
 	Ok(ImageInfo {
 		pixel_format: pixel_format::<P>()?,
-		width: image.width(),
-		height: image.height(),
-		stride_x: image.sample_layout().width_stride as u32,
-		stride_y: image.sample_layout().height_stride as u32,
+		size: glam::UVec2::new(image.width(), image.height()),
+		stride: glam::UVec2::new(
+			image.sample_layout().width_stride as u32,
+			image.sample_layout().height_stride as u32,
+		),
 	})
 }
 
