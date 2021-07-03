@@ -126,7 +126,7 @@ impl<'a> WindowHandle<'a> {
 
 	/// Destroy the window.
 	///
-	/// Any subsequent operation on the window throuw an existing [`WindowProxy`] will return [`InvalidWindowId`](crate::error::InvalidWindowId).
+	/// Any subsequent operation on the window through an existing [`WindowProxy`] will return [`InvalidWindowId`](crate::error::InvalidWindowId).
 	pub fn destroy(self) -> ContextHandle<'a> {
 		let WindowHandle { context_handle, index } = self;
 		context_handle.context.windows.remove(index);
