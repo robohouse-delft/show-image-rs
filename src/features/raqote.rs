@@ -22,7 +22,7 @@ impl From<raqote::DrawTarget> for Image {
 
 impl From<&raqote::DrawTarget> for Image {
 	fn from(other: &raqote::DrawTarget) -> Self {
-		let info = match draw_target_info(&other) {
+		let info = match draw_target_info(other) {
 			Ok(x) => x,
 			Err(e) => return Image::Invalid(e),
 		};

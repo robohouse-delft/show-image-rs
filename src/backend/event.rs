@@ -33,7 +33,7 @@ pub fn convert_winit_device_event(
 		W::Removed => event::DeviceRemovedEvent { device_id }.into(),
 		W::MouseMotion { delta } => event::DeviceMouseMotionEvent {
 			device_id,
-			delta: [delta.0, delta.1],
+			delta: glam::DVec2::new(delta.0, delta.1).as_f32(),
 		}
 		.into(),
 		W::MouseWheel { delta } => event::DeviceMouseWheelEvent { device_id, delta }.into(),
@@ -63,8 +63,8 @@ pub fn convert_winit_window_event(
 
 	#[allow(deprecated)]
 	match event {
-		W::Resized(size) => Some(event::WindowResizedEvent { window_id, size }.into()),
-		W::Moved(position) => Some(event::WindowMovedEvent { window_id, position }.into()),
+		W::Resized(size) => Some(event::WindowResizedEvent { window_id, size: glam::UVec2::new(size.width, size.height) }.into()),
+		W::Moved(position) => Some(event::WindowMovedEvent { window_id, position: glam::IVec2::new(position.x, position.y) }.into()),
 		W::CloseRequested => Some(event::WindowCloseRequestedEvent { window_id }.into()),
 		W::Destroyed => Some(event::WindowDestroyedEvent { window_id }.into()),
 		W::DroppedFile(file) => Some(event::WindowDroppedFileEvent { window_id, file }.into()),
@@ -91,16 +91,17 @@ pub fn convert_winit_window_event(
 			device_id,
 			position,
 			modifiers,
-		} => Some(
-			event::WindowMouseMoveEvent {
+		} => {
+			let position = glam::DVec2::new(position.x, position.y).as_f32();
+			Some(event::WindowMouseMoveEvent {
 				window_id,
 				device_id,
 				position,
+				prev_position: mouse_cache.get_prev_position(window_id, device_id).unwrap_or(position),
 				modifiers,
 				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
-			}
-			.into(),
-		),
+			}.into())
+		},
 		W::CursorEntered { device_id } => Some(event::WindowMouseEnterEvent {
 			window_id,
 			device_id,
@@ -123,7 +124,6 @@ pub fn convert_winit_window_event(
 				delta,
 				phase,
 				position: mouse_cache.get_position(window_id, device_id),
-				previous_position: mouse_cache.get_previous_position(window_id, device_id),
 				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 				modifiers,
 			}
@@ -134,19 +134,20 @@ pub fn convert_winit_window_event(
 			state,
 			button,
 			modifiers,
-		} => Some(
-			event::WindowMouseButtonEvent {
+		} => {
+			let position = mouse_cache.get_position(window_id, device_id)?;
+			let prev_position = mouse_cache.get_prev_position(window_id, device_id).unwrap_or(position);
+			Some(event::WindowMouseButtonEvent {
 				window_id,
 				device_id,
 				button: button.into(),
 				state: state.into(),
-				position: mouse_cache.get_position(window_id, device_id).unwrap_or_else(|| [-1.0, -1.0].into()),
-				previous_position: mouse_cache.get_previous_position(window_id, device_id),
+				position,
+				prev_position,
 				buttons: mouse_cache.get_buttons(device_id).cloned().unwrap_or_default(),
 				modifiers,
-			}
-			.into(),
-		),
+			}.into())
+		},
 		W::TouchpadPressure {
 			device_id,
 			pressure,

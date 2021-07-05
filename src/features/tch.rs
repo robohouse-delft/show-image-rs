@@ -167,8 +167,8 @@ pub trait TensorAsImage {
 impl TensorAsImage for tch::Tensor {
 	fn as_image(&self, pixel_format: TensorPixelFormat) -> Result<TensorImage, ImageDataError> {
 		let (planar, info) = match pixel_format {
-			TensorPixelFormat::Planar(pixel_format) => tensor_info(self, pixel_format, true)?,
-			TensorPixelFormat::Interlaced(pixel_format) => tensor_info(self, pixel_format, false)?,
+			TensorPixelFormat::Planar(pixel_format) => (true, tensor_info(self, pixel_format, true)?),
+			TensorPixelFormat::Interlaced(pixel_format) => (false, tensor_info(self, pixel_format, false)?),
 			TensorPixelFormat::Guess(color_format) => guess_tensor_info(self, color_format)?,
 		};
 		Ok(TensorImage {
@@ -200,7 +200,8 @@ impl<'a> From<Result<TensorImage<'a>, ImageDataError>> for Image {
 }
 
 /// Compute the image info of a tensor, given a known pixel format.
-fn tensor_info(tensor: &tch::Tensor, pixel_format: PixelFormat, planar: bool) -> Result<(bool, ImageInfo), String> {
+#[allow(clippy::branches_sharing_code)] // Stop lying, clippy.
+fn tensor_info(tensor: &tch::Tensor, pixel_format: PixelFormat, planar: bool) -> Result<ImageInfo, String> {
 	let expected_channels = pixel_format.channels();
 	let dimensions = tensor.dim();
 
@@ -211,19 +212,19 @@ fn tensor_info(tensor: &tch::Tensor, pixel_format: PixelFormat, planar: bool) ->
 			if channels != i64::from(expected_channels) {
 				Err(format!("expected shape ({}, height, width), found {:?}", expected_channels, shape))
 			} else {
-				Ok((false, ImageInfo::new(pixel_format, width as u32, height as u32)))
+				Ok(ImageInfo::new(pixel_format, width as u32, height as u32))
 			}
 		} else {
 			let (height, width, channels) = shape;
 			if channels != i64::from(expected_channels) {
 				Err(format!("expected shape (height, width, {}), found {:?}", expected_channels, shape))
 			} else {
-				Ok((false, ImageInfo::new(pixel_format, width as u32, height as u32)))
+				Ok(ImageInfo::new(pixel_format, width as u32, height as u32))
 			}
 		}
 	} else if dimensions == 2 && expected_channels == 1 {
 		let (height, width) = tensor.size2().unwrap();
-		Ok((false, ImageInfo::new(pixel_format, width as u32, height as u32)))
+		Ok(ImageInfo::new(pixel_format, width as u32, height as u32))
 	} else {
 		Err(format!(
 			"wrong number of dimensions ({}) for format ({:?})",

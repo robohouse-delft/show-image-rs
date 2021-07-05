@@ -114,13 +114,14 @@ fn main() -> Result<(), String> {
 	let image: Image = image.into();
 	let image_view = image.as_image_view().map_err(|x| x.to_string())?;
 	println!("{:#?}", image_view.info());
-
-	let window = show_image::create_window("image", Default::default()).map_err(|e| e.to_string())?;
 	let overlay: show_image::Image = overlay.into();
-	window.run_function_wait(move |window| {
-		window.set_image("mondriaan", &image)?;
-		window.add_overlay("overlay", &overlay)
-	}).map_err(|e| e.to_string())?;
+
+	let window = show_image::context().run_function_wait(move |context| -> Result<_, String> {
+		let mut window = context.create_window("image", Default::default()).map_err(|e| e.to_string())?;
+		window.set_image("mondriaan", &image.as_image_view().map_err(|e| e.to_string())?);
+		window.add_overlay("overlay", &overlay.as_image_view().map_err(|e| e.to_string())?);
+		Ok(window.proxy())
+	})?;
 
 	// Wait for the window to be closed or Escape to be pressed.
 	for event in window.event_channel().map_err(|e| e.to_string())? {
@@ -133,10 +134,9 @@ fn main() -> Result<(), String> {
 				break;
 			} else if event.input.key_code == Some(VirtualKeyCode::O) && event.input.modifiers == ModifiersState::CTRL {
 				println!("Ctrl+O pressed, toggling overlay");
-				window.run_function_wait(|window| {
-					window.set_options(|options| options.clone().set_show_overlays(!options.show_overlays))
-				})
-				.map_err(|e| e.to_string())?;
+				window.run_function_wait(|mut window| {
+					window.set_overlays_visible(!window.overlays_visible());
+				}).map_err(|e| e.to_string())?;
 			}
 		}
 	}

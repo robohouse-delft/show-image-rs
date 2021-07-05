@@ -1,5 +1,13 @@
 use super::buffer::create_buffer_with_value;
 
+pub unsafe trait ToStd140 {
+	type Output: Copy;
+
+	const STD140_SIZE: u64 = std::mem::size_of::<Self::Output>() as u64;
+
+	fn to_std140(&self) -> Self::Output;
+}
+
 /// A buffer holding uniform data and matching bind group.
 ///
 /// The buffer can be marked as dirty to indicate the contents need to be updated.
@@ -12,12 +20,12 @@ pub struct UniformsBuffer<T> {
 	_phantom: std::marker::PhantomData<fn(&T)>,
 }
 
-impl<T> UniformsBuffer<T> {
+impl<T: ToStd140> UniformsBuffer<T> {
 	/// Create a new UniformsBuffer from the given value and bind group layout.
 	///
 	/// The bind group layout must have exactly 1 binding for a buffer at index 0.
 	pub fn from_value(device: &wgpu::Device, value: &T, layout: &wgpu::BindGroupLayout) -> Self {
-		let buffer = create_buffer_with_value(device, None, value, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST);
+		let buffer = create_buffer_with_value(device, None, &value.to_std140(), wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST);
 		let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
 			label: Some("uniforms_bind_group"),
 			layout,
@@ -56,8 +64,8 @@ impl<T> UniformsBuffer<T> {
 
 	/// Update the buffer contents using the provided command encoder and clear the dirty flag.
 	pub fn update_from(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, value: &T) {
-		let buffer = create_buffer_with_value(device, None, value, wgpu::BufferUsage::COPY_SRC);
-		encoder.copy_buffer_to_buffer(&buffer, 0, &self.buffer, 0, std::mem::size_of::<T>() as wgpu::BufferAddress);
+		let buffer = create_buffer_with_value(device, None, &value.to_std140(), wgpu::BufferUsage::COPY_SRC);
+		encoder.copy_buffer_to_buffer(&buffer, 0, &self.buffer, 0, T::STD140_SIZE as wgpu::BufferAddress);
 		self.mark_dirty(false);
 	}
 }

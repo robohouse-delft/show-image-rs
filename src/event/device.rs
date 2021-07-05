@@ -62,8 +62,8 @@ pub struct DeviceMouseMotionEvent {
 	/// The ID of the device.
 	pub device_id: DeviceId,
 
-	/// The relative motion as `[x, y]`.
-	pub delta: [f64; 2],
+	/// The relative motion.
+	pub delta: glam::Vec2,
 }
 
 /// The scroll-wheel of a mouse was moved.

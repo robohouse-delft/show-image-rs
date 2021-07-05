@@ -3,10 +3,6 @@
 pub use device::*;
 pub use window::*;
 
-pub use winit::dpi::LogicalPosition;
-pub use winit::dpi::LogicalSize;
-pub use winit::dpi::PhysicalPosition;
-pub use winit::dpi::PhysicalSize;
 pub use winit::event::AxisId;
 pub use winit::event::ButtonId;
 pub use winit::event::DeviceId;

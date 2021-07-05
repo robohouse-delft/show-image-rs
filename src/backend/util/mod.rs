@@ -10,4 +10,4 @@ pub use gpu_image::GpuImageUniforms;
 pub use map_buffer::map_buffer;
 pub use map_buffer::map_buffer_mut;
 pub use retain_mut::RetainMut;
-pub use uniforms_buffer::UniformsBuffer;
+pub use uniforms_buffer::{ToStd140, UniformsBuffer};

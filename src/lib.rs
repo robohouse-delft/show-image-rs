@@ -135,6 +135,8 @@ pub use self::rectangle::Rectangle;
 pub use winit;
 pub use winit::window::WindowId;
 
+pub use glam;
+
 /// An RGBA color.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Color {
@@ -184,28 +186,27 @@ pub use show_image_macros::main;
 fn save_rgba8_image(
 	path: impl AsRef<std::path::Path>,
 	data: &[u8],
-	width: u32,
-	height: u32,
+	size: glam::UVec2,
 	row_stride: u32,
 ) -> Result<(), error::SaveImageError> {
 	let path = path.as_ref();
 
 	let file = std::fs::File::create(path)?;
 
-	let mut encoder = png::Encoder::new(file, width, height);
+	let mut encoder = png::Encoder::new(file, size.x, size.y);
 	encoder.set_color(png::ColorType::RGBA);
 	encoder.set_depth(png::BitDepth::Eight);
 
 	let mut writer = encoder.write_header()?;
 
-	if row_stride == width * 4 {
+	if row_stride == size.x * 4 {
 		Ok(writer.write_image_data(data)?)
 	} else {
 		use std::io::Write;
 
 		let mut writer = writer.into_stream_writer();
 		for row in data.chunks(row_stride as usize) {
-			let row = &row[..width as usize * 4];
+			let row = &row[..size.x as usize * 4];
 			writer.write_all(row)?;
 		}
 		writer.finish()?;

@@ -1,5 +1,4 @@
 use winit::event::{ElementState, Event, WindowEvent, DeviceEvent, DeviceId};
-use winit::dpi::PhysicalPosition;
 use std::collections::BTreeMap;
 
 use crate::WindowId;
@@ -8,17 +7,17 @@ use crate::event::MouseButtonState;
 #[derive(Default)]
 pub struct MouseCache {
 	mouse_buttons: BTreeMap<DeviceId, MouseButtonState>,
-	mouse_position: BTreeMap<(WindowId, DeviceId), PhysicalPosition<f64>>,
-	mouse_previous_position: BTreeMap<(WindowId, DeviceId), PhysicalPosition<f64>>,
+	mouse_position: BTreeMap<(WindowId, DeviceId), glam::Vec2>,
+	mouse_prev_position: BTreeMap<(WindowId, DeviceId), glam::Vec2>,
 }
 
 impl MouseCache {
-	pub fn get_position(&self, window_id: WindowId, device_id: DeviceId) -> Option<PhysicalPosition<f64>> {
+	pub fn get_position(&self, window_id: WindowId, device_id: DeviceId) -> Option<glam::Vec2> {
 		self.mouse_position.get(&(window_id, device_id)).copied()
 	}
 
-	pub fn get_previous_position(&self, window_id: WindowId, device_id: DeviceId) -> Option<PhysicalPosition<f64>> {
-		self.mouse_previous_position.get(&(window_id, device_id)).copied()
+	pub fn get_prev_position(&self, window_id: WindowId, device_id: DeviceId) -> Option<glam::Vec2> {
+		self.mouse_prev_position.get(&(window_id, device_id)).copied()
 	}
 
 	pub fn get_buttons(&self, device_id: DeviceId) -> Option<&MouseButtonState> {
@@ -41,9 +40,9 @@ impl MouseCache {
 			},
 			WindowEvent::CursorMoved { device_id, position, .. } => {
 				let cached_position = self.mouse_position.entry((window_id, *device_id)).or_insert_with(|| [0.0, 0.0].into());
-				let cached_previous_position = self.mouse_previous_position.entry((window_id, *device_id)).or_insert_with(|| [0.0, 0.0].into());
-				*cached_previous_position = *cached_position;
-				*cached_position = *position;
+				let cached_prev_position = self.mouse_prev_position.entry((window_id, *device_id)).or_insert_with(|| [0.0, 0.0].into());
+				*cached_prev_position = *cached_position;
+				*cached_position = glam::DVec2::new(position.x, position.y).as_f32();
 			},
 			_ => {},
 		}
@@ -59,11 +58,11 @@ impl MouseCache {
 		self.mouse_buttons.remove(&device_id);
 		let keys: Vec<_> = self.mouse_position.keys().filter(|(_, x)| *x == device_id).copied().collect();
 		for key in &keys {
-			self.mouse_position.remove(&key);
+			self.mouse_position.remove(key);
 		}
-		let keys: Vec<_> = self.mouse_previous_position.keys().filter(|(_, x)| *x == device_id).copied().collect();
+		let keys: Vec<_> = self.mouse_prev_position.keys().filter(|(_, x)| *x == device_id).copied().collect();
 		for key in &keys {
-			self.mouse_previous_position.remove(&key);
+			self.mouse_prev_position.remove(key);
 		}
 	}
 }

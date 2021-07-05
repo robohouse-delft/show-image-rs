@@ -4,17 +4,11 @@ pub struct ImageInfo {
 	/// The pixel format of the image data.
 	pub pixel_format: PixelFormat,
 
-	/// The width of the image in pixels.
-	pub width: u32,
+	/// The size of the image in pixels
+	pub size: glam::UVec2,
 
-	/// The height of the image in pixels.
-	pub height: u32,
-
-	/// The X stride of the image data in bytes.
-	pub stride_x: u32,
-
-	/// The Y stride of the image data in bytes.
-	pub stride_y: u32,
+	/// The stride of the image data in bytes for both X and Y.
+	pub stride: glam::UVec2,
 }
 
 /// Supported pixel formats.
@@ -61,10 +55,8 @@ impl ImageInfo {
 		let stride_y = stride_x * width;
 		Self {
 			pixel_format,
-			width,
-			height,
-			stride_x,
-			stride_y,
+			size: glam::UVec2::new(width, height),
+			stride: glam::UVec2::new(stride_x, stride_y),
 		}
 	}
 
@@ -115,10 +107,10 @@ impl ImageInfo {
 
 	/// Get the image size in bytes.
 	pub fn byte_size(self) -> u64 {
-		if self.stride_y >= self.stride_x {
-			u64::from(self.stride_y) * u64::from(self.height)
+		if self.stride.y >= self.stride.x {
+			u64::from(self.stride.y) * u64::from(self.size.y)
 		} else {
-			u64::from(self.stride_x) * u64::from(self.width)
+			u64::from(self.stride.x) * u64::from(self.size.x)
 		}
 	}
 }
