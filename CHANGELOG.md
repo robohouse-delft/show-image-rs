@@ -9,6 +9,7 @@ v0.9.0:
   * Add `position` and `prev_position` to `MouseButtonEvent`.
   * Add enabled-by-default mouse controls to pan and zoom images.
   * Use `glam` vectors in public API (and publicly re-export `glam`).
+  * Bump allowed `tch` version to 0.5.
 
 v0.8.5:
   * Update to wgpu `0.9` and winit `0.25`.
