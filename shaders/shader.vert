@@ -32,5 +32,5 @@ void main() {
 	position = 2.0 * position - vec2(1.0, 1.0);
 
 	gl_Position = vec4(position, 0.0, 1.0);
-	texture_coords = (image_size - vec2(1.0, 1.0)) * POSITIONS[gl_VertexIndex];
+	texture_coords = (image_size) * POSITIONS[gl_VertexIndex];
 }

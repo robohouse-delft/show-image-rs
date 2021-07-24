@@ -98,8 +98,8 @@ vec4 get_pixel(uint x, uint y) {
 }
 
 void main() {
-	uint x = uint(round(texture_coords.x));
-	uint y = uint(round(texture_coords.y));
+	uint x = uint(floor(texture_coords.x));
+	uint y = uint(floor(texture_coords.y));
 	if (x >= width || y >= height) {
 		out_color = vec4(0.0, 0.0, 0.0, 0.0);
 	} else {

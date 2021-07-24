@@ -1,3 +1,6 @@
+v0.9.1:
+  * Fix cropping image by half a pixel on all sides.
+
 v0.9.0:
   * Change `WindowHandle` API to provide more efficient access to window properties.
   * `WindowHandle` now guarantees that the referenced window is valid.
