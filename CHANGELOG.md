@@ -1,3 +1,6 @@
+v0.9.2:
+  * Fix horizontal stretching of saved images.
+
 v0.9.1:
   * Fix cropping image by half a pixel on all sides.
 

@@ -414,6 +414,7 @@ impl Context {
 		};
 
 		let bytes_per_row = align_next_u32(image.info().size.x * 4, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
+		let width_scale = image.info().size.x as f32 * 4.0 / bytes_per_row as f32;
 
 		let size = wgpu::Extent3d {
 			width: div_round_up(bytes_per_row, 4),
@@ -422,7 +423,7 @@ impl Context {
 		};
 
 		let window_uniforms = WindowUniforms {
-			transform: Affine2::IDENTITY,
+			transform: Affine2::from_scale([width_scale, 1.0].into()),
 			image_size: image.info().size.as_f32(),
 		};
 		let window_uniforms = UniformsBuffer::from_value(&self.device, &window_uniforms, &self.window_bind_group_layout);
