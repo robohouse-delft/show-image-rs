@@ -1,5 +1,4 @@
 use core::num::{NonZeroU32, NonZeroU64};
-
 use crate::backend::proxy::ContextFunction;
 use crate::backend::util::GpuImage;
 use crate::backend::util::{ToStd140, UniformsBuffer};

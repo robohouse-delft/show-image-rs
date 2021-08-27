@@ -1,3 +1,6 @@
+v0.9.3:
+  * Add 'WindowHandle::effective_transform()` to get the full transformation from image space to virtual window space.
+
 v0.9.2:
   * Fix horizontal stretching of saved images.
 

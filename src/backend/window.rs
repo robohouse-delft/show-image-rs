@@ -133,7 +133,9 @@ impl<'a> WindowHandle<'a> {
 		context_handle
 	}
 
-	/// Get the image info and the area of the window where the image is drawn.
+	/// Get the image info.
+	///
+	/// Returns [`None`] if no image is set for the window.
 	pub fn image_info(&self) -> Option<&ImageInfo> {
 		Some(self.window().image.as_ref()?.info())
 	}
@@ -254,8 +256,26 @@ impl<'a> WindowHandle<'a> {
 	/// The image transformation is applied to the image and all overlays in virtual window space.
 	///
 	/// Virtual window space goes from `(0, 0)` in the top left corner of the window to `(1, 1)` in the bottom right corner.
+	///
+	/// This transformation does not include scaling introduced by the [`Self::preserve_aspect_ratio()`] property.
+	/// Use [`Self::effective_transform()`] if you need that.
 	pub fn transform(&self) -> Affine2 {
 		self.window().user_transform
+	}
+
+	/// Get the full effective transformation from image space to virtual window space.
+	///
+	/// This transformation maps the image coordinates to virtual window coordinates.
+	/// Unlike [`Self::transform()`], this function returns a transformation that include the scaling introduced by the [`preserve_aspect_ratio()`] property.
+	/// This is useful to transform between window coordinates and image coordinates.
+	///
+	/// If no image is set on the window yet, this returns the same transformation as [`Self::transform()`].
+	///
+	/// Virtual window space goes from `(0, 0)` in the top left corner of the window to `(1, 1)` in the bottom right corner.
+	///
+	/// Note that physical pixel locations must be transformed to virtual window coordinates first.
+	pub fn effective_transform(&self) -> Affine2 {
+		self.window().calculate_uniforms().transform
 	}
 
 	/// Set the image transformation to a value.
@@ -263,6 +283,8 @@ impl<'a> WindowHandle<'a> {
 	/// The image transformation is applied to the image and all overlays in virtual window space.
 	///
 	/// Virtual window space goes from `(0, 0)` in the top left corner of the window to `(1, 1)` in the bottom right corner.
+	///
+	/// This transformation should not include any scaling related to the [`Self::preserve_aspect_ratio()`] property.
 	pub fn set_transform(&mut self, transform: Affine2) {
 		self.window_mut().user_transform = transform;
 		self.window_mut().uniforms.mark_dirty(true);
@@ -453,7 +475,10 @@ impl Window {
 					.pre_apply_transform(self.user_transform)
 			}
 		} else {
-			WindowUniforms::no_image()
+			WindowUniforms {
+				transform: self.user_transform,
+				image_size: Vec2::new(0.0, 0.0),
+			}
 		}
 	}
 }
@@ -488,11 +513,11 @@ impl WindowUniforms {
 
 		let w;
 		let h;
-		if ratios[0] >= ratios[1] {
+		if ratios.x >= ratios.y {
 			w = 1.0;
-			h = ratios[1] / ratios[0];
+			h = ratios.y / ratios.x;
 		} else {
-			w = ratios[0] / ratios[1];
+			w = ratios.x / ratios.y;
 			h = 1.0;
 		}
 
