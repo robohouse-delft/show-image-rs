@@ -51,14 +51,14 @@ impl GpuImage {
 			device,
 			Some(&format!("{}_uniforms_buffer", name)),
 			&uniforms,
-			wgpu::BufferUsage::UNIFORM,
+			wgpu::BufferUsages::UNIFORM,
 		);
 
 		use wgpu::util::DeviceExt;
 		let data = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 			label: Some(&format!("{}_image_buffer", name)),
 			contents: image.data(),
-			usage: wgpu::BufferUsage::STORAGE,
+			usage: wgpu::BufferUsages::STORAGE,
 		});
 
 		let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {

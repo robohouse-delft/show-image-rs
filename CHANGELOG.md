@@ -1,3 +1,7 @@
+# main
+  * Update to `wgpu` 0.11 and `glam` 0.20.
+  * Require `resolver="2"` or `edition="2021"` due to updated dependencies.
+
 # v0.9.5 - 2021-11-11:
   * Bump maximum `tch` version to 0.6.x.
   * Improve discoverability of `WindowProxy::run_function_wait()` in documentation.
@@ -6,7 +10,7 @@
   * Fix a black screen on macOS caused by the image transformation.
 
 # v0.9.3 - 2021-08-28:
-  * Add 'WindowHandle::effective_transform()` to get the full transformation from image space to virtual window space.
+  * Add `WindowHandle::effective_transform()` to get the full transformation from image space to virtual window space.
 
 # v0.9.2 - 2021-07-24:
   * Fix horizontal stretching of saved images.

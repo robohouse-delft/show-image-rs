@@ -12,7 +12,7 @@ layout(set = 1, binding = 0) uniform InfoBlock {
 	uint stride_y;
 };
 
-layout(set = 1, binding = 1) buffer Data {
+layout(set = 1, binding = 1) buffer readonly Data {
 	uint data[];
 };
 

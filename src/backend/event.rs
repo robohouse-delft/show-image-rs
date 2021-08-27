@@ -33,7 +33,7 @@ pub fn convert_winit_device_event(
 		W::Removed => event::DeviceRemovedEvent { device_id }.into(),
 		W::MouseMotion { delta } => event::DeviceMouseMotionEvent {
 			device_id,
-			delta: glam::DVec2::new(delta.0, delta.1).as_f32(),
+			delta: glam::DVec2::new(delta.0, delta.1).as_vec2(),
 		}
 		.into(),
 		W::MouseWheel { delta } => event::DeviceMouseWheelEvent { device_id, delta }.into(),
@@ -92,7 +92,7 @@ pub fn convert_winit_window_event(
 			position,
 			modifiers,
 		} => {
-			let position = glam::DVec2::new(position.x, position.y).as_f32();
+			let position = glam::DVec2::new(position.x, position.y).as_vec2();
 			Some(event::WindowMouseMoveEvent {
 				window_id,
 				device_id,

@@ -42,7 +42,7 @@ impl MouseCache {
 				let cached_position = self.mouse_position.entry((window_id, *device_id)).or_insert_with(|| [0.0, 0.0].into());
 				let cached_prev_position = self.mouse_prev_position.entry((window_id, *device_id)).or_insert_with(|| [0.0, 0.0].into());
 				*cached_prev_position = *cached_position;
-				*cached_position = glam::DVec2::new(position.x, position.y).as_f32();
+				*cached_position = glam::DVec2::new(position.x, position.y).as_vec2();
 			},
 			_ => {},
 		}

@@ -32,9 +32,6 @@ pub struct Window {
 	/// The wgpu surface to render to.
 	pub surface: wgpu::Surface,
 
-	/// The swap chain for the surface.
-	pub swap_chain: wgpu::SwapChain,
-
 	/// The window specific uniforms for the render pipeline.
 	pub uniforms: UniformsBuffer<WindowUniforms>,
 
@@ -466,12 +463,12 @@ impl Window {
 	/// Recalculate the uniforms for the render pipeline from the window state.
 	pub fn calculate_uniforms(&self) -> WindowUniforms {
 		if let Some(image) = &self.image {
-			let image_size = image.info().size.as_f32();
+			let image_size = image.info().size.as_vec2();
 			if !self.preserve_aspect_ratio {
 				WindowUniforms::stretch(image_size)
 					.pre_apply_transform(self.user_transform)
 			} else {
-				let window_size = glam::UVec2::new(self.window.inner_size().width, self.window.inner_size().height).as_f32();
+				let window_size = glam::UVec2::new(self.window.inner_size().width, self.window.inner_size().height).as_vec2();
 				WindowUniforms::fit(window_size, image_size)
 					.pre_apply_transform(self.user_transform)
 			}
@@ -632,14 +629,14 @@ pub(super) fn default_controls_handler(mut window: WindowHandle, event: &mut cra
 			let scale = 1.1f32.powf(delta);
 
 			let origin = event.position
-				.map(|pos| pos / window.inner_size().as_f32())
+				.map(|pos| pos / window.inner_size().as_vec2())
 				.unwrap_or_else(|| glam::Vec2::new(0.5, 0.5));
 			let transform = glam::Affine2::from_scale_angle_translation(glam::Vec2::splat(scale), 0.0, origin - scale * origin);
 			window.pre_apply_transform(transform);
 		},
 		WindowEvent::MouseMove(event) => {
 			if event.buttons.is_pressed(crate::event::MouseButton::Left) {
-				let translation = (event.position - event.prev_position) / window.inner_size().as_f32();
+				let translation = (event.position - event.prev_position) / window.inner_size().as_vec2();
 				window.pre_apply_transform(Affine2::from_translation(translation));
 			}
 		},

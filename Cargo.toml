@@ -3,7 +3,8 @@ name          = "show-image"
 version       = "0.9.5"
 license       = "BSD-2-Clause"
 description   = "quickly show images in a window for debugging"
-edition       = "2018"
+
+edition       = "2021"
 
 repository    = "https://github.com/robohouse-delft/show-image-rs"
 documentation = "https://docs.rs/show-image"
@@ -33,15 +34,15 @@ save     = ["tinyfiledialogs", "png", "log"]
 
 [dependencies]
 futures           = { version="0.3.5", default-features=false, features=["executor"] }
-glam              = "0.17.1"
+glam              = "0.20.0"
 image             = { version="0.23.0", optional=true, default-features=false }
 log               = { version="0.4.11", optional=true }
-png               = { version="0.16.7", optional=true }
+png               = { version="0.17.0", optional=true }
 raqote            = { version="0.8.0", optional=true, default-features=false }
 show-image-macros = { version="=0.9.0", optional=true, path="show-image-macros" }
 tch               = { version=">=0.1.6, <0.7.0",  optional=true, default-features= false }
 tinyfiledialogs   = { version="3.3.9", optional=true }
-wgpu              = "0.9.0"
+wgpu              = { version="0.11.0", features=["spirv"] }
 winit             = "0.25.0"
 
 [dev-dependencies]

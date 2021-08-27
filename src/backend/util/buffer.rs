@@ -4,7 +4,7 @@ unsafe fn as_bytes<T>(value: &T) -> &[u8] {
 }
 
 /// Create a [`wgpu::Buffer`] with an arbitrary object as contents.
-pub fn create_buffer_with_value<T: Copy>(device: &wgpu::Device, label: Option<&str>, value: &T, usage: wgpu::BufferUsage) -> wgpu::Buffer {
+pub fn create_buffer_with_value<T: Copy>(device: &wgpu::Device, label: Option<&str>, value: &T, usage: wgpu::BufferUsages) -> wgpu::Buffer {
 	use wgpu::util::DeviceExt;
 	unsafe {
 		let contents = as_bytes(value);

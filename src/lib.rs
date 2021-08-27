@@ -194,7 +194,7 @@ fn save_rgba8_image(
 	let file = std::fs::File::create(path)?;
 
 	let mut encoder = png::Encoder::new(file, size.x, size.y);
-	encoder.set_color(png::ColorType::RGBA);
+	encoder.set_color(png::ColorType::Rgba);
 	encoder.set_depth(png::BitDepth::Eight);
 
 	let mut writer = encoder.write_header()?;
@@ -204,7 +204,7 @@ fn save_rgba8_image(
 	} else {
 		use std::io::Write;
 
-		let mut writer = writer.into_stream_writer();
+		let mut writer = writer.into_stream_writer()?;
 		for row in data.chunks(row_stride as usize) {
 			let row = &row[..size.x as usize * 4];
 			writer.write_all(row)?;
