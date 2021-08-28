@@ -1,6 +1,6 @@
 [package]
 name          = "show-image"
-version       = "0.9.2"
+version       = "0.9.3"
 license       = "BSD-2-Clause"
 description   = "quickly show images in a window for debugging"
 edition       = "2018"
