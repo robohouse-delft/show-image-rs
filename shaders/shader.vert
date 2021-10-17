@@ -1,4 +1,5 @@
-#version 420
+#version 430
+#extension GL_EXT_scalar_block_layout : require
 // vi: ft=glsl
 
 out gl_PerVertex {
@@ -7,7 +8,7 @@ out gl_PerVertex {
 
 layout(location = 0) out vec2 texture_coords;
 
-layout(set = 0, binding = 0) uniform WindowUniforms {
+layout(std430, set = 0, binding = 0) uniform WindowUniforms {
 	mat3x2 transform;
 	vec2 image_size;
 };

@@ -552,7 +552,7 @@ struct Vec2A16 {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 struct Mat3x2 {
-	pub cols: [Vec2A16; 3]
+	pub cols: [Vec2A8; 3]
 }
 
 impl Vec2A8 {
@@ -568,7 +568,7 @@ impl Vec2A16 {
 }
 
 impl Mat3x2 {
-	pub const fn new(col0: Vec2A16, col1: Vec2A16, col2: Vec2A16) -> Self {
+	pub const fn new(col0: Vec2A8, col1: Vec2A8, col2: Vec2A8) -> Self {
 		Self {
 			cols: [col0, col1, col2],
 		}
