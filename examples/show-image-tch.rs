@@ -3,6 +3,8 @@ use show_image::tch::TensorAsImage;
 
 #[show_image::main]
 fn main() -> Result<(), String> {
+	env_logger::init();
+
 	let args: Vec<_> = std::env::args().collect();
 	if args.len() != 2 {
 		return Err(format!("usage: {} IMAGE", args[0]));
