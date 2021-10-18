@@ -1,3 +1,6 @@
+v0.9.4:
+  * Fix a black screen on macOS caused by the image transformation.
+
 v0.9.3:
   * Add 'WindowHandle::effective_transform()` to get the full transformation from image space to virtual window space.
 
