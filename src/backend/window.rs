@@ -9,6 +9,7 @@ use crate::ImageInfo;
 use crate::ImageView;
 use crate::WindowId;
 use crate::WindowProxy;
+use glam::Vec3;
 use glam::{Affine2, Vec2};
 
 /// Internal shorthand for window event handlers.
@@ -544,15 +545,16 @@ struct Vec2A8 {
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
-struct Vec2A16 {
+struct Vec3A16 {
 	pub x: f32,
 	pub y: f32,
+	pub z: f32,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-struct Mat3x2 {
-	pub cols: [Vec2A16; 3]
+struct Mat3x3 {
+	pub cols: [Vec3A16; 3]
 }
 
 impl Vec2A8 {
@@ -561,14 +563,14 @@ impl Vec2A8 {
 	}
 }
 
-impl Vec2A16 {
-	pub const fn new(x: f32, y: f32) -> Self {
-		Self { x, y }
+impl Vec3A16 {
+	pub const fn new(x: f32, y: f32, z: f32) -> Self {
+		Self { x, y, z }
 	}
 }
 
-impl Mat3x2 {
-	pub const fn new(col0: Vec2A16, col1: Vec2A16, col2: Vec2A16) -> Self {
+impl Mat3x3 {
+	pub const fn new(col0: Vec3A16, col1: Vec3A16, col2: Vec3A16) -> Self {
 		Self {
 			cols: [col0, col1, col2],
 		}
@@ -581,18 +583,21 @@ impl From<Vec2> for Vec2A8 {
 	}
 }
 
-impl From<Vec2> for Vec2A16 {
-	fn from(other: Vec2) -> Self {
-		Self::new(other.x, other.y)
+impl From<Vec3> for Vec3A16 {
+	fn from(other: Vec3) -> Self {
+		Self::new(other.x, other.y, other.z)
 	}
 }
 
-impl From<Affine2> for Mat3x2 {
+impl From<Affine2> for Mat3x3 {
 	fn from(other: Affine2) -> Self {
+		let x_axis = other.matrix2.x_axis;
+		let y_axis = other.matrix2.y_axis;
+		let z_axis = other.translation;
 		Self::new(
-			other.matrix2.x_axis.into(),
-			other.matrix2.y_axis.into(),
-			other.translation.into(),
+			Vec3A16::new(x_axis.x, x_axis.y, 0.0),
+			Vec3A16::new(y_axis.x, y_axis.y, 0.0),
+			Vec3A16::new(z_axis.x, z_axis.y, 1.0),
 		)
 	}
 }
@@ -601,8 +606,8 @@ impl From<Affine2> for Mat3x2 {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct WindowUniformsStd140 {
-	transform: Mat3x2,
 	image_size: Vec2A8,
+	transform: Mat3x3,
 }
 
 unsafe impl crate::backend::util::ToStd140 for WindowUniforms {
@@ -610,8 +615,8 @@ unsafe impl crate::backend::util::ToStd140 for WindowUniforms {
 
 	fn to_std140(&self) -> Self::Output {
 		Self::Output {
-			transform: self.transform.into(),
 			image_size: self.image_size.into(),
+			transform: self.transform.into(),
 		}
 	}
 }
