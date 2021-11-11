@@ -1,3 +1,6 @@
+main:
+  * Bump maximum `tch` version to 0.6.x.
+
 v0.9.4:
   * Fix a black screen on macOS caused by the image transformation.
 
