@@ -1,5 +1,6 @@
 main:
   * Bump maximum `tch` version to 0.6.x.
+  * Improve discoverability of `WindowProxy::run_function_wait()` in documentation.
 
 v0.9.4:
   * Fix a black screen on macOS caused by the image transformation.

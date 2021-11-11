@@ -267,7 +267,7 @@ impl<'a> WindowHandle<'a> {
 	/// Get the full effective transformation from image space to virtual window space.
 	///
 	/// This transformation maps the image coordinates to virtual window coordinates.
-	/// Unlike [`Self::transform()`], this function returns a transformation that include the scaling introduced by the [`preserve_aspect_ratio()`] property.
+	/// Unlike [`Self::transform()`], this function returns a transformation that include the scaling introduced by the [`Self::preserve_aspect_ratio()`] property.
 	/// This is useful to transform between window coordinates and image coordinates.
 	///
 	/// If no image is set on the window yet, this returns the same transformation as [`Self::transform()`].

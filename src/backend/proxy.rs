@@ -10,6 +10,29 @@ use crate::oneshot;
 
 use std::sync::mpsc;
 
+/// Proxy object to interact with a window from a user thread.
+///
+/// The proxy object only exposes a small subset of the functionality of a window.
+/// However, you can use [`run_function()`][Self::run_function]
+/// to get access to the underlying [`WindowHandle`] from the context thread.
+/// With [`run_function_wait()`][Self::run_function_wait`] you can also get the return value of the function back:
+///
+/// ```no_run
+/// # fn foo(window_proxy: show_image::WindowProxy) -> Result<(), show_image::error::InvalidWindowId> {
+/// let inner_size = window_proxy.run_function_wait(|window| window.inner_size())?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// You should not use proxy objects from withing the global context thread.
+/// The proxy objects often wait for the global context to perform some action.
+/// Doing so from within the global context thread would cause a deadlock.
+#[derive(Clone)]
+pub struct WindowProxy {
+	window_id: WindowId,
+	context_proxy: ContextProxy,
+}
+
 /// Proxy object to interact with the global context from a user thread.
 ///
 /// You should not use proxy objects from withing the global context thread.
@@ -19,17 +42,6 @@ use std::sync::mpsc;
 pub struct ContextProxy {
 	event_loop: EventLoopProxy,
 	context_thread: std::thread::ThreadId,
-}
-
-/// Proxy object to interact with a window from a user thread.
-///
-/// You should not use proxy objects from withing the global context thread.
-/// The proxy objects often wait for the global context to perform some action.
-/// Doing so from within the global context thread would cause a deadlock.
-#[derive(Clone)]
-pub struct WindowProxy {
-	window_id: WindowId,
-	context_proxy: ContextProxy,
 }
 
 /// Dynamic function that can be run by the global context.
