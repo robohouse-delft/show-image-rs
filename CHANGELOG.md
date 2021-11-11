@@ -1,4 +1,4 @@
-main:
+v0.9.5 - 2021-11-11:
   * Bump maximum `tch` version to 0.6.x.
   * Improve discoverability of `WindowProxy::run_function_wait()` in documentation.
 
