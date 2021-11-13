@@ -46,6 +46,7 @@ fn wait_for_buffer(
 /// Synchronously map a buffer for read access.
 ///
 /// This will internally call [`wgpu::Device::poll()`] until the buffer is ready, and then map it.
+#[allow(unused)]
 pub fn map_buffer<'a>(device: &wgpu::Device, buffer: wgpu::BufferSlice<'a>) -> Result<wgpu::BufferView<'a>, wgpu::BufferAsyncError> {
 	wait_for_buffer(device, buffer, wgpu::MapMode::Read)?;
 	Ok(buffer.get_mapped_range())

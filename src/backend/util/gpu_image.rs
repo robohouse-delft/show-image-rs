@@ -94,6 +94,7 @@ impl GpuImage {
 	}
 
 	/// Get the name of the image.
+	#[allow(unused)]
 	pub fn name(&self) -> &str {
 		&self.name
 	}

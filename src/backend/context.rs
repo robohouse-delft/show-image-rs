@@ -1,4 +1,4 @@
-use core::num::{NonZeroU32, NonZeroU64};
+use core::num::NonZeroU64;
 use crate::backend::proxy::ContextFunction;
 use crate::backend::util::GpuImage;
 use crate::backend::util::{ToStd140, UniformsBuffer};
@@ -400,7 +400,10 @@ impl Context {
 		Ok(())
 	}
 
+	#[cfg(feature = "save")]
 	fn render_to_texture(&self, window_id: WindowId, overlays: bool) -> Result<Option<(String, crate::BoxImage)>, InvalidWindowId> {
+		use core::num::NonZeroU32;
+
 		let window = self
 			.windows
 			.iter()
@@ -925,6 +928,7 @@ fn render_pass(
 	drop(render_pass);
 }
 
+#[cfg(feature = "save")]
 fn align_next_u32(input: u32, alignment: u32) -> u32 {
 	let remainder = input % alignment;
 	if remainder == 0 {
@@ -934,6 +938,7 @@ fn align_next_u32(input: u32, alignment: u32) -> u32 {
 	}
 }
 
+#[cfg(feature = "save")]
 fn div_round_up(input: u32, divisor: u32) -> u32 {
 	if input % divisor == 0 {
 		input / divisor
