@@ -1,4 +1,4 @@
-# main
+# v0.10.0 - 2021-11-13:
   * Update to `wgpu` 0.11 and `glam` 0.20.
   * Require `resolver="2"` or `edition="2021"` due to updated dependencies.
 
