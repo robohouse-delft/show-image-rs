@@ -30,6 +30,23 @@ fn initialize_context() -> Result<Context, error::GetDeviceError> {
 	Ok(context)
 }
 
+/// Initialize the global context, or exit the process.
+fn initialize_context_or_exit() -> Context {
+	match initialize_context() {
+		Ok(x) => x,
+		Err(crate::error::GetDeviceError::NoSuitableDeviceFound(e)) => {
+			eprintln!("show-image: Failed to find a suitable device: {}. Terminating process.", e);
+			std::process::exit(-1);
+		},
+		Err(crate::error::GetDeviceError::NoSuitableAdapterFound(_)) => {
+			eprintln!("show-image: Failed to find a suitable graphics adapter. Terminating process.");
+			#[cfg(any(target_os = "android", target_os = "linux"))]
+			eprintln!("show-image: You may be missing the correct driver. Consider installing the Vulkan driver for your GPU.");
+			std::process::exit(-2);
+		}
+	}
+}
+
 /// Initialize and run the global context and spawn a user task in a new thread.
 ///
 /// This function never returns.
@@ -58,7 +75,7 @@ where
 	F: FnOnce() -> R + Send + 'static,
 	R: crate::termination::Termination,
 {
-	let context = initialize_context().expect("failed to initialize global context");
+	let context = initialize_context_or_exit();
 
 	// Spawn the user task.
 	std::thread::spawn(move || {
@@ -152,7 +169,7 @@ pub fn run_context_with_local_task<F>(user_task: F) -> !
 where
 	F: FnOnce(&mut ContextHandle) + Send + 'static,
 {
-	let context = initialize_context().unwrap();
+	let context = initialize_context_or_exit();
 
 	// Queue the user task.
 	// It won't be executed until context.run() is called.

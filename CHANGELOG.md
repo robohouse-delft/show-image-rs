@@ -1,3 +1,6 @@
+# main
+  * Print a message to install Vulkan drivers on Linux when no adapter is found.
+
 # v0.10.0 - 2021-11-13:
   * Update to `wgpu` 0.11 and `glam` 0.20.
   * Require `resolver="2"` or `edition="2021"` due to updated dependencies.
