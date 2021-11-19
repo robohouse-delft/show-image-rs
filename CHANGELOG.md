@@ -1,4 +1,4 @@
-# main
+# v0.10.1 - 2021-11-19
   * Print a message to install Vulkan drivers on Linux when no adapter is found.
 
 # v0.10.0 - 2021-11-13:
