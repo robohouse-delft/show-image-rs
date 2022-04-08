@@ -867,7 +867,7 @@ fn create_render_pipeline(
 			strip_index_format: None,
 			front_face: wgpu::FrontFace::Cw,
 			cull_mode: Some(wgpu::Face::Back),
-			clamp_depth: false,
+			unclipped_depth: false,
 			polygon_mode: wgpu::PolygonMode::Fill,
 			conservative: false,
 		},
@@ -877,6 +877,7 @@ fn create_render_pipeline(
 			mask: !0,
 			alpha_to_coverage_enabled: false,
 		},
+		multiview: None,
 	})
 }
 
