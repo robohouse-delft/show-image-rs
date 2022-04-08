@@ -588,7 +588,7 @@ impl Context {
 		let mut event_handlers = std::mem::take(&mut self.event_handlers);
 
 		let mut stop_propagation = false;
-		event_handlers.retain_mut(|handler| {
+		RetainMut::retain_mut(&mut event_handlers, |handler| {
 			if stop_propagation {
 				false
 			} else {
@@ -617,7 +617,7 @@ impl Context {
 		let mut event_handlers = std::mem::take(&mut self.windows[window_index].event_handlers);
 
 		let mut stop_propagation = false;
-		event_handlers.retain_mut(|handler| {
+		RetainMut::retain_mut(&mut event_handlers, |handler| {
 			if stop_propagation {
 				false
 			} else {
