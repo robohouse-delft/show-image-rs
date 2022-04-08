@@ -1,4 +1,5 @@
 # main
+  * Bump minumum `image` version to `0.24.1`.
   * Bump maximum `tch` version to `0.7.x`.
 
 # v0.10.1 - 2021-11-19
