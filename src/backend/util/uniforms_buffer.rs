@@ -1,5 +1,10 @@
 use super::buffer::create_buffer_with_value;
 
+/// Trait for data in Std140 compatible layout.
+///
+/// # Safety
+/// Implementing this trait indicates that the data is in Std140 compatible layout.
+/// If that is not true, the GPU may perform illegal memory access.
 pub unsafe trait ToStd140 {
 	type Output: Copy;
 

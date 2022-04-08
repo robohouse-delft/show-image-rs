@@ -14,6 +14,7 @@ pub struct GpuImage {
 
 /// The uniforms associated with a [`GpuImage`].
 #[derive(Debug, Copy, Clone)]
+#[allow(unused)] // All fields are used by the GPU.
 pub struct GpuImageUniforms {
 	format: u32,
 	width: u32,

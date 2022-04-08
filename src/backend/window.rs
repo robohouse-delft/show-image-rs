@@ -79,7 +79,7 @@ impl<'a> WindowHandle<'a> {
 	/// The current window may not be moved or removed through the returned reference.
 	/// In practise, this means that you may not create or destroy any windows.
 	unsafe fn context_mut(&mut self) -> &mut Context {
-		&mut self.context_handle.context
+		self.context_handle.context
 	}
 
 	/// Get a reference to the window.
