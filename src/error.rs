@@ -7,6 +7,9 @@ use crate::WindowId;
 pub enum CreateWindowError {
 	/// The underlying call to `winit` reported an error.
 	Winit(winit::error::OsError),
+
+	/// Failed to get a suitable GPU device.
+	GetDevice(GetDeviceError),
 }
 
 /// An error that can occur while interpreting image data.
@@ -71,6 +74,12 @@ pub enum SaveImageError {
 impl From<winit::error::OsError> for CreateWindowError {
 	fn from(other: winit::error::OsError) -> Self {
 		Self::Winit(other)
+	}
+}
+
+impl From<GetDeviceError> for CreateWindowError {
+	fn from(other: GetDeviceError) -> Self {
+		Self::GetDevice(other)
 	}
 }
 
@@ -145,6 +154,7 @@ impl std::fmt::Display for CreateWindowError {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
 			Self::Winit(e) => write!(f, "{}", e),
+			Self::GetDevice(e) => write!(f, "{}", e),
 		}
 	}
 }

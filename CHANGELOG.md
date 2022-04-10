@@ -1,3 +1,6 @@
+# main
+  * Delay GPU initialization until first window is created.
+
 # v0.11.0 - 2022-04-08
   * Bump minumum `image` version to `0.24.1`.
   * Bump maximum `tch` version to `0.7.x`.

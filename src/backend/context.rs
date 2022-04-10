@@ -43,31 +43,12 @@ impl From<crate::Color> for wgpu::Color {
 	}
 }
 
-/// The global context managing all windows and the main event loop.
-pub struct Context {
-	/// Marker to make context !Send.
-	pub unsend: std::marker::PhantomData<*const ()>,
-
-	/// The wgpu instance to create surfaces with.
-	pub instance: wgpu::Instance,
-
-	/// The event loop to use.
-	///
-	/// Running the event loop consumes it,
-	/// so from that point on this field is `None`.
-	pub event_loop: Option<EventLoop>,
-
-	/// A proxy object to clone for new requests.
-	pub proxy: ContextProxy,
-
+pub struct GpuContext {
 	/// The wgpu device to use.
 	pub device: wgpu::Device,
 
 	/// The wgpu command queue to use.
 	pub queue: wgpu::Queue,
-
-	/// The swap chain format to use.
-	pub swap_chain_format: wgpu::TextureFormat,
 
 	/// The bind group layout for the window specific bindings.
 	pub window_bind_group_layout: wgpu::BindGroupLayout,
@@ -80,6 +61,30 @@ pub struct Context {
 
 	/// The render pipeline to use for rendering to image.
 	pub image_pipeline: wgpu::RenderPipeline,
+}
+
+/// The global context managing all windows and the main event loop.
+pub struct Context {
+	/// Marker to make context !Send.
+	pub unsend: std::marker::PhantomData<*const ()>,
+
+	/// The wgpu instance to create surfaces with.
+	pub instance: wgpu::Instance,
+
+	/// GPU related context that can not be initialized until we have a valid surface.
+	pub gpu: Option<GpuContext>,
+
+	/// The event loop to use.
+	///
+	/// Running the event loop consumes it,
+	/// so from that point on this field is `None`.
+	pub event_loop: Option<EventLoop>,
+
+	/// A proxy object to clone for new requests.
+	pub proxy: ContextProxy,
+
+	/// The swap chain format to use.
+	pub swap_chain_format: wgpu::TextureFormat,
 
 	/// The windows.
 	pub windows: Vec<Window>,
@@ -106,18 +111,9 @@ pub struct ContextHandle<'a> {
 	pub(crate) event_loop: &'a EventLoopWindowTarget,
 }
 
-impl Context {
-	/// Create a new global context.
-	///
-	/// You can theoreticlly create as many contexts as you want,
-	/// but they must be run from the main thread and the [`run`](Self::run) function never returns.
-	/// So it is not possible to *run* more than one context.
-	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
-		let instance = wgpu::Instance::new(select_backend());
-		let event_loop = EventLoop::with_user_event();
-		let proxy = ContextProxy::new(event_loop.create_proxy(), std::thread::current().id());
-
-		let (device, queue) = futures::executor::block_on(get_device(&instance))?;
+impl GpuContext {
+	pub fn new(instance: &wgpu::Instance, swap_chain_format: wgpu::TextureFormat, surface: &wgpu::Surface) -> Result<Self, GetDeviceError> {
+		let (device, queue) = futures::executor::block_on(get_device(&instance, surface))?;
 		device.on_uncaptured_error(|error| {
 			panic!("Unhandled WGPU error: {}", error);
 		});
@@ -150,17 +146,34 @@ impl Context {
 		);
 
 		Ok(Self {
-			unsend: Default::default(),
-			instance,
-			event_loop: Some(event_loop),
-			proxy,
 			device,
 			queue,
-			swap_chain_format,
 			window_bind_group_layout,
 			image_bind_group_layout,
 			window_pipeline,
 			image_pipeline,
+		})
+	}
+}
+
+impl Context {
+	/// Create a new global context.
+	///
+	/// You can theoreticlly create as many contexts as you want,
+	/// but they must be run from the main thread and the [`run`](Self::run) function never returns.
+	/// So it is not possible to *run* more than one context.
+	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
+		let instance = wgpu::Instance::new(select_backend());
+		let event_loop = EventLoop::with_user_event();
+		let proxy = ContextProxy::new(event_loop.create_proxy(), std::thread::current().id());
+
+		Ok(Self {
+			unsend: Default::default(),
+			instance,
+			gpu: None,
+			event_loop: Some(event_loop),
+			proxy,
+			swap_chain_format,
 			windows: Vec::new(),
 			mouse_cache: Default::default(),
 			exit_with_last_window: false,
@@ -293,11 +306,20 @@ impl Context {
 		}
 
 		let window = window.build(event_loop)?;
-
 		let surface = unsafe { self.instance.create_surface(&window) };
+
+
+		let gpu = match &self.gpu {
+			Some(x) => x,
+			None => {
+				let gpu = GpuContext::new(&self.instance, self.swap_chain_format, &surface)?;
+				self.gpu.insert(gpu)
+			}
+		};
+
 		let size = glam::UVec2::new(window.inner_size().width, window.inner_size().height);
-		configure_surface(size, &surface, self.swap_chain_format, &self.device);
-		let uniforms = UniformsBuffer::from_value(&self.device, &WindowUniforms::no_image(), &self.window_bind_group_layout);
+		configure_surface(size, &surface, self.swap_chain_format, &gpu.device);
+		let uniforms = UniformsBuffer::from_value(&gpu.device, &WindowUniforms::no_image(), &gpu.window_bind_group_layout);
 
 		let window = Window {
 			window,
@@ -333,7 +355,8 @@ impl Context {
 
 	/// Upload an image to the GPU.
 	pub fn make_gpu_image(&self, name: impl Into<String>, image: &ImageView) -> GpuImage {
-		GpuImage::from_data(name.into(), &self.device, &self.image_bind_group_layout, image)
+		let gpu = self.gpu.as_ref().unwrap();
+		GpuImage::from_data(name.into(), &gpu.device, &gpu.image_bind_group_layout, image)
 	}
 
 	/// Resize a window.
@@ -344,7 +367,8 @@ impl Context {
 			.find(|w| w.id() == window_id)
 			.ok_or(InvalidWindowId { window_id })?;
 
-		configure_surface(new_size, &window.surface, self.swap_chain_format, &self.device);
+		let gpu = self.gpu.as_ref().unwrap();
+		configure_surface(new_size, &window.surface, self.swap_chain_format, &gpu.device);
 		window.uniforms.mark_dirty(true);
 		Ok(())
 	}
@@ -367,17 +391,18 @@ impl Context {
 			.get_current_texture()
 			.expect("Failed to acquire next frame");
 
-		let mut encoder = self.device.create_command_encoder(&Default::default());
+		let gpu = self.gpu.as_ref().unwrap();
+		let mut encoder = gpu.device.create_command_encoder(&Default::default());
 
 		if window.uniforms.is_dirty() {
 			window
 				.uniforms
-				.update_from(&self.device, &mut encoder, &window.calculate_uniforms());
+				.update_from(&gpu.device, &mut encoder, &window.calculate_uniforms());
 		}
 
 		render_pass(
 			&mut encoder,
-			&self.window_pipeline,
+			&gpu.window_pipeline,
 			&window.uniforms,
 			image,
 			Some(window.background_color),
@@ -387,7 +412,7 @@ impl Context {
 			for overlay in &window.overlays {
 				render_pass(
 					&mut encoder,
-					&self.window_pipeline,
+					&gpu.window_pipeline,
 					&window.uniforms,
 					overlay,
 					None,
@@ -395,7 +420,7 @@ impl Context {
 				);
 			}
 		}
-		self.queue.submit(std::iter::once(encoder.finish()));
+		gpu.queue.submit(std::iter::once(encoder.finish()));
 		frame.present();
 		Ok(())
 	}
@@ -424,13 +449,14 @@ impl Context {
 			depth_or_array_layers: 1,
 		};
 
+		let gpu = self.gpu.as_ref().unwrap();
 		let window_uniforms = WindowUniforms {
 			transform: Affine2::from_scale([width_scale, 1.0].into()),
 			image_size: image.info().size.as_vec2(),
 		};
-		let window_uniforms = UniformsBuffer::from_value(&self.device, &window_uniforms, &self.window_bind_group_layout);
+		let window_uniforms = UniformsBuffer::from_value(&gpu.device, &window_uniforms, &gpu.window_bind_group_layout);
 
-		let target = self.device.create_texture(&wgpu::TextureDescriptor {
+		let target = gpu.device.create_texture(&wgpu::TextureDescriptor {
 			label: Some(&format!("{}_render", image.name())),
 			usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
 			sample_count: 1,
@@ -440,7 +466,7 @@ impl Context {
 			size,
 		});
 
-		let mut encoder = self.device.create_command_encoder(&Default::default());
+		let mut encoder = gpu.device.create_command_encoder(&Default::default());
 		let transparent = crate::Color::rgba(0.0, 0.0, 0.0, 0.0);
 		let render_target = target.create_view(&wgpu::TextureViewDescriptor {
 			label: None,
@@ -455,7 +481,7 @@ impl Context {
 
 		render_pass(
 			&mut encoder,
-			&self.image_pipeline,
+			&gpu.image_pipeline,
 			&window_uniforms,
 			image,
 			Some(transparent),
@@ -463,11 +489,11 @@ impl Context {
 		);
 		if overlays {
 			for overlay in &window.overlays {
-				render_pass(&mut encoder, &self.image_pipeline, &window_uniforms, overlay, None, &render_target);
+				render_pass(&mut encoder, &gpu.image_pipeline, &window_uniforms, overlay, None, &render_target);
 			}
 		}
 
-		let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+		let buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
 			label: None,
 			size: u64::from(bytes_per_row) * u64::from(image.info().size.y),
 			usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
@@ -492,9 +518,9 @@ impl Context {
 			size,
 		);
 
-		self.queue.submit(std::iter::once(encoder.finish()));
+		gpu.queue.submit(std::iter::once(encoder.finish()));
 
-		let view = super::util::map_buffer(&self.device, buffer.slice(..)).unwrap();
+		let view = super::util::map_buffer(&gpu.device, buffer.slice(..)).unwrap();
 		let info = crate::ImageInfo {
 			pixel_format: crate::PixelFormat::Rgba8(crate::Alpha::Unpremultiplied),
 			size: image.info().size,
@@ -753,11 +779,11 @@ fn select_power_preference() -> wgpu::PowerPreference {
 }
 
 /// Get a wgpu device to use.
-async fn get_device(instance: &wgpu::Instance) -> Result<(wgpu::Device, wgpu::Queue), GetDeviceError> {
+async fn get_device(instance: &wgpu::Instance, surface: &wgpu::Surface) -> Result<(wgpu::Device, wgpu::Queue), GetDeviceError> {
 	// Find a suitable display adapter.
 	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
 		power_preference: select_power_preference(),
-		compatible_surface: None, // TODO: can we use a hidden window or something?
+		compatible_surface: Some(surface),
 		force_fallback_adapter: false,
 	});
 
