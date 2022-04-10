@@ -1,4 +1,4 @@
-# main
+# v0.12.0 - 2022-04-10
   * Delay GPU initialization until first window is created.
 
 # v0.11.0 - 2022-04-08
