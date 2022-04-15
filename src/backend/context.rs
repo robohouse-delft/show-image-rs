@@ -113,7 +113,7 @@ pub struct ContextHandle<'a> {
 
 impl GpuContext {
 	pub fn new(instance: &wgpu::Instance, swap_chain_format: wgpu::TextureFormat, surface: &wgpu::Surface) -> Result<Self, GetDeviceError> {
-		let (device, queue) = futures::executor::block_on(get_device(&instance, surface))?;
+		let (device, queue) = futures::executor::block_on(get_device(instance, surface))?;
 		device.on_uncaptured_error(|error| {
 			panic!("Unhandled WGPU error: {}", error);
 		});
