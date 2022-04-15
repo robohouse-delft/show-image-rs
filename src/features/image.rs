@@ -81,7 +81,7 @@ where
 	Container: Deref<Target = [u8]>,
 {
 	// TODO: Specialize this for Vec<u8> to avoid copying when
-	//       https://github.com/rust-lang/rust/issues/31844 lands in stable.
+	// https://github.com/rust-lang/rust/issues/31844 lands in stable.
 	Box::from(buffer.into_raw().deref())
 }
 
