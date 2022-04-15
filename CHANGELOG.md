@@ -1,3 +1,6 @@
+# Unreleased
+  * Change `Container` for `image` crate support to accept any `Deref<Target = [u8]` container.
+
 # v0.12.0 - 2022-04-10
   * Delay GPU initialization until first window is created.
 

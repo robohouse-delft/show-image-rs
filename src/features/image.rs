@@ -1,5 +1,7 @@
 //! Support for the [`image`][::image] crate.
 
+use std::ops::Deref;
+
 use crate::error::ImageDataError;
 use crate::Alpha;
 use crate::AsImageView;
@@ -35,9 +37,10 @@ impl From<image::DynamicImage> for Image {
 	}
 }
 
-impl<P> AsImageView for image::ImageBuffer<P, Vec<u8>>
+impl<P, Container> AsImageView for image::ImageBuffer<P, Container>
 where
 	P: image::Pixel<Subpixel = u8> + image::PixelWithColorType,
+	Container: Deref<Target = [u8]>,
 {
 	fn as_image_view(&self) -> Result<ImageView, ImageDataError> {
 		let info = info(self)?;
@@ -46,20 +49,22 @@ where
 	}
 }
 
-impl<P> AsImageView for &'_ image::ImageBuffer<P, Vec<u8>>
+impl<P, Container> AsImageView for &'_ image::ImageBuffer<P, Container>
 where
 	P: image::Pixel<Subpixel = u8> + image::PixelWithColorType,
+	Container: Deref<Target = [u8]>,
 {
 	fn as_image_view(&self) -> Result<ImageView, ImageDataError> {
 		(*self).as_image_view()
 	}
 }
 
-impl<P> From<image::ImageBuffer<P, Vec<u8>>> for Image
+impl<P, Container> From<image::ImageBuffer<P, Container>> for Image
 where
 	P: image::Pixel<Subpixel = u8> + image::PixelWithColorType,
+	Container: Deref<Target = [u8]>,
 {
-	fn from(other: image::ImageBuffer<P, Vec<u8>>) -> Self {
+	fn from(other: image::ImageBuffer<P, Container>) -> Self {
 		let info = match info(&other) {
 			Ok(x) => x,
 			Err(e) => return Self::Invalid(e),
@@ -70,11 +75,14 @@ where
 }
 
 /// Consume an [`image::ImageBuffer`] and return the pixel data as boxed slice.
-fn into_bytes<P>(buffer: image::ImageBuffer<P, Vec<u8>>) -> Box<[u8]>
+fn into_bytes<P, Container>(buffer: image::ImageBuffer<P, Container>) -> Box<[u8]>
 where
 	P: image::Pixel<Subpixel = u8> + image::PixelWithColorType,
+	Container: Deref<Target = [u8]>,
 {
-	buffer.into_raw().into_boxed_slice()
+	// TODO: Specialize this for Vec<u8> to avoid copying when
+	// https://github.com/rust-lang/rust/issues/31844 lands in stable.
+	Box::from(buffer.into_raw().deref())
 }
 
 fn dynamic_image_into_bytes(image: image::DynamicImage) -> Box<[u8]> {
@@ -94,9 +102,10 @@ fn dynamic_image_into_bytes(image: image::DynamicImage) -> Box<[u8]> {
 }
 
 /// Get the pixel data of an [`image::ImageBuffer`] to as a byte slice.
-fn as_bytes<P>(buffer: &image::ImageBuffer<P, Vec<u8>>) -> &[u8]
+fn as_bytes<P, Container>(buffer: &image::ImageBuffer<P, Container>) -> &[u8]
 where
 	P: image::Pixel<Subpixel = u8> + image::PixelWithColorType,
+	Container: Deref<Target = [u8]>,
 {
 	&*buffer
 }
