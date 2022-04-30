@@ -9,8 +9,8 @@ use crate::ImageInfo;
 use crate::ImageView;
 use crate::WindowId;
 use crate::WindowProxy;
-use glam::Vec3;
-use glam::{Affine2, Vec2};
+use glam::{Affine2, IVec2, Vec2, Vec3};
+use winit::dpi::PhysicalPosition;
 
 /// Internal shorthand for window event handlers.
 type DynWindowEventHandler = dyn FnMut(WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow);
@@ -167,8 +167,8 @@ impl<'a> WindowHandle<'a> {
 	}
 
 	/// Set the window position.
-	pub fn set_outer_position<P: Into<winit::dpi::Position>>(&self, position: P) {
-		self.window().window.set_outer_position(position);
+	pub fn set_outer_position(&self, position: IVec2) {
+		self.window().window.set_outer_position(PhysicalPosition::new(position.x, position.y));
 		self.window().window.request_redraw();
 	}
 
