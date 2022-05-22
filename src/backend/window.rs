@@ -227,6 +227,14 @@ impl<'a> WindowHandle<'a> {
 		self.window().window.set_fullscreen(opt);
 	}
 
+	/// Check if the window is set to fullscreen mode.
+	///
+	/// Note that some window managers may ignore the request for fullscreen mode.
+	/// In that case, this function may return true while the window is not displayed in fullscreen mode.
+	pub fn is_fullscreen(&self) -> bool {
+		self.window().window.fullscreen().is_some()
+	}
+
 	/// Check if the window is currently showing overlays.
 	pub fn overlays_visible(&self) -> bool {
 		self.window().overlays_visible
