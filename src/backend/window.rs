@@ -60,12 +60,15 @@ pub struct WindowHandle<'a> {
 
 	/// The index of the window in [`Context::windows`].
 	index: usize,
+
+	/// Flag to signal to the handle creator that the window was destroyed.
+	destroy_flag: Option<&'a mut bool>,
 }
 
 impl<'a> WindowHandle<'a> {
 	/// Create a new window handle from a context handle and a window ID.
-	pub fn new(context_handle: ContextHandle<'a>, index: usize) -> Self {
-		Self { context_handle, index }
+	pub fn new(context_handle: ContextHandle<'a>, index: usize, destroy_flag: Option<&'a mut bool>) -> Self {
+		Self { context_handle, index, destroy_flag }
 	}
 
 	/// Get a reference to the context.
@@ -126,8 +129,11 @@ impl<'a> WindowHandle<'a> {
 	///
 	/// Any subsequent operation on the window through an existing [`WindowProxy`] will return [`InvalidWindowId`](crate::error::InvalidWindowId).
 	pub fn destroy(self) -> ContextHandle<'a> {
-		let WindowHandle { context_handle, index } = self;
+		let WindowHandle { context_handle, index, destroy_flag } = self;
 		context_handle.context.windows.remove(index);
+		if let Some(destroy_flag) =  destroy_flag {
+			*destroy_flag = true;
+		}
 		context_handle
 	}
 

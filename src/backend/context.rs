@@ -245,13 +245,13 @@ impl<'a> ContextHandle<'a> {
 	/// Get a window handle for the given window ID.
 	pub fn window(&mut self, window_id: WindowId) -> Result<WindowHandle, InvalidWindowId> {
 		let index = self.context.windows.iter().position(|x| x.id() == window_id).ok_or(InvalidWindowId { window_id })?;
-		Ok(WindowHandle::new(self.reborrow(), index))
+		Ok(WindowHandle::new(self.reborrow(), index, None))
 	}
 
 	/// Create a new window.
 	pub fn create_window(&mut self, title: impl Into<String>, options: WindowOptions) -> Result<WindowHandle, CreateWindowError> {
 		let index = self.context.create_window(self.event_loop, title, options)?;
-		Ok(WindowHandle::new(self.reborrow(), index))
+		Ok(WindowHandle::new(self.reborrow(), index, None))
 	}
 
 	/// Add a global event handler.
@@ -616,7 +616,7 @@ impl Context {
 		let mut stop_propagation = false;
 		RetainMut::retain_mut(&mut event_handlers, |handler| {
 			if stop_propagation {
-				false
+				true
 			} else {
 				let mut context_handle = ContextHandle::new(self, event_loop);
 				let mut control = EventHandlerControlFlow::default();
@@ -643,12 +643,13 @@ impl Context {
 		let mut event_handlers = std::mem::take(&mut self.windows[window_index].event_handlers);
 
 		let mut stop_propagation = false;
+		let mut window_destroyed = false;
 		RetainMut::retain_mut(&mut event_handlers, |handler| {
-			if stop_propagation {
-				false
+			if window_destroyed || stop_propagation {
+				true
 			} else {
 				let context_handle = ContextHandle::new(self, event_loop);
-				let window_handle = WindowHandle::new(context_handle, window_index);
+				let window_handle = WindowHandle::new(context_handle, window_index, Some(&mut window_destroyed));
 				let mut control = EventHandlerControlFlow::default();
 				(handler)(window_handle, event, &mut control);
 				stop_propagation = control.stop_propagation;
@@ -656,11 +657,13 @@ impl Context {
 			}
 		});
 
-		let new_event_handlers = std::mem::take(&mut self.windows[window_index].event_handlers);
-		event_handlers.extend(new_event_handlers);
-		self.windows[window_index].event_handlers = event_handlers;
+		if !window_destroyed {
+			let new_event_handlers = std::mem::take(&mut self.windows[window_index].event_handlers);
+			event_handlers.extend(new_event_handlers);
+			self.windows[window_index].event_handlers = event_handlers;
+		}
 
-		!stop_propagation
+		!stop_propagation && !window_destroyed
 	}
 
 	/// Run a background task in a separate thread.

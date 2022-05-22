@@ -125,6 +125,7 @@ fn main() -> Result<(), String> {
 		Ok(window.proxy())
 	})?;
 
+
 	// Wait for the window to be closed or Escape to be pressed.
 	for event in window.event_channel().map_err(|e| e.to_string())? {
 		if let WindowEvent::KeyboardInput(event) = event {
