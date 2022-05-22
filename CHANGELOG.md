@@ -1,4 +1,4 @@
-# main
+# 0.12.3 - 2022-05-22
   * Add `WindowHandle::set_outer_position`.
 
 # v0.12.2 - 2022-05-22
