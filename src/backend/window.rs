@@ -212,6 +212,22 @@ impl<'a> WindowHandle<'a> {
 		self.window().window.set_decorations(!borderless);
 	}
 
+	/// Set the window in fullscreen mode or back.
+	///
+	/// This will set the window to borderless fullscreen on the current
+	/// monitor or back. Fullscreen is set if the argument is `true`,
+	/// otherwise the window is returned to normal size.
+	///
+	/// Some window managers may ignore this property.
+	pub fn set_fullscreen(&mut self, fullscreen: bool) {
+		let opt = if fullscreen {
+			Some( winit::window::Fullscreen::Borderless( None ) )
+		} else {
+			None
+		};
+		self.window().window.set_fullscreen(opt);
+	}
+
 	/// Check if the window is currently showing overlays.
 	pub fn overlays_visible(&self) -> bool {
 		self.window().overlays_visible
