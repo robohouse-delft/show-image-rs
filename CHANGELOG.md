@@ -1,4 +1,5 @@
 # main
+  * Add fullscreen mode for windows.
   * Fix behavior when a window event handler destroys its window.
 
 # v0.12.1 - 2022-04-15
