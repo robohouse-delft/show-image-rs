@@ -172,6 +172,12 @@ impl<'a> WindowHandle<'a> {
 		self.window().window.request_redraw();
 	}
 
+	/// Set the window position.
+	pub fn set_outer_position(&self, position: [i32; 2]) {
+		self.window().window.set_outer_position(winit::dpi::PhysicalPosition::<i32>::from(position));
+		self.window().window.request_redraw();
+	}
+
 	/// Get the inner size of the window in physical pixels.
 	///
 	/// This returns the size of the window contents, excluding borders, the title bar and other decorations.
