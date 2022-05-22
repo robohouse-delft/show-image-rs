@@ -1,3 +1,6 @@
+# main
+  * Add `WindowHandle::set_outer_position`.
+
 # v0.12.2 - 2022-05-22
   * Add fullscreen mode for windows.
   * Fix behavior when a window event handler destroys its window.

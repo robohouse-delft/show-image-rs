@@ -172,10 +172,14 @@ impl<'a> WindowHandle<'a> {
 		self.window().window.request_redraw();
 	}
 
-	/// Set the window position.
+	/// Set the window position in pixels.
+	///
+	/// This will automatically un-maximize the window.
+	///
+	/// Some window managers or platforms may ignore this property.
 	pub fn set_outer_position(&self, position: [i32; 2]) {
-		self.window().window.set_outer_position(winit::dpi::PhysicalPosition::<i32>::from(position));
 		self.window().window.request_redraw();
+		self.window().window.set_outer_position(winit::dpi::PhysicalPosition::<i32>::from(position));
 	}
 
 	/// Get the inner size of the window in physical pixels.
