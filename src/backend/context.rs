@@ -295,11 +295,17 @@ impl Context {
 		title: impl Into<String>,
 		options: WindowOptions,
 	) -> Result<usize, CreateWindowError> {
+		let fullscreen = if options.fullscreen {
+			Some(winit::window::Fullscreen::Borderless(None))
+		} else {
+			None
+		};
 		let mut window = winit::window::WindowBuilder::new()
 			.with_title(title)
 			.with_visible(!options.start_hidden)
 			.with_resizable(options.resizable)
-			.with_decorations(!options.borderless);
+			.with_decorations(!options.borderless)
+			.with_fullscreen(fullscreen);
 
 		if let Some(size) = options.size {
 			window = window.with_inner_size(winit::dpi::PhysicalSize::new(size[0], size[1]));

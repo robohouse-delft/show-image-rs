@@ -376,7 +376,14 @@ pub struct WindowOptions {
 	pub resizable: bool,
 
 	/// Make the window borderless.
+	///
+	/// This may be ignored by some window managers.
 	pub borderless: bool,
+
+	/// Make the window fullscreen.
+	///
+	/// This may be ignored by some window managers.
+	pub fullscreen: bool,
 
 	/// If true, draw overlays on the image.
 	///
@@ -405,6 +412,7 @@ impl WindowOptions {
 			size: None,
 			resizable: true,
 			borderless: false,
+			fullscreen: false,
 			overlays_visible: true,
 			default_controls: true,
 		}
@@ -462,6 +470,14 @@ impl WindowOptions {
 	/// This function consumes and returns `self` to allow daisy chaining.
 	pub fn set_borderless(mut self, borderless: bool) -> Self {
 		self.borderless = borderless;
+		self
+	}
+
+	/// Make the window fullscreen or not.
+	///
+	/// This function consumes and returns `self` to allow daisy chaining.
+	pub fn set_fullscreen(mut self, fullscreen: bool) -> Self {
+		self.fullscreen = fullscreen;
 		self
 	}
 
