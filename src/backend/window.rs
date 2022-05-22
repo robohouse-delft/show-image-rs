@@ -214,14 +214,13 @@ impl<'a> WindowHandle<'a> {
 
 	/// Set the window in fullscreen mode or back.
 	///
-	/// This will set the window to borderless fullscreen on the current
-	/// monitor or back. Fullscreen is set if the argument is `true`,
-	/// otherwise the window is returned to normal size.
+	/// This will set the window to borderless fullscreen on the current monitor or back.
+	/// Fullscreen is set if the argument is `true`, otherwise the window is returned to normal size.
 	///
 	/// Some window managers may ignore this property.
 	pub fn set_fullscreen(&mut self, fullscreen: bool) {
 		let opt = if fullscreen {
-			Some( winit::window::Fullscreen::Borderless( None ) )
+			Some(winit::window::Fullscreen::Borderless(None))
 		} else {
 			None
 		};
