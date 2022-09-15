@@ -928,7 +928,7 @@ fn configure_surface(
 		format,
 		width: size.x,
 		height: size.y,
-		present_mode: wgpu::PresentMode::Mailbox,
+		present_mode: wgpu::PresentMode::AutoVsync,
 	};
 	surface.configure(device, &config);
 }

@@ -1,4 +1,5 @@
 # main
+  * Autoselect compatible present mode for all platforms.
   * Bump maximum `tch` version to `0.8.x`.
   * Update internal dependencies.
 
