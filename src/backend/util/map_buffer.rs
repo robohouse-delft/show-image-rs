@@ -1,29 +1,4 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
-use std::task::RawWaker;
-use std::task::RawWakerVTable;
-use std::task::Waker;
-
-/// A vtable with all no-ops.
-#[rustfmt::skip]
-static NULL_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(
-	|_| raw_null_waker(),
-	|_| (),
-	|_| (),
-	|_| (),
-);
-
-/// Create a raw null waker that does nothing.
-fn raw_null_waker() -> RawWaker {
-	RawWaker::new(std::ptr::null(), &NULL_WAKER_VTABLE)
-}
-
-/// Create a null waker that does nothing.
-fn null_waker() -> Waker {
-	unsafe { Waker::from_raw(raw_null_waker()) }
-}
+use std::sync::{Arc, Mutex};
 
 /// Synchronously wait for a buffer to be mappable.
 fn wait_for_buffer(
@@ -31,14 +6,18 @@ fn wait_for_buffer(
 	buffer: wgpu::BufferSlice<'_>,
 	map_mode: wgpu::MapMode,
 ) -> Result<(), wgpu::BufferAsyncError> {
-	let mut future = buffer.map_async(map_mode);
-	let waker = null_waker();
+	let result = Arc::new(Mutex::new(None));
+	buffer.map_async(map_mode, {
+		let result = result.clone();
+		move |new_result| {
+			*result.lock().unwrap() = Some(new_result);
+		}
+	});
 
 	loop {
-		let future = Pin::new(&mut future);
-		match future.poll(&mut Context::from_waker(&waker)) {
-			Poll::Ready(x) => return x,
-			Poll::Pending => device.poll(wgpu::Maintain::Wait),
+		device.poll(wgpu::Maintain::Wait);
+		if let Some(result) = result.lock().unwrap().take() {
+			return result;
 		}
 	}
 }

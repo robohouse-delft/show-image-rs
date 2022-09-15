@@ -63,6 +63,8 @@ pub fn convert_winit_window_event(
 
 	#[allow(deprecated)]
 	match event {
+		W::Ime(_) => None,
+		W::Occluded(_) => None,
 		W::Resized(size) => Some(event::WindowResizedEvent { window_id, size: glam::UVec2::new(size.width, size.height) }.into()),
 		W::Moved(position) => Some(event::WindowMovedEvent { window_id, position: glam::IVec2::new(position.x, position.y) }.into()),
 		W::CloseRequested => Some(event::WindowCloseRequestedEvent { window_id }.into()),

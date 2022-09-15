@@ -121,8 +121,8 @@ impl GpuContext {
 		let window_bind_group_layout = create_window_bind_group_layout(&device);
 		let image_bind_group_layout = create_image_bind_group_layout(&device);
 
-		let vertex_shader = device.create_shader_module(&wgpu::include_spirv!("../../shaders/shader.vert.spv"));
-		let fragment_shader_unorm8 = device.create_shader_module(&wgpu::include_spirv!("../../shaders/unorm8.frag.spv"));
+		let vertex_shader = device.create_shader_module(wgpu::include_spirv!("../../shaders/shader.vert.spv"));
+		let fragment_shader_unorm8 = device.create_shader_module(wgpu::include_spirv!("../../shaders/unorm8.frag.spv"));
 
 		let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			label: Some("show-image-pipeline-layout"),
@@ -164,7 +164,7 @@ impl Context {
 	/// So it is not possible to *run* more than one context.
 	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
 		let instance = wgpu::Instance::new(select_backend());
-		let event_loop = EventLoop::with_user_event();
+		let event_loop = winit::event_loop::EventLoopBuilder::with_user_event().build();
 		let proxy = ContextProxy::new(event_loop.create_proxy(), std::thread::current().id());
 
 		Ok(Self {
@@ -880,7 +880,7 @@ fn create_render_pipeline(
 		fragment: Some(wgpu::FragmentState {
 			module: fragment_shader,
 			entry_point: "main",
-			targets: &[wgpu::ColorTargetState {
+			targets: &[Some(wgpu::ColorTargetState {
 				format: swap_chain_format,
 				blend: Some(wgpu::BlendState {
 					color: wgpu::BlendComponent {
@@ -895,7 +895,7 @@ fn create_render_pipeline(
 					},
 				}),
 				write_mask: wgpu::ColorWrites::ALL,
-			}],
+			})],
 		}),
 		primitive: wgpu::PrimitiveState {
 			topology: wgpu::PrimitiveTopology::TriangleList,
@@ -949,11 +949,11 @@ fn render_pass(
 
 	let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 		label: Some("render-image"),
-		color_attachments: &[wgpu::RenderPassColorAttachment {
+		color_attachments: &[Some(wgpu::RenderPassColorAttachment {
 			view: target,
 			resolve_target: None,
 			ops: wgpu::Operations { load, store: true },
-		}],
+		})],
 		depth_stencil_attachment: None,
 	});
 

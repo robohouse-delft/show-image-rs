@@ -1,3 +1,7 @@
+# main
+  * Bump maximum `tch` version to `0.8.x`.
+  * Update internal dependencies.
+
 # 0.12.3 - 2022-05-22
   * Add `WindowHandle::set_outer_position`.
 

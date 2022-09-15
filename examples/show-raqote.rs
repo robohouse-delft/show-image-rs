@@ -18,8 +18,8 @@ fn main() -> Result<(), String> {
 
 	let mut image = DrawTarget::new(1000, 1000);
 	let mut overlay = DrawTarget::new(500, 1000);
-	image.set_transform(&raqote::Transform::create_scale(1000.0, 1000.0));
-	overlay.set_transform(&raqote::Transform::create_scale(1000.0, 1000.0));
+	image.set_transform(&raqote::Transform::scale(1000.0, 1000.0));
+	overlay.set_transform(&raqote::Transform::scale(1000.0, 1000.0));
 
 	let black = raqote::Color::new(255, 0, 0, 0).into();
 	let white = raqote::Color::new(255, 255, 255, 255).into();
