@@ -177,9 +177,9 @@ impl<'a> WindowHandle<'a> {
 	/// This will automatically un-maximize the window.
 	///
 	/// Some window managers or platforms may ignore this property.
-	pub fn set_outer_position(&self, position: [i32; 2]) {
-		self.window().window.request_redraw();
-		self.window().window.set_outer_position(winit::dpi::PhysicalPosition::<i32>::from(position));
+	pub fn set_outer_position(&self, position: impl Into<glam::IVec2>) {
+		let position = position.into();
+		self.window().window.set_outer_position(winit::dpi::PhysicalPosition::new(position.x, position.y));
 	}
 
 	/// Get the inner size of the window in physical pixels.
@@ -203,8 +203,9 @@ impl<'a> WindowHandle<'a> {
 	/// The size is excluding borders, the title bar and other decorations.
 	///
 	/// Some window managers may ignore this property.
-	pub fn set_inner_size(&mut self, size: [u32; 2]) {
-		self.window_mut().window.set_inner_size(winit::dpi::PhysicalSize::<u32>::from(size));
+	pub fn set_inner_size(&mut self, size: impl Into<glam::UVec2>) {
+		let size = size.into();
+		self.window_mut().window.set_inner_size(winit::dpi::PhysicalSize::new(size.x, size.y));
 		self.window().window.request_redraw();
 	}
 

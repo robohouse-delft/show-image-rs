@@ -1,5 +1,7 @@
 # main
   * Autoselect compatible present mode for all platforms.
+  * Change `window.set_outer_position()` to take an `impl Into<glam::IVec2>`.
+  * Change `window.set_inner_size()` to take an `impl Into<glam::UVec2>`.
   * Bump maximum `tch` version to `0.8.x`.
   * Update internal dependencies.
 
