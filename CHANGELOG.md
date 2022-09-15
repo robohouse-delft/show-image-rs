@@ -7,7 +7,7 @@
   * Use `glam` version `0.20` or `0.21`.
   * Update internal dependencies.
 
-# 0.12.3 - 2022-05-22
+# v0.12.3 - 2022-05-22
   * Add `WindowHandle::set_outer_position`.
 
 # v0.12.2 - 2022-05-22
