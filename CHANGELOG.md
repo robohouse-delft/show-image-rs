@@ -1,4 +1,4 @@
-# main
+# v0.13.0 - 2022-09-15
   * Autoselect compatible present mode for all platforms.
   * Change `window.set_outer_position()` to take an `impl Into<glam::IVec2>`.
   * Change `window.set_inner_size()` to take an `impl Into<glam::UVec2>`.
