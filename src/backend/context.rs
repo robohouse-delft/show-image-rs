@@ -60,6 +60,7 @@ pub(crate) struct GpuContext {
 	pub window_pipeline: wgpu::RenderPipeline,
 
 	/// The render pipeline to use for rendering to image.
+	#[cfg(feature = "save")]
 	pub image_pipeline: wgpu::RenderPipeline,
 }
 
@@ -137,6 +138,8 @@ impl GpuContext {
 			&fragment_shader_unorm8,
 			swap_chain_format,
 		);
+
+		#[cfg(feature = "save")]
 		let image_pipeline = create_render_pipeline(
 			&device,
 			&pipeline_layout,
@@ -151,6 +154,7 @@ impl GpuContext {
 			window_bind_group_layout,
 			image_bind_group_layout,
 			window_pipeline,
+			#[cfg(feature = "save")]
 			image_pipeline,
 		})
 	}
