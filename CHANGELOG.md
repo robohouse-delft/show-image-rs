@@ -2,6 +2,7 @@
   * Autoselect compatible present mode for all platforms.
   * Change `window.set_outer_position()` to take an `impl Into<glam::IVec2>`.
   * Change `window.set_inner_size()` to take an `impl Into<glam::UVec2>`.
+  * Redesign overlay API.
   * Bump maximum `tch` version to `0.8.x`.
   * Use `glam` version `0.20` or `0.21`.
   * Update internal dependencies.

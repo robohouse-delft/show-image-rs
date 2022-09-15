@@ -46,6 +46,13 @@ pub enum SetImageError {
 	ImageDataError(ImageDataError),
 }
 
+/// The specified overlay was not found on the window.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct UnknownOverlay {
+	/// The name of the overlay.
+	pub name: String,
+}
+
 /// An error occured trying to find a usable graphics device.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum GetDeviceError {
@@ -146,6 +153,7 @@ impl std::error::Error for ImageDataError {}
 impl std::error::Error for UnsupportedImageFormat {}
 impl std::error::Error for InvalidWindowId {}
 impl std::error::Error for SetImageError {}
+impl std::error::Error for UnknownOverlay {}
 impl std::error::Error for GetDeviceError {}
 impl std::error::Error for NoSuitableAdapterFound {}
 impl std::error::Error for SaveImageError {}
@@ -186,6 +194,12 @@ impl std::fmt::Display for SetImageError {
 			Self::InvalidWindowId(e) => write!(f, "{}", e),
 			Self::ImageDataError(e) => write!(f, "{}", e),
 		}
+	}
+}
+
+impl std::fmt::Display for UnknownOverlay {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "unknown overlay: {}", self.name)
 	}
 }
 

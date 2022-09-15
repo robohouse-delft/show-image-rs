@@ -1,22 +1,24 @@
-use crate::backend::Context;
-use crate::backend::util::GpuImage;
-use crate::backend::util::UniformsBuffer;
-use crate::event::EventHandlerControlFlow;
-use crate::event::WindowEvent;
 use crate::Color;
 use crate::ContextHandle;
 use crate::ImageInfo;
 use crate::ImageView;
 use crate::WindowId;
 use crate::WindowProxy;
+use crate::backend::Context;
+use crate::backend::util::GpuImage;
+use crate::backend::util::UniformsBuffer;
+use crate::error;
+use crate::event::EventHandlerControlFlow;
+use crate::event::WindowEvent;
 use glam::Vec3;
 use glam::{Affine2, Vec2};
+use indexmap::IndexMap;
 
 /// Internal shorthand for window event handlers.
 type DynWindowEventHandler = dyn FnMut(WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow);
 
 /// Window capable of displaying images using wgpu.
-pub struct Window {
+pub(crate) struct Window {
 	/// The winit window.
 	pub window: winit::window::Window,
 
@@ -25,9 +27,6 @@ pub struct Window {
 
 	/// The background color of the window.
 	pub background_color: Color,
-
-	/// If true, draw overlays on top of the main image.
-	pub overlays_visible: bool,
 
 	/// The wgpu surface to render to.
 	pub surface: wgpu::Surface,
@@ -38,16 +37,25 @@ pub struct Window {
 	/// The image to display (if any).
 	pub image: Option<GpuImage>,
 
+	/// Overlays for the window.
+	pub overlays: IndexMap<String, Overlay>,
+
 	/// Transformation to apply to the image, in virtual window space.
 	///
 	/// Virtual window space goes from (0, 0) in the top left to (1, 1) in the bottom right.
 	pub user_transform: Affine2,
 
-	/// Overlays to draw on top of images.
-	pub overlays: Vec<GpuImage>,
-
 	/// The event handlers for this specific window.
 	pub event_handlers: Vec<Box<DynWindowEventHandler>>,
+}
+
+/// An overlay added to a window.
+pub(crate) struct Overlay {
+	/// The image to show.
+	pub image: GpuImage,
+
+	/// If true, show the overlay, otherwise do not.
+	pub visible: bool,
 }
 
 /// Handle to a window.
@@ -246,17 +254,6 @@ impl<'a> WindowHandle<'a> {
 		self.window().window.fullscreen().is_some()
 	}
 
-	/// Check if the window is currently showing overlays.
-	pub fn overlays_visible(&self) -> bool {
-		self.window().overlays_visible
-	}
-
-	/// Enable or disable the overlays for this window.
-	pub fn set_overlays_visible(&mut self, overlays_visible: bool) {
-		self.window_mut().overlays_visible = overlays_visible;
-		self.window().window.request_redraw()
-	}
-
 	/// Set the image to display on the window.
 	pub fn set_image(&mut self, name: impl Into<String>, image: &ImageView) {
 		let image = self.context().make_gpu_image(name, image);
@@ -267,17 +264,64 @@ impl<'a> WindowHandle<'a> {
 
 	/// Add an overlay to the window.
 	///
-	/// Overlays are drawn on top of the image.
-	/// Overlays remain active until you call they are cleared.
-	pub fn add_overlay(&mut self, name: impl Into<String>, image: &ImageView) {
-		let image = self.context().make_gpu_image(name, image);
-		self.window_mut().overlays.push(image);
+	/// If the window already has an overlay with the same name,
+	/// the overlay is overwritten.
+	///
+	/// Overlays are drawn on top of the image in the order that they are first added.
+	///
+	/// If you wish to change the order of existing overlays, you must remove and re-add the overlays.
+	pub fn set_overlay(&mut self, name: impl Into<String>, image: &ImageView, visible: bool) {
+		let name = name.into();
+		let image = self.context().make_gpu_image(name.clone(), image);
+		self.window_mut().overlays.insert(name, Overlay {
+			image,
+			visible,
+		});
 		self.window().window.request_redraw()
 	}
 
-	/// Clear the overlays of the window.
+	/// Remove an overlay from the window.
+	///
+	/// Returns `true` if there was an overlay to remove.
+	pub fn remove_overlay(&mut self, name: &impl AsRef<str>) -> bool {
+		let removed = self.window_mut().overlays.remove(name.as_ref()).is_some();
+		self.window().window.request_redraw();
+		removed
+	}
+
+	/// Remove all overlays from the window.
 	pub fn clear_overlays(&mut self) {
 		self.window_mut().overlays.clear();
+		self.window().window.request_redraw()
+	}
+
+	/// Disable a specific overlay.
+	///
+	/// The overlay is not removed, but it will not be rendered anymore untill you enable the overlay again.
+	pub fn set_overlay_visible(&mut self, name: impl AsRef<str>, visible: bool) -> Result<(), error::UnknownOverlay> {
+		let name = name.as_ref();
+		let overlay = self.window_mut().overlays.get_mut(name)
+			.ok_or_else(|| error::UnknownOverlay { name: name.into() })?;
+		overlay.visible = visible;
+		self.window().window.request_redraw();
+		Ok(())
+	}
+
+	/// Toggle an overlay between enabled and disabled.
+	pub fn toggle_overlay_visible(&mut self, name: impl AsRef<str>) -> Result<(), error::UnknownOverlay> {
+		let name = name.as_ref();
+		let overlay = self.window_mut().overlays.get_mut(name)
+			.ok_or_else(|| error::UnknownOverlay { name: name.into() })?;
+		overlay.visible = !overlay.visible;
+		self.window().window.request_redraw();
+		Ok(())
+	}
+
+	/// Enable or disable all overlays for this window.
+	pub fn set_all_overlays_visible(&mut self, overlays_visible: bool) {
+		for (_name, overlay) in &mut self.window_mut().overlays {
+			overlay.visible = overlays_visible;
+		}
 		self.window().window.request_redraw()
 	}
 

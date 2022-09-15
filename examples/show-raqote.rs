@@ -121,7 +121,7 @@ fn main() -> Result<(), String> {
 	let window = show_image::context().run_function_wait(move |context| -> Result<_, String> {
 		let mut window = context.create_window("image", Default::default()).map_err(|e| e.to_string())?;
 		window.set_image("mondriaan", &image.as_image_view().map_err(|e| e.to_string())?);
-		window.add_overlay("overlay", &overlay.as_image_view().map_err(|e| e.to_string())?);
+		window.set_overlay("overlay", &overlay.as_image_view().map_err(|e| e.to_string())?, false);
 		Ok(window.proxy())
 	})?;
 
@@ -138,7 +138,7 @@ fn main() -> Result<(), String> {
 			} else if event.input.key_code == Some(VirtualKeyCode::O) && event.input.modifiers == ModifiersState::CTRL {
 				println!("Ctrl+O pressed, toggling overlay");
 				window.run_function_wait(|mut window| {
-					window.set_overlays_visible(!window.overlays_visible());
+					window.toggle_overlay_visible("overlay").unwrap();
 				}).map_err(|e| e.to_string())?;
 			}
 		}

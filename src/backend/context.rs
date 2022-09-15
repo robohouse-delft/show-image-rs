@@ -43,7 +43,7 @@ impl From<crate::Color> for wgpu::Color {
 	}
 }
 
-pub struct GpuContext {
+pub(crate) struct GpuContext {
 	/// The wgpu device to use.
 	pub device: wgpu::Device,
 
@@ -64,7 +64,7 @@ pub struct GpuContext {
 }
 
 /// The global context managing all windows and the main event loop.
-pub struct Context {
+pub(crate) struct Context {
 	/// Marker to make context !Send.
 	pub unsend: std::marker::PhantomData<*const ()>,
 
@@ -335,8 +335,7 @@ impl Context {
 			uniforms,
 			image: None,
 			user_transform: Affine2::IDENTITY,
-			overlays: Vec::new(),
-			overlays_visible: options.overlays_visible,
+			overlays: Default::default(),
 			event_handlers: Vec::new(),
 		};
 
@@ -414,13 +413,13 @@ impl Context {
 			Some(window.background_color),
 			&frame.texture.create_view(&wgpu::TextureViewDescriptor::default()),
 		);
-		if window.overlays_visible {
-			for overlay in &window.overlays {
+		for (_name, overlay) in &window.overlays {
+			if overlay.visible {
 				render_pass(
 					&mut encoder,
 					&gpu.window_pipeline,
 					&window.uniforms,
-					overlay,
+					&overlay.image,
 					None,
 					&frame.texture.create_view(&wgpu::TextureViewDescriptor::default()),
 				);
@@ -494,8 +493,10 @@ impl Context {
 			&render_target,
 		);
 		if overlays {
-			for overlay in &window.overlays {
-				render_pass(&mut encoder, &gpu.image_pipeline, &window_uniforms, overlay, None, &render_target);
+			for (_name, overlay) in &window.overlays {
+				if overlay.visible {
+					render_pass(&mut encoder, &gpu.image_pipeline, &window_uniforms, &overlay.image, None, &render_target);
+				}
 			}
 		}
 
