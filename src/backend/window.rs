@@ -264,19 +264,29 @@ impl<'a> WindowHandle<'a> {
 
 	/// Add an overlay to the window.
 	///
-	/// If the window already has an overlay with the same name,
-	/// the overlay is overwritten.
-	///
 	/// Overlays are drawn on top of the image in the order that they are first added.
-	///
 	/// If you wish to change the order of existing overlays, you must remove and re-add the overlays.
-	pub fn set_overlay(&mut self, name: impl Into<String>, image: &ImageView, visible: bool) {
+	///
+	/// If the window already has an overlay with the same name,
+	/// the overlay is overwritten and the `initially_visible` argument is ignored.
+	/// If you want to change the visibility of the overlay, you can call [`set_overlay_visible()`].
+	/// If you do so before your function returns, it is guaranteed to have taken effect before the next redraw.
+	pub fn set_overlay(&mut self, name: impl Into<String>, image: &ImageView, initially_visible: bool) {
+		use indexmap::map::Entry;
+
 		let name = name.into();
 		let image = self.context().make_gpu_image(name.clone(), image);
-		self.window_mut().overlays.insert(name, Overlay {
-			image,
-			visible,
-		});
+		match self.window_mut().overlays.entry(name) {
+			Entry::Occupied(mut entry) => {
+				entry.get_mut().image = image;
+			},
+			Entry::Vacant(entry) => {
+				entry.insert(Overlay {
+					image,
+					visible: initially_visible,
+				});
+			},
+		};
 		self.window().window.request_redraw()
 	}
 
