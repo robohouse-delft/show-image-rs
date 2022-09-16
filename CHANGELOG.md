@@ -1,3 +1,6 @@
+# main
+  * Add `window.is_overlay_visible()`.
+
 # v0.13.0 - 2022-09-15
   * Autoselect compatible present mode for all platforms.
   * Change `window.set_outer_position()` to take an `impl Into<glam::IVec2>`.

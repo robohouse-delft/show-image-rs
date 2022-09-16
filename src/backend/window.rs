@@ -295,32 +295,32 @@ impl<'a> WindowHandle<'a> {
 		self.window().window.request_redraw()
 	}
 
+	/// Check if an overlay is visible or not.
+	pub fn is_overlay_visible(&mut self, name: impl AsRef<str>) -> Result<bool, error::UnknownOverlay> {
+		Ok(self.window().get_overlay(name)?.visible)
+	}
+
 	/// Disable a specific overlay.
 	///
 	/// The overlay is not removed, but it will not be rendered anymore untill you enable the overlay again.
 	pub fn set_overlay_visible(&mut self, name: impl AsRef<str>, visible: bool) -> Result<(), error::UnknownOverlay> {
-		let name = name.as_ref();
-		let overlay = self.window_mut().overlays.get_mut(name)
-			.ok_or_else(|| error::UnknownOverlay { name: name.into() })?;
-		overlay.visible = visible;
+		self.window_mut().get_overlay_mut(name)?.visible = visible;
 		self.window().window.request_redraw();
 		Ok(())
 	}
 
 	/// Toggle an overlay between enabled and disabled.
 	pub fn toggle_overlay_visible(&mut self, name: impl AsRef<str>) -> Result<(), error::UnknownOverlay> {
-		let name = name.as_ref();
-		let overlay = self.window_mut().overlays.get_mut(name)
-			.ok_or_else(|| error::UnknownOverlay { name: name.into() })?;
+		let mut overlay = self.window_mut().get_overlay_mut(name)?;
 		overlay.visible = !overlay.visible;
 		self.window().window.request_redraw();
 		Ok(())
 	}
 
 	/// Enable or disable all overlays for this window.
-	pub fn set_all_overlays_visible(&mut self, overlays_visible: bool) {
+	pub fn set_all_overlays_visible(&mut self, visible: bool) {
 		for (_name, overlay) in &mut self.window_mut().overlays {
-			overlay.visible = overlays_visible;
+			overlay.visible = visible;
 		}
 		self.window().window.request_redraw()
 	}
@@ -579,11 +579,23 @@ impl Window {
 			}
 		}
 	}
+
+	fn get_overlay(&self, name: impl AsRef<str>) -> Result<&Overlay, error::UnknownOverlay> {
+		let name = name.as_ref();
+		self.overlays.get(name)
+			.ok_or_else(|| error::UnknownOverlay { name: name.into() })
+	}
+
+	fn get_overlay_mut(&mut self, name: impl AsRef<str>) -> Result<&mut Overlay, error::UnknownOverlay> {
+		let name = name.as_ref();
+		self.overlays.get_mut(name)
+			.ok_or_else(|| error::UnknownOverlay { name: name.into() })
+	}
 }
 
 /// The window specific uniforms for the render pipeline.
 #[derive(Debug, Copy, Clone)]
-pub struct WindowUniforms {
+pub(crate) struct WindowUniforms {
 	/// The transformation applied to the image.
 	///
 	/// With the identity transform, the image is stretched to the inner window size,
