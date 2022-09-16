@@ -1715,7 +1715,7 @@ dependencies = [
 
 [[package]]
 name = "show-image"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "assert2",
  "env_logger",

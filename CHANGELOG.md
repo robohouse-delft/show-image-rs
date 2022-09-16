@@ -1,4 +1,4 @@
-# main
+# v0.13.1 - 2022-09-16
   * Tweak the behavior of `set_overlay` to preserve visibility of existing overlays.
   * Add `window.is_overlay_visible()`.
 
