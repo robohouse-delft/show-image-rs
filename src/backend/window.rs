@@ -269,7 +269,7 @@ impl<'a> WindowHandle<'a> {
 	///
 	/// If the window already has an overlay with the same name,
 	/// the overlay is overwritten and the `initially_visible` argument is ignored.
-	/// If you want to change the visibility of the overlay, you can call [`set_overlay_visible()`].
+	/// If you want to change the visibility of the overlay, you can call [`set_overlay_visible()`][Self::set_overlay_visible].
 	/// If you do so before your function returns, it is guaranteed to have taken effect before the next redraw.
 	pub fn set_overlay(&mut self, name: impl Into<String>, image: &ImageView, initially_visible: bool) {
 		use indexmap::map::Entry;
@@ -310,16 +310,16 @@ impl<'a> WindowHandle<'a> {
 		Ok(self.window().get_overlay(name)?.visible)
 	}
 
-	/// Disable a specific overlay.
+	/// Make a specific overlay visible or invisible for this window.
 	///
-	/// The overlay is not removed, but it will not be rendered anymore untill you enable the overlay again.
+	/// The overlay is not removed, but it will not be rendered anymore untill you make it visible again.
 	pub fn set_overlay_visible(&mut self, name: impl AsRef<str>, visible: bool) -> Result<(), error::UnknownOverlay> {
 		self.window_mut().get_overlay_mut(name)?.visible = visible;
 		self.window().window.request_redraw();
 		Ok(())
 	}
 
-	/// Toggle an overlay between enabled and disabled.
+	/// Toggle an overlay between visible and invisible.
 	pub fn toggle_overlay_visible(&mut self, name: impl AsRef<str>) -> Result<(), error::UnknownOverlay> {
 		let mut overlay = self.window_mut().get_overlay_mut(name)?;
 		overlay.visible = !overlay.visible;
@@ -327,7 +327,7 @@ impl<'a> WindowHandle<'a> {
 		Ok(())
 	}
 
-	/// Enable or disable all overlays for this window.
+	/// Make all overlays visible or invisible for this window.
 	pub fn set_all_overlays_visible(&mut self, visible: bool) {
 		for (_name, overlay) in &mut self.window_mut().overlays {
 			overlay.visible = visible;
