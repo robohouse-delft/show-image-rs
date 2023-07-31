@@ -409,37 +409,37 @@ impl Context {
 			None => return Ok(()),
 		};
 
-		let frame = window.surface.get_current_texture().expect("Failed to acquire next frame");
+		if let Ok(frame) = window.surface.get_current_texture() {
+			let gpu = self.gpu.as_ref().unwrap();
+			let mut encoder = gpu.device.create_command_encoder(&Default::default());
 
-		let gpu = self.gpu.as_ref().unwrap();
-		let mut encoder = gpu.device.create_command_encoder(&Default::default());
-
-		if window.uniforms.is_dirty() {
-			window.uniforms.update_from(&gpu.device, &mut encoder, &window.calculate_uniforms());
-		}
-
-		render_pass(
-			&mut encoder,
-			&gpu.window_pipeline,
-			&window.uniforms,
-			image,
-			Some(window.background_color),
-			&frame.texture.create_view(&wgpu::TextureViewDescriptor::default()),
-		);
-		for (_name, overlay) in &window.overlays {
-			if overlay.visible {
-				render_pass(
-					&mut encoder,
-					&gpu.window_pipeline,
-					&window.uniforms,
-					&overlay.image,
-					None,
-					&frame.texture.create_view(&wgpu::TextureViewDescriptor::default()),
-				);
+			if window.uniforms.is_dirty() {
+				window.uniforms.update_from(&gpu.device, &mut encoder, &window.calculate_uniforms());
 			}
+
+			render_pass(
+				&mut encoder,
+				&gpu.window_pipeline,
+				&window.uniforms,
+				image,
+				Some(window.background_color),
+				&frame.texture.create_view(&wgpu::TextureViewDescriptor::default()),
+			);
+			for (_name, overlay) in &window.overlays {
+				if overlay.visible {
+					render_pass(
+						&mut encoder,
+						&gpu.window_pipeline,
+						&window.uniforms,
+						&overlay.image,
+						None,
+						&frame.texture.create_view(&wgpu::TextureViewDescriptor::default()),
+					);
+				}
+			}
+			gpu.queue.submit(std::iter::once(encoder.finish()));
+			frame.present();
 		}
-		gpu.queue.submit(std::iter::once(encoder.finish()));
-		frame.present();
 		Ok(())
 	}
 
