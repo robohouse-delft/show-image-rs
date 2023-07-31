@@ -34,7 +34,7 @@ save     = ["tinyfiledialogs", "png", "log"]
 
 [dependencies]
 futures           = { version = "0.3.28", default-features = false, features = ["executor"] }
-glam              = ">=0.20.0, <0.22.0"
+glam              = ">=0.20.0, <0.25.0"
 image             = { version = "0.24.6", optional = true, default-features = false }
 indexmap          = "1.9.3"
 log               = { version = "0.4.19", optional = true }
