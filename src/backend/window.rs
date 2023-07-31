@@ -1,18 +1,19 @@
+use crate::backend::util::GpuImage;
+use crate::backend::util::UniformsBuffer;
+use crate::backend::Context;
+use crate::error;
+use crate::event::EventHandlerControlFlow;
+use crate::event::WindowEvent;
 use crate::Color;
 use crate::ContextHandle;
 use crate::ImageInfo;
 use crate::ImageView;
 use crate::WindowId;
 use crate::WindowProxy;
-use crate::backend::Context;
-use crate::backend::util::GpuImage;
-use crate::backend::util::UniformsBuffer;
-use crate::error;
-use crate::event::EventHandlerControlFlow;
-use crate::event::WindowEvent;
 use glam::Vec3;
 use glam::{Affine2, Vec2};
 use indexmap::IndexMap;
+use winit::window::Icon;
 
 /// Internal shorthand for window event handlers.
 type DynWindowEventHandler = dyn FnMut(WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow);
@@ -76,7 +77,11 @@ pub struct WindowHandle<'a> {
 impl<'a> WindowHandle<'a> {
 	/// Create a new window handle from a context handle and a window ID.
 	pub fn new(context_handle: ContextHandle<'a>, index: usize, destroy_flag: Option<&'a mut bool>) -> Self {
-		Self { context_handle, index, destroy_flag }
+		Self {
+			context_handle,
+			index,
+			destroy_flag,
+		}
 	}
 
 	/// Get a reference to the context.
@@ -137,9 +142,13 @@ impl<'a> WindowHandle<'a> {
 	///
 	/// Any subsequent operation on the window through an existing [`WindowProxy`] will return [`InvalidWindowId`](crate::error::InvalidWindowId).
 	pub fn destroy(self) -> ContextHandle<'a> {
-		let WindowHandle { context_handle, index, destroy_flag } = self;
+		let WindowHandle {
+			context_handle,
+			index,
+			destroy_flag,
+		} = self;
 		context_handle.context.windows.remove(index);
-		if let Some(destroy_flag) =  destroy_flag {
+		if let Some(destroy_flag) = destroy_flag {
 			*destroy_flag = true;
 		}
 		context_handle
@@ -187,7 +196,9 @@ impl<'a> WindowHandle<'a> {
 	/// Some window managers or platforms may ignore this property.
 	pub fn set_outer_position(&self, position: impl Into<glam::IVec2>) {
 		let position = position.into();
-		self.window().window.set_outer_position(winit::dpi::PhysicalPosition::new(position.x, position.y));
+		self.window()
+			.window
+			.set_outer_position(winit::dpi::PhysicalPosition::new(position.x, position.y));
 	}
 
 	/// Get the inner size of the window in physical pixels.
@@ -213,7 +224,9 @@ impl<'a> WindowHandle<'a> {
 	/// Some window managers may ignore this property.
 	pub fn set_inner_size(&mut self, size: impl Into<glam::UVec2>) {
 		let size = size.into();
-		self.window_mut().window.set_inner_size(winit::dpi::PhysicalSize::new(size.x, size.y));
+		self.window_mut()
+			.window
+			.set_inner_size(winit::dpi::PhysicalSize::new(size.x, size.y));
 		self.window().window.request_redraw();
 	}
 
@@ -459,6 +472,8 @@ pub struct WindowOptions {
 	///
 	/// Defaults to true.
 	pub default_controls: bool,
+
+	pub icon: Option<Icon>,
 }
 
 impl Default for WindowOptions {
@@ -480,6 +495,7 @@ impl WindowOptions {
 			fullscreen: false,
 			overlays_visible: true,
 			default_controls: true,
+			icon: None,
 		}
 	}
 
@@ -575,12 +591,10 @@ impl Window {
 		if let Some(image) = &self.image {
 			let image_size = image.info().size.as_vec2();
 			if !self.preserve_aspect_ratio {
-				WindowUniforms::stretch(image_size)
-					.pre_apply_transform(self.user_transform)
+				WindowUniforms::stretch(image_size).pre_apply_transform(self.user_transform)
 			} else {
 				let window_size = glam::UVec2::new(self.window.inner_size().width, self.window.inner_size().height).as_vec2();
-				WindowUniforms::fit(window_size, image_size)
-					.pre_apply_transform(self.user_transform)
+				WindowUniforms::fit(window_size, image_size).pre_apply_transform(self.user_transform)
 			}
 		} else {
 			WindowUniforms {
@@ -592,13 +606,13 @@ impl Window {
 
 	fn get_overlay(&self, name: impl AsRef<str>) -> Result<&Overlay, error::UnknownOverlay> {
 		let name = name.as_ref();
-		self.overlays.get(name)
-			.ok_or_else(|| error::UnknownOverlay { name: name.into() })
+		self.overlays.get(name).ok_or_else(|| error::UnknownOverlay { name: name.into() })
 	}
 
 	fn get_overlay_mut(&mut self, name: impl AsRef<str>) -> Result<&mut Overlay, error::UnknownOverlay> {
 		let name = name.as_ref();
-		self.overlays.get_mut(name)
+		self.overlays
+			.get_mut(name)
 			.ok_or_else(|| error::UnknownOverlay { name: name.into() })
 	}
 }
@@ -642,10 +656,7 @@ impl WindowUniforms {
 		}
 
 		let transform = Affine2::from_scale_angle_translation(Vec2::new(w, h), 0.0, 0.5 * Vec2::new(1.0 - w, 1.0 - h));
-		Self {
-			transform,
-			image_size,
-		}
+		Self { transform, image_size }
 	}
 
 	/// Pre-apply a transformation.
@@ -673,7 +684,7 @@ struct Vec3A16 {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 struct Mat3x3 {
-	pub cols: [Vec3A16; 3]
+	pub cols: [Vec3A16; 3],
 }
 
 impl Vec2A8 {
@@ -690,9 +701,7 @@ impl Vec3A16 {
 
 impl Mat3x3 {
 	pub const fn new(col0: Vec3A16, col1: Vec3A16, col2: Vec3A16) -> Self {
-		Self {
-			cols: [col0, col1, col2],
-		}
+		Self { cols: [col0, col1, col2] }
 	}
 }
 
@@ -741,7 +750,11 @@ unsafe impl crate::backend::util::ToStd140 for WindowUniforms {
 }
 
 /// Event handler that implements the default controls.
-pub(super) fn default_controls_handler(mut window: WindowHandle, event: &mut crate::event::WindowEvent, _control_flow: &mut crate::event::EventHandlerControlFlow) {
+pub(super) fn default_controls_handler(
+	mut window: WindowHandle,
+	event: &mut crate::event::WindowEvent,
+	_control_flow: &mut crate::event::EventHandlerControlFlow,
+) {
 	match event {
 		WindowEvent::MouseWheel(event) => {
 			let delta = match event.delta {
@@ -750,7 +763,8 @@ pub(super) fn default_controls_handler(mut window: WindowHandle, event: &mut cra
 			};
 			let scale = 1.1f32.powf(delta);
 
-			let origin = event.position
+			let origin = event
+				.position
 				.map(|pos| pos / window.inner_size().as_vec2())
 				.unwrap_or_else(|| glam::Vec2::new(0.5, 0.5));
 			let transform = glam::Affine2::from_scale_angle_translation(glam::Vec2::splat(scale), 0.0, origin - scale * origin);

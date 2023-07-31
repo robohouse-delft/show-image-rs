@@ -1,4 +1,3 @@
-use core::num::NonZeroU64;
 use crate::backend::proxy::ContextFunction;
 use crate::backend::util::GpuImage;
 use crate::backend::util::{ToStd140, UniformsBuffer};
@@ -15,7 +14,9 @@ use crate::ImageView;
 use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
+use core::num::NonZeroU64;
 use glam::Affine2;
+use winit::platform::windows::EventLoopBuilderExtWindows;
 
 /// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
 ///
@@ -168,6 +169,12 @@ impl Context {
 	/// So it is not possible to *run* more than one context.
 	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
 		let instance = wgpu::Instance::new(select_backend());
+		#[cfg(feature = "anythread")]
+		let event_loop = winit::event_loop::EventLoopBuilder::with_user_event()
+			.with_any_thread(true)
+			.with_dpi_aware(true)
+			.build();
+		#[cfg(not(feature = "anythread"))]
 		let event_loop = winit::event_loop::EventLoopBuilder::with_user_event().build();
 		let proxy = ContextProxy::new(event_loop.create_proxy(), std::thread::current().id());
 
@@ -248,7 +255,12 @@ impl<'a> ContextHandle<'a> {
 
 	/// Get a window handle for the given window ID.
 	pub fn window(&mut self, window_id: WindowId) -> Result<WindowHandle, InvalidWindowId> {
-		let index = self.context.windows.iter().position(|x| x.id() == window_id).ok_or(InvalidWindowId { window_id })?;
+		let index = self
+			.context
+			.windows
+			.iter()
+			.position(|x| x.id() == window_id)
+			.ok_or(InvalidWindowId { window_id })?;
 		Ok(WindowHandle::new(self.reborrow(), index, None))
 	}
 
@@ -309,7 +321,8 @@ impl Context {
 			.with_visible(!options.start_hidden)
 			.with_resizable(options.resizable)
 			.with_decorations(!options.borderless)
-			.with_fullscreen(fullscreen);
+			.with_fullscreen(fullscreen)
+			.with_window_icon(options.icon);
 
 		if let Some(size) = options.size {
 			window = window.with_inner_size(winit::dpi::PhysicalSize::new(size[0], size[1]));
@@ -318,13 +331,12 @@ impl Context {
 		let window = window.build(event_loop)?;
 		let surface = unsafe { self.instance.create_surface(&window) };
 
-
 		let gpu = match &self.gpu {
 			Some(x) => x,
 			None => {
 				let gpu = GpuContext::new(&self.instance, self.swap_chain_format, &surface)?;
 				self.gpu.insert(gpu)
-			}
+			},
 		};
 
 		let size = glam::UVec2::new(window.inner_size().width, window.inner_size().height);
@@ -346,7 +358,9 @@ impl Context {
 		self.windows.push(window);
 		let index = self.windows.len() - 1;
 		if options.default_controls {
-			self.windows[index].event_handlers.push(Box::new(super::window::default_controls_handler));
+			self.windows[index]
+				.event_handlers
+				.push(Box::new(super::window::default_controls_handler));
 		}
 		Ok(index)
 	}
@@ -395,18 +409,13 @@ impl Context {
 			None => return Ok(()),
 		};
 
-		let frame = window
-			.surface
-			.get_current_texture()
-			.expect("Failed to acquire next frame");
+		let frame = window.surface.get_current_texture().expect("Failed to acquire next frame");
 
 		let gpu = self.gpu.as_ref().unwrap();
 		let mut encoder = gpu.device.create_command_encoder(&Default::default());
 
 		if window.uniforms.is_dirty() {
-			window
-				.uniforms
-				.update_from(&gpu.device, &mut encoder, &window.calculate_uniforms());
+			window.uniforms.update_from(&gpu.device, &mut encoder, &window.calculate_uniforms());
 		}
 
 		render_pass(
@@ -499,7 +508,14 @@ impl Context {
 		if overlays {
 			for (_name, overlay) in &window.overlays {
 				if overlay.visible {
-					render_pass(&mut encoder, &gpu.image_pipeline, &window_uniforms, &overlay.image, None, &render_target);
+					render_pass(
+						&mut encoder,
+						&gpu.image_pipeline,
+						&window_uniforms,
+						&overlay.image,
+						None,
+						&render_target,
+					);
 				}
 			}
 		}
@@ -749,7 +765,7 @@ fn select_backend() -> wgpu::Backends {
 		None => {
 			eprintln!("Unknown WGPU_BACKEND: {:?}", backend);
 			std::process::exit(1);
-		}
+		},
 	};
 
 	if backend.eq_ignore_ascii_case("primary") {
@@ -779,7 +795,7 @@ fn select_power_preference() -> wgpu::PowerPreference {
 		None => {
 			eprintln!("Unknown WGPU_POWER_PREF: {:?}", power_pref);
 			std::process::exit(1);
-		}
+		},
 	};
 
 	if power_pref.eq_ignore_ascii_case("low") {
@@ -855,9 +871,7 @@ fn create_image_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 				visibility: wgpu::ShaderStages::FRAGMENT,
 				count: None,
 				ty: wgpu::BindingType::Buffer {
-					ty: wgpu::BufferBindingType::Storage {
-						read_only: true,
-					},
+					ty: wgpu::BufferBindingType::Storage { read_only: true },
 					has_dynamic_offset: false,
 					min_binding_size: None,
 				},
@@ -922,12 +936,7 @@ fn create_render_pipeline(
 }
 
 /// Create a swap chain for a surface.
-fn configure_surface(
-	size: glam::UVec2,
-	surface: &wgpu::Surface,
-	format: wgpu::TextureFormat,
-	device: &wgpu::Device,
-) {
+fn configure_surface(size: glam::UVec2, surface: &wgpu::Surface, format: wgpu::TextureFormat, device: &wgpu::Device) {
 	let config = wgpu::SurfaceConfiguration {
 		usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
 		format,
