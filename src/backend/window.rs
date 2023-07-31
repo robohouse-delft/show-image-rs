@@ -321,7 +321,7 @@ impl<'a> WindowHandle<'a> {
 
 	/// Toggle an overlay between visible and invisible.
 	pub fn toggle_overlay_visible(&mut self, name: impl AsRef<str>) -> Result<(), error::UnknownOverlay> {
-		let mut overlay = self.window_mut().get_overlay_mut(name)?;
+		let overlay = self.window_mut().get_overlay_mut(name)?;
 		overlay.visible = !overlay.visible;
 		self.window().window.request_redraw();
 		Ok(())
