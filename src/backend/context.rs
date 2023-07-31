@@ -115,9 +115,9 @@ pub struct ContextHandle<'a> {
 impl GpuContext {
 	pub fn new(instance: &wgpu::Instance, swap_chain_format: wgpu::TextureFormat, surface: &wgpu::Surface) -> Result<Self, GetDeviceError> {
 		let (device, queue) = futures::executor::block_on(get_device(instance, surface))?;
-		device.on_uncaptured_error(|error| {
+		device.on_uncaptured_error(Box::new(|error| {
 			panic!("Unhandled WGPU error: {}", error);
-		});
+		}));
 
 		let window_bind_group_layout = create_window_bind_group_layout(&device);
 		let image_bind_group_layout = create_image_bind_group_layout(&device);
@@ -167,7 +167,10 @@ impl Context {
 	/// but they must be run from the main thread and the [`run`](Self::run) function never returns.
 	/// So it is not possible to *run* more than one context.
 	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
-		let instance = wgpu::Instance::new(select_backend());
+		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+			backends: select_backend(),
+			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+		});
 		let event_loop = winit::event_loop::EventLoopBuilder::with_user_event().build();
 		let proxy = ContextProxy::new(event_loop.create_proxy(), std::thread::current().id());
 
@@ -316,7 +319,7 @@ impl Context {
 		}
 
 		let window = window.build(event_loop)?;
-		let surface = unsafe { self.instance.create_surface(&window) };
+		let surface = unsafe { self.instance.create_surface(&window)? };
 
 
 		let gpu = match &self.gpu {
@@ -436,8 +439,6 @@ impl Context {
 
 	#[cfg(feature = "save")]
 	fn render_to_texture(&self, window_id: WindowId, overlays: bool) -> Result<Option<(String, crate::BoxImage)>, InvalidWindowId> {
-		use core::num::NonZeroU32;
-
 		let window = self
 			.windows
 			.iter()
@@ -473,6 +474,7 @@ impl Context {
 			format: wgpu::TextureFormat::Rgba8Unorm,
 			dimension: wgpu::TextureDimension::D2,
 			size,
+			view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
 		});
 
 		let mut encoder = gpu.device.create_command_encoder(&Default::default());
@@ -522,8 +524,8 @@ impl Context {
 				buffer: &buffer,
 				layout: wgpu::ImageDataLayout {
 					offset: 0,
-					bytes_per_row: NonZeroU32::new(bytes_per_row),
-					rows_per_image: NonZeroU32::new(image.info().size.y),
+					bytes_per_row: Some(bytes_per_row),
+					rows_per_image: Some(image.info().size.y),
 				},
 			},
 			size,
@@ -934,6 +936,8 @@ fn configure_surface(
 		width: size.x,
 		height: size.y,
 		present_mode: wgpu::PresentMode::AutoVsync,
+		alpha_mode: wgpu::CompositeAlphaMode::Auto,
+		view_formats: vec![format],
 	};
 	surface.configure(device, &config);
 }

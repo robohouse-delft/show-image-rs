@@ -10,6 +10,9 @@ pub enum CreateWindowError {
 
 	/// Failed to get a suitable GPU device.
 	GetDevice(GetDeviceError),
+
+	/// Failed to create a surface for drawing.
+	CreateSurface(wgpu::CreateSurfaceError),
 }
 
 /// An error that can occur while interpreting image data.
@@ -90,6 +93,12 @@ impl From<GetDeviceError> for CreateWindowError {
 	}
 }
 
+impl From<wgpu::CreateSurfaceError> for CreateWindowError {
+	fn from(other: wgpu::CreateSurfaceError) -> Self {
+		Self::CreateSurface(other)
+	}
+}
+
 impl From<ImageDataError> for SetImageError {
 	fn from(other: ImageDataError) -> Self {
 		Self::ImageDataError(other)
@@ -163,6 +172,7 @@ impl std::fmt::Display for CreateWindowError {
 		match self {
 			Self::Winit(e) => write!(f, "{}", e),
 			Self::GetDevice(e) => write!(f, "{}", e),
+			Self::CreateSurface(e) => write!(f, "{}", e),
 		}
 	}
 }

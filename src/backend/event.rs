@@ -173,6 +173,23 @@ pub fn convert_winit_window_event(
 			.into(),
 		),
 		W::Touch(touch) => Some(event::WindowTouchEvent { window_id, touch }.into()),
+		W::TouchpadMagnify { device_id, delta, phase } => Some(
+			event::WindowTouchpadMagnifyEvent {
+				window_id,
+				device_id,
+				scale: 1.0 + delta,
+				phase,
+			}.into()
+		),
+		W::SmartMagnify { .. } => None,
+		W::TouchpadRotate { device_id, delta, phase } => Some(
+			event::WindowTouchpadRotateEvent {
+				window_id,
+				device_id,
+				angle_radians: delta.to_radians().into(),
+				phase,
+			}.into()
+		),
 		W::ThemeChanged(theme) => Some(
 			event::WindowThemeChangedEvent {
 				window_id,

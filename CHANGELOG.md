@@ -1,4 +1,7 @@
 # main
+  * Update to `winit` version `0.28`.
+  * Update to `wgpu` version `0.17`.
+  * Expose `winit` support for `WindowTouchpadMagnifyEvent` and `WindowTouchpadRotateEvent` on supported platforms.
   * Bump minimum `tch` version to `0.13.0`.
 
 # v0.13.1 - 2022-09-16

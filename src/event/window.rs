@@ -73,6 +73,20 @@ pub enum WindowEvent {
 	/// A window received touchpad pressure input.
 	TouchpadPressure(WindowTouchpadPressureEvent),
 
+	/// A window received a touchpad magnify event.
+	///
+	/// On supported platforms, the event is triggered moving two fingers towards or away from each-other on the touchpad.
+	///
+	/// *Platform specific:* Only available on macOS.
+	TouchpadMagnify(WindowTouchpadMagnifyEvent),
+
+	/// A window received a touchpad rotate event.
+	///
+	/// On supported platforms, the event is triggered putting two fingers on the touchpad and rotating them.
+	///
+	/// *Platform specific:* Only available on macOS.
+	TouchpadRotate(WindowTouchpadRotateEvent),
+
 	/// A window received touch input.
 	Touch(WindowTouchEvent),
 
@@ -106,6 +120,8 @@ impl WindowEvent {
 			Self::MouseWheel(x) => x.window_id,
 			Self::AxisMotion(x) => x.window_id,
 			Self::TouchpadPressure(x) => x.window_id,
+			Self::TouchpadMagnify(x) => x.window_id,
+			Self::TouchpadRotate(x) => x.window_id,
 			Self::Touch(x) => x.window_id,
 			Self::ScaleFactorChanged(x) => x.window_id,
 			Self::ThemeChanged(x) => x.window_id,
@@ -357,6 +373,43 @@ pub struct WindowTouchpadPressureEvent {
 	pub stage: i64,
 }
 
+/// A window received touchpad magnify input.
+#[derive(Debug, Clone)]
+pub struct WindowTouchpadMagnifyEvent {
+	/// The ID of the window.
+	pub window_id: WindowId,
+
+	/// The device that generated the input.
+	pub device_id: DeviceId,
+
+	/// The scaling to be applied.
+	///
+	/// Values between 0.0 and 1.0 indicate zooming out.
+	/// Values above 1.0 indicate zooming in.
+	pub scale: f64,
+
+	/// The touch phase for the event.
+	pub phase: TouchPhase,
+}
+
+/// A window received touchpad rotate input.
+#[derive(Debug, Clone)]
+pub struct WindowTouchpadRotateEvent {
+	/// The ID of the window.
+	pub window_id: WindowId,
+
+	/// The device that generated the input.
+	pub device_id: DeviceId,
+
+	/// The rotation angle in radians.
+	///
+	/// A positive rotation is counter clockwise.
+	pub angle_radians: f64,
+
+	/// The touch phase for the event.
+	pub phase: TouchPhase,
+}
+
 /// A window received touch input.
 #[derive(Debug, Clone)]
 pub struct WindowTouchEvent {
@@ -406,6 +459,8 @@ impl_from_variant!(WindowEvent::MouseButton(WindowMouseButtonEvent));
 impl_from_variant!(WindowEvent::MouseWheel(WindowMouseWheelEvent));
 impl_from_variant!(WindowEvent::AxisMotion(WindowAxisMotionEvent));
 impl_from_variant!(WindowEvent::TouchpadPressure(WindowTouchpadPressureEvent));
+impl_from_variant!(WindowEvent::TouchpadMagnify(WindowTouchpadMagnifyEvent));
+impl_from_variant!(WindowEvent::TouchpadRotate(WindowTouchpadRotateEvent));
 impl_from_variant!(WindowEvent::Touch(WindowTouchEvent));
 impl_from_variant!(WindowEvent::ScaleFactorChanged(WindowScaleFactorChangedEvent));
 impl_from_variant!(WindowEvent::ThemeChanged(WindowThemeChangedEvent));
