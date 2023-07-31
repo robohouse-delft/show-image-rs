@@ -14,9 +14,9 @@ authors = ["Maarten de Vries <maarten@de-vri.es>"]
 proc_macro = true
 
 [dependencies]
-quote = "1.0.7"
-proc-macro2 = "1.0.19"
-syn = { version = "1.0.39", features = ["full"] }
+quote = "1.0.32"
+proc-macro2 = "1.0.66"
+syn = { version = "1.0.109", features = ["full"] }
 
 [dev-dependencies]
 show-image = { path = ".." }

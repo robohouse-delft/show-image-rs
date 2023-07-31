@@ -33,24 +33,24 @@ nightly  = []
 save     = ["tinyfiledialogs", "png", "log"]
 
 [dependencies]
-futures           = { version = "0.3.5", default-features = false, features = ["executor"] }
+futures           = { version = "0.3.28", default-features = false, features = ["executor"] }
 glam              = ">=0.20.0, <0.22.0"
-image             = { version = "0.24.1", optional = true, default-features = false }
-indexmap          = "1.9.1"
-log               = { version = "0.4.11", optional = true }
-png               = { version = "0.17.0", optional = true }
-raqote            = { version = "0.8.0", optional = true, default-features = false }
+image             = { version = "0.24.6", optional = true, default-features = false }
+indexmap          = "1.9.3"
+log               = { version = "0.4.19", optional = true }
+png               = { version = "0.17.9", optional = true }
+raqote            = { version = "0.8.2", optional = true, default-features = false }
 show-image-macros = { version = "=0.12.3", optional = true, path = "show-image-macros" }
 tch               = { version = ">=0.13.0, <0.14.0",  optional = true }
-tinyfiledialogs   = { version = "3.3.9", optional = true }
+tinyfiledialogs   = { version = "3.9.1", optional = true }
 wgpu              = { version = "0.13.1", features = ["spirv"] }
-winit             = "0.27.3"
+winit             = "0.27.5"
 
 [dev-dependencies]
 show-image = { path = ".", features = ["full"] }
-assert2    = "0.3.5"
-image      = { version = "0.24.1", default-features = true }
-env_logger = "0.9.0"
+assert2    = "0.3.11"
+image      = { version = "0.24.6", default-features = true }
+env_logger = "0.10.0"
 
 [build-dependencies]
 rustc_version = "0.4.0"
