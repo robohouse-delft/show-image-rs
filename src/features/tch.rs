@@ -179,11 +179,19 @@ impl TensorAsImage for tch::Tensor {
 	}
 }
 
+fn tensor_to_byte_vec(tensor: &tch::Tensor) -> Vec<u8> {
+	let size = tensor.numel() * tensor.kind().elt_size_in_bytes();
+	let mut data = vec![0u8; size];
+	tensor.copy_data_u8(&mut data, tensor.numel());
+	data
+}
+
 impl<'a> From<TensorImage<'a>> for Image {
 	fn from(other: TensorImage<'a>) -> Self {
-		let data: Vec<u8> = match other.planar {
-			true => other.tensor.permute(&[1, 2, 0]).into(),
-			false => other.tensor.into(),
+		let data = if other.planar {
+			tensor_to_byte_vec(&other.tensor.permute([1, 2, 0]))
+		} else {
+			tensor_to_byte_vec(other.tensor)
 		};
 
 		BoxImage::new(other.info, data.into_boxed_slice()).into()
@@ -270,89 +278,89 @@ mod test {
 
 	#[test]
 	fn guess_tensor_info() {
-		let data = tch::Tensor::of_slice(&(0..120).collect::<Vec<u8>>());
+		let data = tch::Tensor::from_slice(&(0..120).collect::<Vec<u8>>());
 
 		// Guess monochrome from compatible data.
-		assert!(data.reshape(&[12, 10, 1]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::mono8(10, 12)));
-		assert!(data.reshape(&[1, 12, 10]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::mono8(10, 12)));
-		assert!(data.reshape(&[12, 10]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::mono8(10, 12)));
+		assert!(data.reshape([12, 10, 1]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::mono8(10, 12)));
+		assert!(data.reshape([1, 12, 10]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::mono8(10, 12)));
+		assert!(data.reshape([12, 10]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::mono8(10, 12)));
 
 		// Guess RGB[A]/BGR[A] from interlaced data.
-		assert!(data.reshape(&[8, 5, 3]).as_image_guess_rgb().map(|x| x.info) == Ok(ImageInfo::rgb8(5, 8)));
-		assert!(data.reshape(&[8, 5, 3]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::bgr8(5, 8)));
-		assert!(data.reshape(&[5, 6, 4]).as_image_guess_rgb().map(|x| x.info) == Ok(ImageInfo::rgba8(6, 5)));
-		assert!(data.reshape(&[5, 6, 4]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::bgra8(6, 5)));
+		assert!(data.reshape([8, 5, 3]).as_image_guess_rgb().map(|x| x.info) == Ok(ImageInfo::rgb8(5, 8)));
+		assert!(data.reshape([8, 5, 3]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::bgr8(5, 8)));
+		assert!(data.reshape([5, 6, 4]).as_image_guess_rgb().map(|x| x.info) == Ok(ImageInfo::rgba8(6, 5)));
+		assert!(data.reshape([5, 6, 4]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::bgra8(6, 5)));
 
 		// Guess RGB[A]/BGR[A] from planar data.
-		assert!(data.reshape(&[3, 8, 5]).as_image_guess_rgb().map(|x| x.info) == Ok(ImageInfo::rgb8(5, 8)));
-		assert!(data.reshape(&[3, 8, 5]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::bgr8(5, 8)));
-		assert!(data.reshape(&[4, 5, 6]).as_image_guess_rgb().map(|x| x.info) == Ok(ImageInfo::rgba8(6, 5)));
-		assert!(data.reshape(&[4, 5, 6]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::bgra8(6, 5)));
+		assert!(data.reshape([3, 8, 5]).as_image_guess_rgb().map(|x| x.info) == Ok(ImageInfo::rgb8(5, 8)));
+		assert!(data.reshape([3, 8, 5]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::bgr8(5, 8)));
+		assert!(data.reshape([4, 5, 6]).as_image_guess_rgb().map(|x| x.info) == Ok(ImageInfo::rgba8(6, 5)));
+		assert!(data.reshape([4, 5, 6]).as_image_guess_bgr().map(|x| x.info) == Ok(ImageInfo::bgra8(6, 5)));
 
 		// Fail to guess on other dimensions
-		assert!(let Err(_) = data.reshape(&[120]).as_image_guess_rgb().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[2, 10, 6]).as_image_guess_rgb().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[6, 10, 2]).as_image_guess_rgb().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[8, 5, 3, 1]).as_image_guess_rgb().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[4, 5, 6, 1]).as_image_guess_rgb().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([120]).as_image_guess_rgb().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([2, 10, 6]).as_image_guess_rgb().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([6, 10, 2]).as_image_guess_rgb().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([8, 5, 3, 1]).as_image_guess_rgb().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([4, 5, 6, 1]).as_image_guess_rgb().map(|x| x.info));
 	}
 
 	#[test]
 	fn tensor_info_interlaced_with_known_format() {
-		let data = tch::Tensor::of_slice(&(0..60).collect::<Vec<u8>>());
+		let data = tch::Tensor::from_slice(&(0..60).collect::<Vec<u8>>());
 
 		// Monochrome
-		assert!(data.reshape(&[12, 5, 1]).as_mono8().map(|x| x.info) == Ok(ImageInfo::mono8(5, 12)));
-		assert!(data.reshape(&[12, 5]).as_mono8().map(|x| x.info) == Ok(ImageInfo::mono8(5, 12)));
-		assert!(let Err(_) = data.reshape(&[12, 5, 1, 1]).as_mono8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[6, 5, 2]).as_mono8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[3, 5, 4]).as_mono8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[4, 5, 3]).as_mono8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[60]).as_mono8().map(|x| x.info));
+		assert!(data.reshape([12, 5, 1]).as_mono8().map(|x| x.info) == Ok(ImageInfo::mono8(5, 12)));
+		assert!(data.reshape([12, 5]).as_mono8().map(|x| x.info) == Ok(ImageInfo::mono8(5, 12)));
+		assert!(let Err(_) = data.reshape([12, 5, 1, 1]).as_mono8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([6, 5, 2]).as_mono8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([3, 5, 4]).as_mono8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([4, 5, 3]).as_mono8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([60]).as_mono8().map(|x| x.info));
 
 		// RGB/BGR
-		assert!(data.reshape(&[4, 5, 3]).as_interlaced_rgb8().map(|x| x.info) == Ok(ImageInfo::rgb8(5, 4)));
-		assert!(data.reshape(&[4, 5, 3]).as_interlaced_bgr8().map(|x| x.info) == Ok(ImageInfo::bgr8(5, 4)));
-		assert!(let Err(_) = data.reshape(&[4, 5, 3, 1]).as_interlaced_bgr8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[4, 5, 3, 1]).as_interlaced_bgr8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[3, 5, 4]).as_interlaced_bgr8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[3, 5, 4]).as_interlaced_bgr8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[15, 4]).as_interlaced_rgb8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[15, 4]).as_interlaced_rgb8().map(|x| x.info));
+		assert!(data.reshape([4, 5, 3]).as_interlaced_rgb8().map(|x| x.info) == Ok(ImageInfo::rgb8(5, 4)));
+		assert!(data.reshape([4, 5, 3]).as_interlaced_bgr8().map(|x| x.info) == Ok(ImageInfo::bgr8(5, 4)));
+		assert!(let Err(_) = data.reshape([4, 5, 3, 1]).as_interlaced_bgr8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([4, 5, 3, 1]).as_interlaced_bgr8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([3, 5, 4]).as_interlaced_bgr8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([3, 5, 4]).as_interlaced_bgr8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([15, 4]).as_interlaced_rgb8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([15, 4]).as_interlaced_rgb8().map(|x| x.info));
 
 		// RGBA/BGRA
-		assert!(data.reshape(&[3, 5, 4]).as_interlaced_rgba8().map(|x| x.info) == Ok(ImageInfo::rgba8(5, 3)));
-		assert!(data.reshape(&[3, 5, 4]).as_interlaced_bgra8().map(|x| x.info) == Ok(ImageInfo::bgra8(5, 3)));
-		assert!(let Err(_) = data.reshape(&[3, 5, 4, 1]).as_interlaced_rgba8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[3, 5, 4, 1]).as_interlaced_bgra8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[4, 5, 3]).as_interlaced_rgba8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[4, 5, 3]).as_interlaced_bgra8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[15, 4]).as_interlaced_rgba8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[15, 4]).as_interlaced_bgra8().map(|x| x.info));
+		assert!(data.reshape([3, 5, 4]).as_interlaced_rgba8().map(|x| x.info) == Ok(ImageInfo::rgba8(5, 3)));
+		assert!(data.reshape([3, 5, 4]).as_interlaced_bgra8().map(|x| x.info) == Ok(ImageInfo::bgra8(5, 3)));
+		assert!(let Err(_) = data.reshape([3, 5, 4, 1]).as_interlaced_rgba8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([3, 5, 4, 1]).as_interlaced_bgra8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([4, 5, 3]).as_interlaced_rgba8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([4, 5, 3]).as_interlaced_bgra8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([15, 4]).as_interlaced_rgba8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([15, 4]).as_interlaced_bgra8().map(|x| x.info));
 	}
 
 	#[test]
 	fn tensor_info_planar_with_known_format() {
-		let data = tch::Tensor::of_slice(&(0..60).collect::<Vec<u8>>());
+		let data = tch::Tensor::from_slice(&(0..60).collect::<Vec<u8>>());
 
 		// RGB/BGR
-		assert!(data.reshape(&[3, 4, 5]).as_planar_rgb8().map(|x| x.info) == Ok(ImageInfo::rgb8(5, 4)));
-		assert!(data.reshape(&[3, 4, 5]).as_planar_bgr8().map(|x| x.info) == Ok(ImageInfo::bgr8(5, 4)));
-		assert!(let Err(_) = data.reshape(&[4, 5, 3, 1]).as_planar_bgr8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[4, 5, 3, 1]).as_planar_bgr8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[4, 5, 3]).as_planar_bgr8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[4, 5, 3]).as_planar_bgr8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[15, 4]).as_planar_rgb8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[15, 4]).as_planar_rgb8().map(|x| x.info));
+		assert!(data.reshape([3, 4, 5]).as_planar_rgb8().map(|x| x.info) == Ok(ImageInfo::rgb8(5, 4)));
+		assert!(data.reshape([3, 4, 5]).as_planar_bgr8().map(|x| x.info) == Ok(ImageInfo::bgr8(5, 4)));
+		assert!(let Err(_) = data.reshape([4, 5, 3, 1]).as_planar_bgr8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([4, 5, 3, 1]).as_planar_bgr8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([4, 5, 3]).as_planar_bgr8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([4, 5, 3]).as_planar_bgr8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([15, 4]).as_planar_rgb8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([15, 4]).as_planar_rgb8().map(|x| x.info));
 
 		// RGBA/BGRA
-		assert!(data.reshape(&[4, 3, 5]).as_planar_rgba8().map(|x| x.info) == Ok(ImageInfo::rgba8(5, 3)));
-		assert!(data.reshape(&[4, 3, 5]).as_planar_bgra8().map(|x| x.info) == Ok(ImageInfo::bgra8(5, 3)));
-		assert!(let Err(_) = data.reshape(&[3, 5, 4, 1]).as_planar_rgba8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[3, 5, 4, 1]).as_planar_bgra8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[3, 5, 4]).as_planar_rgba8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[3, 5, 4]).as_planar_bgra8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[15, 4]).as_planar_rgba8().map(|x| x.info));
-		assert!(let Err(_) = data.reshape(&[15, 4]).as_planar_bgra8().map(|x| x.info));
+		assert!(data.reshape([4, 3, 5]).as_planar_rgba8().map(|x| x.info) == Ok(ImageInfo::rgba8(5, 3)));
+		assert!(data.reshape([4, 3, 5]).as_planar_bgra8().map(|x| x.info) == Ok(ImageInfo::bgra8(5, 3)));
+		assert!(let Err(_) = data.reshape([3, 5, 4, 1]).as_planar_rgba8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([3, 5, 4, 1]).as_planar_bgra8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([3, 5, 4]).as_planar_rgba8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([3, 5, 4]).as_planar_bgra8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([15, 4]).as_planar_rgba8().map(|x| x.info));
+		assert!(let Err(_) = data.reshape([15, 4]).as_planar_bgra8().map(|x| x.info));
 	}
 }
