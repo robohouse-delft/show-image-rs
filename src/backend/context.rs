@@ -401,18 +401,12 @@ impl Context {
 			None => return Ok(()),
 		};
 
-		let frame = window
-			.surface
-			.get_current_texture()
-			.expect("Failed to acquire next frame");
-
+		if let Ok(frame) = window.surface.get_current_texture() {
 		let gpu = self.gpu.as_ref().unwrap();
 		let mut encoder = gpu.device.create_command_encoder(&Default::default());
 
 		if window.uniforms.is_dirty() {
-			window
-				.uniforms
-				.update_from(&gpu.device, &mut encoder, &window.calculate_uniforms());
+				window.uniforms.update_from(&gpu.device, &mut encoder, &window.calculate_uniforms());
 		}
 
 		render_pass(
@@ -437,6 +431,7 @@ impl Context {
 		}
 		gpu.queue.submit(std::iter::once(encoder.finish()));
 		frame.present();
+		}
 		Ok(())
 	}
 
