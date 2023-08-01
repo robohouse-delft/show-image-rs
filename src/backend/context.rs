@@ -16,6 +16,7 @@ use crate::WindowHandle;
 use crate::WindowId;
 use crate::WindowOptions;
 use glam::Affine2;
+use winit::platform::windows::EventLoopBuilderExtWindows;
 
 /// Internal shorthand type-alias for the correct [`winit::event_loop::EventLoop`].
 ///
@@ -167,10 +168,12 @@ impl Context {
 	/// but they must be run from the main thread and the [`run`](Self::run) function never returns.
 	/// So it is not possible to *run* more than one context.
 	pub fn new(swap_chain_format: wgpu::TextureFormat) -> Result<Self, GetDeviceError> {
-		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-			backends: select_backend(),
-			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
-		});
+		#[cfg(feature = "anythread")]
+		let event_loop = winit::event_loop::EventLoopBuilder::with_user_event()
+			.with_any_thread(true)
+			.with_dpi_aware(true)
+			.build();
+		#[cfg(not(feature = "anythread"))]
 		let event_loop = winit::event_loop::EventLoopBuilder::with_user_event().build();
 		let proxy = ContextProxy::new(event_loop.create_proxy(), std::thread::current().id());
 

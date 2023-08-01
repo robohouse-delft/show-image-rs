@@ -27,10 +27,7 @@ categories = [
 [features]
 default  = ["macros"]
 doc-only = ["tch/doc-only"]
-full     = ["save", "image", "tch", "raqote", "macros"]
-macros   = ["show-image-macros"]
-nightly  = []
-save     = ["tinyfiledialogs", "png", "log"]
+anythread = []
 
 [dependencies]
 futures           = { version = "0.3.28", default-features = false, features = ["executor"] }
