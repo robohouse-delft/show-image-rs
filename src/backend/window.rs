@@ -13,6 +13,7 @@ use crate::event::WindowEvent;
 use glam::Vec3;
 use glam::{Affine2, Vec2};
 use indexmap::IndexMap;
+use winit::window::Icon;
 
 /// Internal shorthand for window event handlers.
 type DynWindowEventHandler = dyn FnMut(WindowHandle, &mut WindowEvent, &mut EventHandlerControlFlow);
@@ -459,6 +460,8 @@ pub struct WindowOptions {
 	///
 	/// Defaults to true.
 	pub default_controls: bool,
+
+	pub icon: Option<Icon>,
 }
 
 impl Default for WindowOptions {
@@ -480,6 +483,7 @@ impl WindowOptions {
 			fullscreen: false,
 			overlays_visible: true,
 			default_controls: true,
+			icon: None,
 		}
 	}
 
