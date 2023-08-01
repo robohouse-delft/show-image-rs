@@ -27,6 +27,10 @@ categories = [
 [features]
 default  = ["macros"]
 doc-only = ["tch/doc-only"]
+full     = ["save", "image", "tch", "raqote", "macros"]
+macros   = ["show-image-macros"]
+nightly  = []
+save     = ["tinyfiledialogs", "png", "log"]
 anythread = []
 
 [dependencies]
