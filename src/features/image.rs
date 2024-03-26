@@ -155,10 +155,10 @@ fn dynamic_image_info(image: &image::DynamicImage) -> Result<ImageInfo, ImageDat
 /// Extract the PixelFormat from an [`image::Pixel`].
 fn pixel_format<P: image::PixelWithColorType>() -> Result<PixelFormat, ImageDataError> {
 	match P::COLOR_TYPE {
-		image::ColorType::L8 => Ok(PixelFormat::Mono8),
-		image::ColorType::La8 => Ok(PixelFormat::MonoAlpha8(Alpha::Unpremultiplied)),
-		image::ColorType::Rgb8 => Ok(PixelFormat::Rgb8),
-		image::ColorType::Rgba8 => Ok(PixelFormat::Rgba8(Alpha::Unpremultiplied)),
+		image::ExtendedColorType::L8 => Ok(PixelFormat::Mono8),
+		image::ExtendedColorType::La8 => Ok(PixelFormat::MonoAlpha8(Alpha::Unpremultiplied)),
+		image::ExtendedColorType::Rgb8 => Ok(PixelFormat::Rgb8),
+		image::ExtendedColorType::Rgba8 => Ok(PixelFormat::Rgba8(Alpha::Unpremultiplied)),
 		x => Err(UnsupportedImageFormat { format: format!("{:?}", x) }.into()),
 	}
 }
