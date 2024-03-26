@@ -35,7 +35,7 @@ save     = ["tinyfiledialogs", "png", "log"]
 [dependencies]
 futures           = { version = "0.3.28", default-features = false, features = ["executor"] }
 glam              = ">=0.20.0, <0.25.0"
-image             = { version = "0.24.6", optional = true, default-features = false }
+image             = { version = "0.25.0", optional = true, default-features = false }
 indexmap          = "2.0.0"
 log               = { version = "0.4.19", optional = true }
 png               = { version = "0.17.9", optional = true }
@@ -49,7 +49,7 @@ winit             = "0.28.6"
 [dev-dependencies]
 show-image = { path = ".", features = ["full"] }
 assert2    = "0.3.11"
-image      = { version = "0.24.6", default-features = true }
+image      = { version = "0.25.0", default-features = true }
 env_logger = "0.10.0"
 
 [build-dependencies]
