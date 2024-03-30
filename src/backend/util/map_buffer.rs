@@ -30,12 +30,3 @@ pub fn map_buffer<'a>(device: &wgpu::Device, buffer: wgpu::BufferSlice<'a>) -> R
 	wait_for_buffer(device, buffer, wgpu::MapMode::Read)?;
 	Ok(buffer.get_mapped_range())
 }
-
-/// Synchronously map a buffer for write access.
-///
-/// This will internally call [`wgpu::Device::poll()`] until the buffer is ready, and then map it.
-#[allow(unused)]
-pub fn map_buffer_mut<'a>(device: &wgpu::Device, buffer: wgpu::BufferSlice<'a>) -> Result<wgpu::BufferViewMut<'a>, wgpu::BufferAsyncError> {
-	wait_for_buffer(device, buffer, wgpu::MapMode::Write)?;
-	Ok(buffer.get_mapped_range_mut())
-}

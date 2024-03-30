@@ -107,7 +107,7 @@ where
 	P: image::Pixel<Subpixel = u8> + image::PixelWithColorType,
 	Container: Deref<Target = [u8]>,
 {
-	&*buffer
+	buffer
 }
 
 fn dynamic_image_as_bytes(image: &image::DynamicImage) -> &[u8] {

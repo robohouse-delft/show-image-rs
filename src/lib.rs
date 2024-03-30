@@ -121,15 +121,16 @@ mod background_thread;
 pub mod error;
 pub mod event;
 mod features;
-mod image;
 mod image_info;
+mod image_types;
 mod oneshot;
 mod rectangle;
 
 pub use self::backend::*;
+#[allow(unused_imports)]
 pub use self::features::*;
-pub use self::image::*;
 pub use self::image_info::*;
+pub use self::image_types::*;
 pub use self::rectangle::Rectangle;
 
 pub use winit;
