@@ -4,6 +4,7 @@
   * Expose `winit` support for `WindowTouchpadMagnifyEvent` and `WindowTouchpadRotateEvent` on supported platforms.
   * Bump minimum `tch` version to `0.13.0`.
   * Bump supported `image` version to `0.25`.
+  * Preserve order of overlays when removing one.
 
 # v0.13.1 - 2022-09-16
   * Tweak the behavior of `set_overlay` to preserve visibility of existing overlays.

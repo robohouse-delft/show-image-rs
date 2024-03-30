@@ -294,7 +294,7 @@ impl<'a> WindowHandle<'a> {
 	///
 	/// Returns `true` if there was an overlay to remove.
 	pub fn remove_overlay(&mut self, name: &impl AsRef<str>) -> bool {
-		let removed = self.window_mut().overlays.remove(name.as_ref()).is_some();
+		let removed = self.window_mut().overlays.shift_remove(name.as_ref()).is_some();
 		self.window().window.request_redraw();
 		removed
 	}
