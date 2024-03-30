@@ -2,7 +2,8 @@
   * Update to `winit` version `0.28`.
   * Update to `wgpu` version `0.17`.
   * Expose `winit` support for `WindowTouchpadMagnifyEvent` and `WindowTouchpadRotateEvent` on supported platforms.
-  * Bump minimum `tch` version to `0.13.0`.
+  * Bump minimum `tch` version to `0.13`.
+  * Bump maximum `tch` version to `0.15`.
   * Bump supported `image` version to `0.25`.
   * Preserve order of overlays when removing one.
 
