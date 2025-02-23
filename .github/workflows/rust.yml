@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Install pytorch
         run: |
-          pip3 install torch==2.2.0 --index-url https://download.pytorch.org/whl/cpu
+          pip3 install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
           echo LIBTORCH_USE_PYTORCH=1 >> "$GITHUB_ENV"
           echo LD_LIBRARY_PATH="$(python -m site --user-site)/torch/lib${LD_LIBRARY_PATH:+:}$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
       - name: Checkout code
