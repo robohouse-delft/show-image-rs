@@ -1,5 +1,5 @@
 # main
-  * Bump maximum supported version of `tch` to `v0.18.x`.
+  * Bump maximum supported version of `tch` to `v0.19.x`.
 
 # v0.14.0 - 2024-03-30
   * Update to `winit` version `0.28`.
