@@ -24,6 +24,14 @@ categories = [
 	"gui",
 ]
 
+[[example]]
+name = "show-raqote"
+required-features = ["raqote"]
+
+[[example]]
+name = "show-image-tch"
+required-features = ["tch"]
+
 [features]
 default  = ["macros"]
 doc-only = ["tch/doc-only"]
@@ -47,7 +55,7 @@ wgpu              = { version = "0.17.0", features = ["spirv"] }
 winit             = "0.28.6"
 
 [dev-dependencies]
-show-image = { path = ".", features = ["full"] }
+show-image = { path = ".", features = ["image"] }
 assert2    = "0.3.11"
 image      = { version = "0.25.0", default-features = true }
 env_logger = "0.10.0"
