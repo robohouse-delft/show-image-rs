@@ -13,20 +13,16 @@ pub use window::WindowOptions;
 
 use crate::error;
 use context::Context;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-static CONTEXT_PROXY_VALID: AtomicBool = AtomicBool::new(false);
-static mut CONTEXT_PROXY: Option<ContextProxy> = None;
+static CONTEXT_PROXY: std::sync::OnceLock<ContextProxy> = std::sync::OnceLock::new();
 
 /// Initialize the global context.
 fn initialize_context() -> Result<Context, error::GetDeviceError> {
 	let context = Context::new(wgpu::TextureFormat::Bgra8Unorm)?;
-	unsafe {
-		CONTEXT_PROXY = Some(context.proxy.clone());
+	if let Err(_) = CONTEXT_PROXY.set(context.proxy.clone()) {
+		panic!("show_image: context already initialized");
 	}
-	CONTEXT_PROXY_VALID.store(true, Ordering::Release);
 	Ok(context)
 }
 
@@ -215,10 +211,10 @@ where
 /// # Panics
 /// This panics if the global context is not yet fully initialized.
 pub fn context() -> ContextProxy {
-	if !CONTEXT_PROXY_VALID.load(Ordering::Acquire) {
-		panic!("show-image: global context is not yet fully initialized");
+	match CONTEXT_PROXY.get() {
+		Some(proxy) => proxy.clone(),
+		None => panic!("show_image: context not initialized"),
 	}
-	unsafe { CONTEXT_PROXY.clone().unwrap() }
 }
 
 /// Create a new window with the global context.
