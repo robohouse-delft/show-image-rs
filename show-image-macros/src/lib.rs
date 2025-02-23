@@ -70,9 +70,10 @@ mod details {
 
 		let function: syn::ItemFn = syn::parse2(input)?;
 		let name = function.sig.ident.clone();
+		let visibility = &function.vis;
 
 		Ok(quote! {
-			fn main() {
+			#visibility fn main() {
 				#function
 				::show_image::run_context(#name);
 			}
