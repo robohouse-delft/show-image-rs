@@ -1,3 +1,6 @@
+# main
+  * Bump maximum supported version of `tch` to `v0.18.x`.
+
 # v0.14.0 - 2024-03-30
   * Update to `winit` version `0.28`.
   * Update to `wgpu` version `0.17`.
