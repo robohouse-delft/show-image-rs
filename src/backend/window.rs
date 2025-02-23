@@ -145,6 +145,11 @@ impl<'a> WindowHandle<'a> {
 		context_handle
 	}
 
+	/// Set the title of the window.
+	pub fn set_title(&self, title: impl AsRef<str>) {
+		self.window().window.set_title(title.as_ref());
+	}
+
 	/// Get the image info.
 	///
 	/// Returns [`None`] if no image is set for the window.
