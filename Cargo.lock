@@ -2225,7 +2225,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "show-image"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "assert2",
  "env_logger",
@@ -2247,7 +2247,7 @@ dependencies = [
 
 [[package]]
 name = "show-image-macros"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "proc-macro2",
  "quote",

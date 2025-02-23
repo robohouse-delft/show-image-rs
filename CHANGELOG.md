@@ -1,4 +1,4 @@
-# main
+# v0.14.1 - 2025-02-23
   * Add `WindowHandle::set_title()` to update the title of a window.
   * Bump maximum supported version of `tch` to `v0.19.x`.
   * Bump maximum supported version of `glam` to `v0.30.x`.
