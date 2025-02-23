@@ -57,7 +57,7 @@ pub struct UnknownOverlay {
 }
 
 /// An error occured trying to find a usable graphics device.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum GetDeviceError {
 	/// No suitable video adapter was found.
 	NoSuitableAdapterFound(NoSuitableAdapterFound),

@@ -29,7 +29,7 @@ pub(crate) struct Window {
 	pub background_color: Color,
 
 	/// The wgpu surface to render to.
-	pub surface: wgpu::Surface,
+	pub surface: wgpu::Surface<'static>,
 
 	/// The window specific uniforms for the render pipeline.
 	pub uniforms: UniformsBuffer<WindowUniforms>,

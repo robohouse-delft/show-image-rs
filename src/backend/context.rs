@@ -170,6 +170,8 @@ impl Context {
 		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
 			backends: select_backend(),
 			dx12_shader_compiler: wgpu::Dx12Compiler::Fxc,
+			flags: wgpu::InstanceFlags::empty().with_env(),
+			gles_minor_version: wgpu::Gles3MinorVersion::Automatic,
 		});
 		let event_loop = winit::event_loop::EventLoopBuilder::with_user_event().build();
 		let proxy = ContextProxy::new(event_loop.create_proxy(), std::thread::current().id());
@@ -762,8 +764,6 @@ fn select_backend() -> wgpu::Backends {
 		wgpu::Backends::METAL
 	} else if backend.eq_ignore_ascii_case("dx12") {
 		wgpu::Backends::DX12
-	} else if backend.eq_ignore_ascii_case("dx11") {
-		wgpu::Backends::DX11
 	} else if backend.eq_ignore_ascii_case("gl") {
 		wgpu::Backends::GL
 	} else if backend.eq_ignore_ascii_case("webgpu") {
@@ -795,7 +795,7 @@ fn select_power_preference() -> wgpu::PowerPreference {
 }
 
 /// Get a wgpu device to use.
-async fn get_device(instance: &wgpu::Instance, surface: &wgpu::Surface) -> Result<(wgpu::Device, wgpu::Queue), GetDeviceError> {
+async fn get_device(instance: &wgpu::Instance, surface: &wgpu::Surface<'_>) -> Result<(wgpu::Device, wgpu::Queue), GetDeviceError> {
 	// Find a suitable display adapter.
 	let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
 		power_preference: select_power_preference(),
@@ -809,8 +809,8 @@ async fn get_device(instance: &wgpu::Instance, surface: &wgpu::Surface) -> Resul
 	let device = adapter.request_device(
 		&wgpu::DeviceDescriptor {
 			label: Some("show-image"),
-			limits: wgpu::Limits::default(),
-			features: wgpu::Features::default(),
+			required_limits: wgpu::Limits::default(),
+			required_features: wgpu::Features::default(),
 		},
 		None,
 	);
@@ -938,6 +938,7 @@ fn configure_surface(
 		present_mode: wgpu::PresentMode::AutoVsync,
 		alpha_mode: wgpu::CompositeAlphaMode::Auto,
 		view_formats: vec![format],
+		desired_maximum_frame_latency: 2, // TODO: Maybe allow 1 for lower display latency?
 	};
 	surface.configure(device, &config);
 }
@@ -961,9 +962,14 @@ fn render_pass(
 		color_attachments: &[Some(wgpu::RenderPassColorAttachment {
 			view: target,
 			resolve_target: None,
-			ops: wgpu::Operations { load, store: true },
+			ops: wgpu::Operations {
+				load,
+				store: wgpu::StoreOp::Store,
+			},
 		})],
 		depth_stencil_attachment: None,
+		timestamp_writes: None,
+		occlusion_query_set: None,
 	});
 
 	render_pass.set_pipeline(render_pipeline);
